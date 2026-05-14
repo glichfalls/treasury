@@ -13,5 +13,6 @@ enum AccountType: string
     case CryptoWallet = 'crypto_wallet';
     case RealEstate = 'real_estate';
     case Vehicle = 'vehicle';
+    case PreciousMetals = 'precious_metals';
     case Other = 'other';
 }

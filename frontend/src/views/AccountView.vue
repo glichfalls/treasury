@@ -6,6 +6,7 @@ import { formatMinor } from '@/lib/money'
 import NewTransactionForm from '@/components/NewTransactionForm.vue'
 import ImportDropzone from '@/components/ImportDropzone.vue'
 import HoldingsTable from '@/components/HoldingsTable.vue'
+import AddCoinForm from '@/components/AddCoinForm.vue'
 import NetWorthChart from '@/components/NetWorthChart.vue'
 import AllocationDonut from '@/components/AllocationDonut.vue'
 import AssetPriceChart from '@/components/AssetPriceChart.vue'
@@ -108,8 +109,9 @@ function toggleHolding(isin: string) {
         <div class="lg:col-span-2">
           <NetWorthChart
             :endpoint="`/api/accounts/${account.id}/timeseries`"
-            title="Account value over time"
+            :title="account.type === 'brokerage' ? 'Value vs net deposits' : 'Account value over time'"
             :range="range"
+            :mode="account.type === 'brokerage' ? 'vs-deposits' : 'total'"
             granularity="weekly"
             :currency="account.currency"
             @update:range="range = $event"
@@ -119,7 +121,15 @@ function toggleHolding(isin: string) {
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ImportDropzone :account-id="account.id" @imported="reloadAfterImport" />
+        <ImportDropzone v-if="account.type !== 'precious_metals'" :account-id="account.id" @imported="reloadAfterImport" />
+        <div v-if="account.type === 'precious_metals'" class="flex items-start">
+          <AddCoinForm
+            :account-id="account.id"
+            :currency="account.currency"
+            class="w-full"
+            @created="load"
+          />
+        </div>
         <div class="flex items-start">
           <NewTransactionForm
             :account-id="account.id"

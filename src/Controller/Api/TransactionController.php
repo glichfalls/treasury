@@ -66,6 +66,22 @@ class TransactionController extends AbstractController
         $t->setDescription($body['description'] ?? null);
         $t->setSource(TransactionSource::Manual);
 
+        // Optional asset linkage (used by the coin-purchase form, and possibly other
+        // manual trades). For coin purchases the client will send type=trade_buy,
+        // assetIsin (catalog id), assetQuantity, and a negative amountMinor.
+        if (!empty($body['assetIsin']) && is_string($body['assetIsin'])) {
+            $t->setAssetIsin($body['assetIsin']);
+        }
+        if (isset($body['assetQuantity']) && (is_string($body['assetQuantity']) || is_numeric($body['assetQuantity']))) {
+            $t->setAssetQuantity((string) $body['assetQuantity']);
+        }
+        if (!empty($body['type']) && is_string($body['type'])) {
+            $typeEnum = \App\Entity\TransactionType::tryFrom($body['type']);
+            if ($typeEnum !== null) {
+                $t->setType($typeEnum);
+            }
+        }
+
         $this->em->persist($t);
         $this->em->flush();
 

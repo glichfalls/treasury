@@ -9,6 +9,7 @@ interface Point {
   cashMinor: string
   holdingsMinor: string
   totalMinor: string
+  netDepositsMinor?: string
 }
 
 const props = withDefaults(
@@ -18,12 +19,15 @@ const props = withDefaults(
     granularity?: 'daily' | 'weekly' | 'monthly'
     range?: '6mo' | '1y' | '2y' | '5y' | 'all'
     title?: string
+    // Single line of total value (default), stacked cash+holdings, or value plus net deposits.
+    mode?: 'total' | 'stacked' | 'vs-deposits'
   }>(),
   {
     currency: 'CHF',
     granularity: 'weekly',
     range: '2y',
     title: 'Net worth',
+    mode: 'total',
   },
 )
 
@@ -56,65 +60,172 @@ async function load() {
 onMounted(load)
 watch(() => [props.endpoint, props.granularity, props.range], load)
 
-const option = computed<EChartsOption>(() => ({
-  backgroundColor: 'transparent',
-  grid: { top: 30, right: 10, bottom: 50, left: 60, containLabel: true },
-  tooltip: {
-    trigger: 'axis',
-    backgroundColor: chartColors.surface,
-    borderColor: chartColors.border,
-    textStyle: { color: chartColors.text },
-    formatter: (params: unknown) => {
-      const arr = params as Array<{ axisValue: string; data: number; color: string; seriesName: string }>
-      const d = arr[0]
-      if (!d) return ''
-      const total = formatMinor(String(Math.round(d.data * 100)), props.currency)
-      return `<div style="font-weight:600">${d.axisValue}</div><div style="color:${chartColors.textMuted}">${total}</div>`
+function fmt(v: number): string {
+  return formatMinor(String(Math.round(v * 100)), props.currency)
+}
+
+const option = computed<EChartsOption>(() => {
+  const dates = points.value.map((p) => p.date)
+
+  const baseAxisStyle = {
+    backgroundColor: 'transparent',
+    grid: { top: 30, right: 10, bottom: 50, left: 60, containLabel: true },
+    xAxis: {
+      type: 'category' as const,
+      data: dates,
+      axisLine: { lineStyle: { color: chartColors.border } },
+      axisLabel: { color: chartColors.textMuted, fontSize: 11 },
+      boundaryGap: false,
     },
-  },
-  xAxis: {
-    type: 'category',
-    data: points.value.map((p) => p.date),
-    axisLine: { lineStyle: { color: chartColors.border } },
-    axisLabel: { color: chartColors.textMuted, fontSize: 11 },
-    boundaryGap: false,
-  },
-  yAxis: {
-    type: 'value',
-    axisLine: { show: false },
-    splitLine: { lineStyle: { color: chartColors.border, opacity: 0.4 } },
-    axisLabel: {
-      color: chartColors.textMuted,
-      fontSize: 11,
-      formatter: (v: number) => {
-        const abs = Math.abs(v)
-        if (abs >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
-        if (abs >= 1_000) return `${(v / 1_000).toFixed(0)}k`
-        return v.toFixed(0)
+    yAxis: {
+      type: 'value' as const,
+      axisLine: { show: false },
+      splitLine: { lineStyle: { color: chartColors.border, opacity: 0.4 } },
+      axisLabel: {
+        color: chartColors.textMuted,
+        fontSize: 11,
+        formatter: (v: number) => {
+          const abs = Math.abs(v)
+          if (abs >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
+          if (abs >= 1_000) return `${(v / 1_000).toFixed(0)}k`
+          return v.toFixed(0)
+        },
       },
     },
-  },
-  dataZoom: [{ type: 'inside', start: 0, end: 100 }, { type: 'slider', height: 18, bottom: 8, borderColor: chartColors.border, fillerColor: 'rgba(99,102,241,0.15)', handleStyle: { color: chartColors.accent }, textStyle: { color: chartColors.textMuted } }],
-  series: [{
-    name: props.title,
-    type: 'line',
-    smooth: true,
-    showSymbol: false,
-    sampling: 'lttb',
-    lineStyle: { color: chartColors.accent, width: 2 },
-    areaStyle: {
-      color: {
-        type: 'linear',
-        x: 0, y: 0, x2: 0, y2: 1,
-        colorStops: [
-          { offset: 0, color: 'rgba(99,102,241,0.35)' },
-          { offset: 1, color: 'rgba(99,102,241,0.00)' },
-        ],
+    dataZoom: [
+      { type: 'inside' as const, start: 0, end: 100 },
+      {
+        type: 'slider' as const,
+        height: 18,
+        bottom: 8,
+        borderColor: chartColors.border,
+        fillerColor: 'rgba(99,102,241,0.15)',
+        handleStyle: { color: chartColors.accent },
+        textStyle: { color: chartColors.textMuted },
+      },
+    ],
+    tooltip: {
+      trigger: 'axis' as const,
+      backgroundColor: chartColors.surface,
+      borderColor: chartColors.border,
+      textStyle: { color: chartColors.text },
+      formatter: (params: unknown) => {
+        const arr = params as Array<{ axisValue: string; data: number; seriesName: string; color: string }>
+        if (arr.length === 0) return ''
+        const lines = arr
+          .map((p) => `<div style="color:${p.color}">● ${p.seriesName}: ${fmt(p.data)}</div>`)
+          .join('')
+        return `<div style="font-weight:600">${arr[0]!.axisValue}</div>${lines}`
       },
     },
-    data: points.value.map((p) => Number(p.totalMinor) / 100),
-  }],
-}))
+  }
+
+  if (props.mode === 'stacked') {
+    return {
+      ...baseAxisStyle,
+      legend: {
+        top: 4,
+        right: 70,
+        textStyle: { color: chartColors.textMuted, fontSize: 11 },
+        itemWidth: 10,
+        itemHeight: 10,
+      },
+      series: [
+        {
+          name: 'Cash',
+          type: 'line',
+          stack: 'total',
+          smooth: true,
+          showSymbol: false,
+          sampling: 'lttb',
+          lineStyle: { width: 0 },
+          areaStyle: { color: 'rgba(99,102,241,0.45)' },
+          data: points.value.map((p) => Number(p.cashMinor) / 100),
+        },
+        {
+          name: 'Holdings',
+          type: 'line',
+          stack: 'total',
+          smooth: true,
+          showSymbol: false,
+          sampling: 'lttb',
+          lineStyle: { width: 0 },
+          areaStyle: { color: 'rgba(16,185,129,0.45)' },
+          data: points.value.map((p) => Number(p.holdingsMinor) / 100),
+        },
+      ],
+    }
+  }
+
+  if (props.mode === 'vs-deposits') {
+    return {
+      ...baseAxisStyle,
+      legend: {
+        top: 4,
+        right: 70,
+        textStyle: { color: chartColors.textMuted, fontSize: 11 },
+        itemWidth: 10,
+        itemHeight: 10,
+      },
+      series: [
+        {
+          name: 'Account value',
+          type: 'line',
+          smooth: true,
+          showSymbol: false,
+          sampling: 'lttb',
+          lineStyle: { color: chartColors.accent, width: 2 },
+          areaStyle: {
+            color: {
+              type: 'linear',
+              x: 0, y: 0, x2: 0, y2: 1,
+              colorStops: [
+                { offset: 0, color: 'rgba(99,102,241,0.35)' },
+                { offset: 1, color: 'rgba(99,102,241,0.00)' },
+              ],
+            },
+          },
+          data: points.value.map((p) => Number(p.totalMinor) / 100),
+          z: 2,
+        },
+        {
+          name: 'Net deposits',
+          type: 'line',
+          smooth: true,
+          showSymbol: false,
+          sampling: 'lttb',
+          lineStyle: { color: chartColors.textMuted, width: 1.5, type: 'dashed' },
+          data: points.value.map((p) => Number(p.netDepositsMinor ?? '0') / 100),
+          z: 1,
+        },
+      ],
+    }
+  }
+
+  // default: single area
+  return {
+    ...baseAxisStyle,
+    series: [{
+      name: props.title,
+      type: 'line',
+      smooth: true,
+      showSymbol: false,
+      sampling: 'lttb',
+      lineStyle: { color: chartColors.accent, width: 2 },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(99,102,241,0.35)' },
+            { offset: 1, color: 'rgba(99,102,241,0.00)' },
+          ],
+        },
+      },
+      data: points.value.map((p) => Number(p.totalMinor) / 100),
+    }],
+  }
+})
 </script>
 
 <template>

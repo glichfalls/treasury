@@ -21,7 +21,7 @@ class PriceRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('p')
             ->andWhere('p.asset = :asset')
-            ->setParameter('asset', $asset)
+            ->setParameter('asset', $asset->getId(), \Symfony\Bridge\Doctrine\Types\UuidType::NAME)
             ->orderBy('p.occurredAt', 'DESC')
             ->setMaxResults(1)
             ->getQuery()

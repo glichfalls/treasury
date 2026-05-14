@@ -22,8 +22,9 @@ final class PriceFetcher
     ) {}
 
     /**
-     * Refresh prices for the given assets (or all known assets if null).
-     * Returns a per-asset success/skip summary.
+     * Refresh prices for the given assets (or all known assets if null). The gold spot
+     * reference asset is always included even if not in the provided list, so commodity-
+     * backed coin valuations stay current.
      *
      * @param Asset[]|null $assets
      * @return array{updated: int, skipped: int, errors: string[]}
@@ -31,6 +32,19 @@ final class PriceFetcher
     public function refreshAssets(?array $assets = null): array
     {
         $assets ??= $this->assets->findAll();
+        $spot = $this->assets->findByIsin(\App\Holdings\HoldingsService::SPOT_GOLD_ISIN);
+        if ($spot !== null) {
+            $haveSpot = false;
+            foreach ($assets as $a) {
+                if ($a->getIsin() === $spot->getIsin()) {
+                    $haveSpot = true;
+                    break;
+                }
+            }
+            if (!$haveSpot) {
+                $assets[] = $spot;
+            }
+        }
         $updated = 0;
         $skipped = 0;
         $errors = [];

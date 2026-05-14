@@ -29,6 +29,20 @@ class TimeSeriesController extends AbstractController
         return new JsonResponse(array_map(fn($p) => $p->toArray(), $series));
     }
 
+    #[Route('/api/cashflow', name: 'api_cashflow', methods: ['GET'])]
+    public function cashFlow(Request $request, #[CurrentUser] User $user): JsonResponse
+    {
+        [$from, $to] = $this->parseRange($request);
+        $series = $this->service->cashFlowMonthly($user, $from, $to);
+        return new JsonResponse(array_map(fn($p) => $p->toArray(), $series));
+    }
+
+    #[Route('/api/allocation', name: 'api_global_allocation', methods: ['GET'])]
+    public function globalAllocation(#[CurrentUser] User $user): JsonResponse
+    {
+        return new JsonResponse($this->service->globalAllocation($user));
+    }
+
     #[Route('/api/accounts/{id}/timeseries', name: 'api_account_timeseries', methods: ['GET'])]
     public function accountSeries(string $id, Request $request, #[CurrentUser] User $user): JsonResponse
     {

@@ -1,7 +1,7 @@
 // ECharts setup: register only the chart types we actually use to keep bundle small.
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
-import { LineChart, PieChart } from 'echarts/charts'
+import { LineChart, PieChart, BarChart } from 'echarts/charts'
 import {
   GridComponent,
   TooltipComponent,
@@ -16,6 +16,7 @@ use([
   CanvasRenderer,
   LineChart,
   PieChart,
+  BarChart,
   GridComponent,
   TooltipComponent,
   TitleComponent,

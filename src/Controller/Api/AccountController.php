@@ -55,6 +55,22 @@ class AccountController extends AbstractController
         ));
     }
 
+    #[Route('/coins/catalog', name: 'api_coins_catalog', methods: ['GET'])]
+    public function coinCatalog(): JsonResponse
+    {
+        $rows = $this->em->getConnection()->fetchAllAssociative(
+            "SELECT isin, name, currency, unit_weight_grams AS weight, price_premium_pct AS premium
+             FROM assets WHERE unit_weight_grams IS NOT NULL ORDER BY name ASC",
+        );
+        return new JsonResponse(array_map(fn($r) => [
+            'isin' => $r['isin'],
+            'name' => $r['name'],
+            'currency' => $r['currency'],
+            'unitWeightGrams' => $r['weight'],
+            'pricePremiumPct' => $r['premium'],
+        ], $rows));
+    }
+
     #[Route('', name: 'api_accounts_create', methods: ['POST'])]
     public function create(Request $request, #[CurrentUser] User $user): JsonResponse
     {

@@ -31,6 +31,159 @@ final class TimeSeriesService
     }
 
     /**
+     * Monthly income vs expense across all accounts owned by $user.
+     *
+     * Trade legs (trade_buy/trade_sell) and FX conversions are excluded — they represent
+     * money moving inside the system, not real income or spending. Deposits/dividends/
+     * interest count as income; withdrawals/fees count as expenses.
+     *
+     * @return CashFlowPoint[]
+     */
+    public function cashFlowMonthly(\App\Entity\User $user, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $rows = $this->conn->fetchAllAssociative(
+            "SELECT DATE_FORMAT(t.occurred_at, '%Y-%m') AS ym,
+                    SUM(CASE WHEN t.amount_minor > 0 THEN t.amount_minor ELSE 0 END) AS income,
+                    SUM(CASE WHEN t.amount_minor < 0 THEN t.amount_minor ELSE 0 END) AS expense
+             FROM transactions t
+             INNER JOIN accounts a ON a.id = t.account_id
+             WHERE a.owner_id = :owner
+               AND t.occurred_at BETWEEN :from AND :to
+               AND t.type NOT IN ('trade_buy', 'trade_sell', 'fx_conversion')
+             GROUP BY ym
+             ORDER BY ym ASC",
+            [
+                'owner' => $user->getId()->toBinary(),
+                'from' => $from->format('Y-m-d'),
+                'to' => $to->format('Y-m-d'),
+            ],
+        );
+
+        $byYm = [];
+        foreach ($rows as $r) {
+            $byYm[$r['ym']] = $r;
+        }
+
+        // Fill in months with no activity so the chart shows a continuous axis.
+        $out = [];
+        $cursor = $from->modify('first day of this month');
+        $end = $to->modify('first day of this month');
+        while ($cursor <= $end) {
+            $key = $cursor->format('Y-m');
+            $row = $byYm[$key] ?? ['income' => 0, 'expense' => 0];
+            $out[] = new CashFlowPoint(
+                month: $cursor,
+                incomeMinor: (string) (int) $row['income'],
+                expenseMinor: (string) (int) $row['expense'],
+            );
+            $cursor = $cursor->modify('first day of next month');
+        }
+        return $out;
+    }
+
+    /**
+     * Aggregated allocation across all the user's accounts. Holdings are converted to
+     * $displayCurrency via latest FX; cash from each account converted similarly.
+     *
+     * @return array{baseCurrency: string, slices: list<array{label: string, isin: ?string, valueBaseMinor: string}>}
+     */
+    public function globalAllocation(\App\Entity\User $user, string $displayCurrency = 'CHF'): array
+    {
+        // Aggregate cash per currency, then aggregate holdings qty per ISIN.
+        $cashRows = $this->conn->fetchAllAssociative(
+            "SELECT t.currency, COALESCE(SUM(t.amount_minor), 0) AS cash
+             FROM transactions t
+             INNER JOIN accounts a ON a.id = t.account_id
+             WHERE a.owner_id = :owner
+             GROUP BY t.currency",
+            ['owner' => $user->getId()->toBinary()],
+        );
+
+        $holdingRows = $this->conn->fetchAllAssociative(
+            "SELECT t.asset_isin, SUM(t.asset_quantity) AS qty
+             FROM transactions t
+             INNER JOIN accounts a ON a.id = t.account_id
+             WHERE a.owner_id = :owner
+               AND t.asset_isin IS NOT NULL AND t.asset_quantity IS NOT NULL
+             GROUP BY t.asset_isin
+             HAVING qty <> 0",
+            ['owner' => $user->getId()->toBinary()],
+        );
+
+        // Resolve latest prices and FX for the conversion.
+        $isins = array_column($holdingRows, 'asset_isin');
+        $pricesByIsin = $isins === [] ? [] : $this->loadPrices($isins);
+        $allCurrencies = array_unique(array_merge(
+            array_column($cashRows, 'currency'),
+            array_map(fn($r) => $r['currency'] ?? '', array_map(fn($rs) => end($rs), $pricesByIsin)),
+        ));
+        $fxByPair = $this->loadFxRates($displayCurrency, $pricesByIsin);
+
+        $today = (new \DateTimeImmutable())->format('Y-m-d');
+
+        // One pseudo-slice for total cash converted to display currency.
+        $cashTotalMinor = 0;
+        foreach ($cashRows as $r) {
+            $ccy = $r['currency'];
+            $val = (int) $r['cash'];
+            if ($ccy === $displayCurrency) {
+                $cashTotalMinor += $val;
+            } else {
+                $fx = $this->findOnOrBefore($fxByPair[$ccy] ?? [], $today);
+                if ($fx !== null) {
+                    $cashTotalMinor += (int) round($val * $fx['rate']);
+                }
+            }
+        }
+
+        $slices = [];
+        if ($cashTotalMinor !== 0) {
+            $slices[] = ['label' => 'Cash', 'isin' => null, 'valueBaseMinor' => (string) $cashTotalMinor];
+        }
+
+        // Per-holding slice.
+        $assetMeta = [];
+        if ($isins !== []) {
+            $placeholders = implode(',', array_fill(0, count($isins), '?'));
+            $metaRows = $this->conn->fetchAllAssociative(
+                "SELECT isin, ticker, name FROM assets WHERE isin IN ($placeholders)",
+                $isins,
+            );
+            foreach ($metaRows as $m) {
+                $assetMeta[$m['isin']] = $m;
+            }
+        }
+
+        foreach ($holdingRows as $r) {
+            $isin = $r['asset_isin'];
+            $qty = (float) $r['qty'];
+            $priceEntry = $this->findOnOrBefore($pricesByIsin[$isin] ?? [], $today);
+            if ($priceEntry === null) {
+                continue;
+            }
+            $priceMajor = $priceEntry['price_minor'] / 100;
+            $native = $qty * $priceMajor;
+            $assetCcy = $priceEntry['currency'];
+            $valueDisplay = $native;
+            if ($assetCcy !== $displayCurrency) {
+                $fx = $this->findOnOrBefore($fxByPair[$assetCcy] ?? [], $today);
+                if ($fx === null) {
+                    continue;
+                }
+                $valueDisplay = $native * $fx['rate'];
+            }
+            $meta = $assetMeta[$isin] ?? ['ticker' => null, 'name' => null];
+            $slices[] = [
+                'label' => $meta['ticker'] ?? $meta['name'] ?? $isin,
+                'isin' => $isin,
+                'valueBaseMinor' => (string) (int) round($valueDisplay * 100),
+            ];
+        }
+
+        return ['baseCurrency' => $displayCurrency, 'slices' => $slices];
+    }
+
+    /**
      * Net-worth time series for all accounts owned by $user.
      *
      * @return TimeSeriesPoint[]
@@ -94,6 +247,9 @@ final class TimeSeriesService
             $accountBinIds,
         );
 
+        // Types that count as external cash flow (not internal trade/FX movements).
+        $depositLikeTypes = ['deposit', 'withdrawal', 'dividend', 'interest', 'fee', 'other'];
+
         // Collect ISINs we'll need to look up prices for.
         $isins = [];
         foreach ($tx as $r) {
@@ -103,12 +259,17 @@ final class TimeSeriesService
         }
 
         $pricesByIsin = $this->loadPrices(array_keys($isins));
+        // For commodity-backed assets (gold coins), substitute their price series with
+        // one derived from gold spot prices × grams × (1 + premium). This way the rest
+        // of the loop treats them like any other asset.
+        $pricesByIsin = $this->applyCommodityDerivedPrices($pricesByIsin, array_keys($isins));
         $fxByPair = $this->loadFxRates($displayCurrency, $pricesByIsin);
 
         $dates = $this->sampleDates($from, $to, $granularity);
         $points = [];
 
         $cashCum = 0;
+        $netDepositsCum = 0;
         $qtyByIsin = [];   // isin => cumulative qty (decimal string)
         $txIdx = 0;
         $txCount = count($tx);
@@ -119,6 +280,9 @@ final class TimeSeriesService
             while ($txIdx < $txCount && $tx[$txIdx]['occurred_at'] <= $dateStr) {
                 $row = $tx[$txIdx];
                 $cashCum += (int) $row['amount_minor'];
+                if (in_array($row['type'], $depositLikeTypes, true)) {
+                    $netDepositsCum += (int) $row['amount_minor'];
+                }
                 if ($row['asset_isin'] !== null && $row['asset_quantity'] !== null
                     && in_array($row['type'], ['trade_buy', 'trade_sell'], true)
                 ) {
@@ -160,10 +324,65 @@ final class TimeSeriesService
                 cashMinor: (string) $cashCum,
                 holdingsMinor: $holdingsMinor,
                 totalMinor: $totalMinor,
+                netDepositsMinor: (string) $netDepositsCum,
             );
         }
 
         return $points;
+    }
+
+    /**
+     * For each held ISIN that has a unitWeightGrams set (commodity-backed coins),
+     * replace its price series with one derived from gold spot × grams × (1 + premium).
+     * Non-commodity ISINs are passed through unchanged.
+     *
+     * @param array<string, list<array{date:string,price_minor:int,currency:string}>> $pricesByIsin
+     * @param list<string> $isins
+     * @return array<string, list<array{date:string,price_minor:int,currency:string}>>
+     */
+    private function applyCommodityDerivedPrices(array $pricesByIsin, array $isins): array
+    {
+        if ($isins === []) {
+            return $pricesByIsin;
+        }
+        // Look up unit_weight_grams + premium per requested isin.
+        $placeholders = implode(',', array_fill(0, count($isins), '?'));
+        $metaRows = $this->conn->fetchAllAssociative(
+            "SELECT isin, unit_weight_grams, price_premium_pct
+             FROM assets WHERE isin IN ($placeholders) AND unit_weight_grams IS NOT NULL",
+            $isins,
+        );
+        if ($metaRows === []) {
+            return $pricesByIsin;
+        }
+
+        // Pull the gold spot history once.
+        $spot = $this->conn->fetchAllAssociative(
+            "SELECT p.occurred_at AS date, p.price_minor, p.currency
+             FROM prices p INNER JOIN assets a ON a.id = p.asset_id
+             WHERE a.isin = ? ORDER BY p.occurred_at ASC",
+            [\App\Holdings\HoldingsService::SPOT_GOLD_ISIN],
+        );
+        if ($spot === []) {
+            return $pricesByIsin;
+        }
+        $troyOunce = 31.1034768;
+
+        foreach ($metaRows as $m) {
+            $grams = (float) $m['unit_weight_grams'];
+            $premium = (float) ($m['price_premium_pct'] ?? '0') / 100;
+            $factor = ($grams / $troyOunce) * (1 + $premium);
+            $series = [];
+            foreach ($spot as $s) {
+                $series[] = [
+                    'date' => $s['date'],
+                    'price_minor' => (int) round((int) $s['price_minor'] * $factor),
+                    'currency' => $s['currency'],
+                ];
+            }
+            $pricesByIsin[$m['isin']] = $series;
+        }
+        return $pricesByIsin;
     }
 
     /**

@@ -15,6 +15,7 @@ const accountTypes = [
   { value: 'crypto_wallet', label: 'Crypto wallet' },
   { value: 'real_estate', label: 'Real estate' },
   { value: 'vehicle', label: 'Vehicle' },
+  { value: 'precious_metals', label: 'Precious metals' },
   { value: 'other', label: 'Other' },
 ]
 

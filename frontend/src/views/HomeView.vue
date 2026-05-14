@@ -5,10 +5,13 @@ import { RouterLink } from 'vue-router'
 import { formatMinor } from '@/lib/money'
 import NewAccountForm from '@/components/NewAccountForm.vue'
 import NetWorthChart from '@/components/NetWorthChart.vue'
+import CashFlowChart from '@/components/CashFlowChart.vue'
+import AllocationDonut from '@/components/AllocationDonut.vue'
 import { Trash2, ChevronRight, Inbox } from 'lucide-vue-next'
 
 const accounts = useAccountsStore()
 const range = ref<'6mo' | '1y' | '2y' | '5y' | 'all'>('2y')
+const networthMode = ref<'total' | 'stacked'>('total')
 
 onMounted(() => {
   if (!accounts.loaded) {
@@ -34,6 +37,7 @@ const typeLabels: Record<string, string> = {
   crypto_wallet: 'Crypto wallet',
   real_estate: 'Real estate',
   vehicle: 'Vehicle',
+  precious_metals: 'Precious metals',
   other: 'Other',
 }
 
@@ -61,14 +65,31 @@ async function remove(a: Account, ev: MouseEvent) {
       </div>
     </section>
 
-    <section v-if="accounts.accounts.length > 0">
+    <section v-if="accounts.accounts.length > 0" class="space-y-4">
+      <div class="flex items-center justify-end gap-1 -mb-2">
+        <button
+          v-for="m in (['total','stacked'] as const)"
+          :key="m"
+          :class="['text-xs px-2 py-0.5 rounded transition-colors',
+            m === networthMode
+              ? 'bg-[var(--color-surface-hover)] text-[var(--color-text)]'
+              : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]']"
+          @click="networthMode = m"
+        >{{ m === 'total' ? 'Total' : 'Cash + holdings' }}</button>
+      </div>
       <NetWorthChart
         endpoint="/api/networth/timeseries"
         title="Net worth over time"
         :range="range"
+        :mode="networthMode"
         granularity="weekly"
         @update:range="range = $event"
       />
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <CashFlowChart :months="18" />
+        <AllocationDonut endpoint="/api/allocation" />
+      </div>
     </section>
 
     <section class="space-y-4">
