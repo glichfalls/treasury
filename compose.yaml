@@ -1,0 +1,42 @@
+
+services:
+  php:
+    build: ./docker/php
+    environment:
+      DATABASE_URL: "mysql://${MYSQL_USER:-app}:${MYSQL_PASSWORD:-apppass}@database:3306/${MYSQL_DATABASE:-app}?serverVersion=8.4&charset=utf8mb4"
+      APP_ENV: dev
+    depends_on:
+      database:
+        condition: service_healthy
+    working_dir: /app
+
+  frontend:
+    build: ./docker/frontend
+    working_dir: /app
+    depends_on:
+      - php
+
+###> doctrine/doctrine-bundle ###
+  database:
+    image: mysql:${MYSQL_VERSION:-8.4}
+    command: --skip-name-resolve --mysql-native-password=ON
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-app}
+      MYSQL_USER: ${MYSQL_USER:-app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-apppass}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-!ChangeMe!}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-!ChangeMe!}"]
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - database_data:/var/lib/mysql:rw
+###< doctrine/doctrine-bundle ###
+
+volumes:
+###> doctrine/doctrine-bundle ###
+  database_data:
+###< doctrine/doctrine-bundle ###
+  php_vendor:
+  frontend_node_modules:
