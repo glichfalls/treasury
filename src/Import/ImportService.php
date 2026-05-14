@@ -26,6 +26,10 @@ final class ImportService
     public function importFromFile(Account $account, string $path): ImportResult
     {
         $csv = Reader::from(new \SplFileObject($path, 'r'));
+        // Detect delimiter: IBKR/Degiro use comma, ZKB uses semicolon. League/csv defaults
+        // to comma; with the wrong delimiter every row collapses to a single column and the
+        // importer detection fails with a confusing error.
+        $csv->setDelimiter($this->detectDelimiter($path));
 
         // Read header row manually — some broker exports (Degiro) have empty-named columns
         // which league/csv's setHeaderOffset rejects as duplicates.
@@ -118,5 +122,38 @@ final class ImportService
             }
         }
         return null;
+    }
+
+    /**
+     * Sniff the delimiter from the file's first non-empty line by counting candidates.
+     * Robust enough for the formats we actually see (comma, semicolon, tab); falls back
+     * to comma if the line is empty / unreadable.
+     */
+    private function detectDelimiter(string $path): string
+    {
+        $f = @fopen($path, 'r');
+        if ($f === false) {
+            return ',';
+        }
+        $firstLine = '';
+        while (($line = fgets($f)) !== false) {
+            $line = rtrim($line, "\r\n");
+            if ($line !== '') {
+                $firstLine = $line;
+                break;
+            }
+        }
+        fclose($f);
+        if ($firstLine === '') {
+            return ',';
+        }
+        $counts = [
+            ',' => substr_count($firstLine, ','),
+            ';' => substr_count($firstLine, ';'),
+            "\t" => substr_count($firstLine, "\t"),
+        ];
+        arsort($counts);
+        $top = array_key_first($counts);
+        return $counts[$top] > 0 ? $top : ',';
     }
 }

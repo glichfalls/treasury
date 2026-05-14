@@ -92,7 +92,7 @@ function onFilePicked(ev: Event) {
         <template v-else>
           <p class="font-medium">Import CSV</p>
           <p class="text-sm text-[var(--color-text-muted)] mt-0.5">
-            Drag a file here or click to browse. Auto-detects Degiro trades and IBKR Statement of Funds.
+            Drag a file here or click to browse. Auto-detects ZKB, Degiro trades, and IBKR Statement of Funds.
           </p>
         </template>
 
