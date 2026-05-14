@@ -4,6 +4,8 @@ Personal net worth tracker. Imports broker exports, fetches market prices from Y
 
 Single user, self-hosted, runs in Docker.
 
+![Treasury dashboard](docs/screenshot.png)
+
 ## What it does
 
 Accounts hold transactions. Transactions can be entered by hand or imported from:

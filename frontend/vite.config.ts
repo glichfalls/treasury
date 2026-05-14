@@ -20,6 +20,9 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
+    // Allow requests from other containers on the docker network (e.g. the playwright
+    // container that takes screenshots) by hostname.
+    allowedHosts: ['frontend', 'localhost', '127.0.0.1'],
     watch: {
       usePolling: true,
       interval: 400,
