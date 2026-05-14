@@ -25,11 +25,15 @@ const { chromium } = require('playwright');
   await page.locator('input[type=password]').fill('demo');
   await page.locator('button[type=submit]').click();
 
-  // Wait for the dashboard to settle: net-worth chart canvas rendered.
   await page.waitForURL('http://frontend:5173/');
+  // Navigate to the 3a account page where the new allocation UI lives.
+  await page.goto('http://frontend:5173/accounts/019e2708-069f-7669-9011-3484b9611ee6', { waitUntil: 'networkidle' });
   await page.waitForSelector('canvas', { state: 'visible', timeout: 20000 });
   // Give ECharts a beat to finish animating.
   await page.waitForTimeout(1500);
+  // Open the strategy editor so the screenshot shows edit mode.
+  await page.getByRole('button', { name: 'Edit' }).first().click();
+  await page.waitForTimeout(400);
 
   // Hide the floating vue-devtools panel so it doesn't appear in the screenshot.
   await page.addStyleTag({ content: `

@@ -2,8 +2,10 @@
 
 namespace App\Controller\Api;
 
+use App\Entity\AccountType;
 use App\Entity\Transaction;
 use App\Entity\TransactionSource;
+use App\Entity\TransactionType;
 use App\Entity\User;
 use App\Repository\AccountRepository;
 use App\Repository\TransactionRepository;
@@ -86,6 +88,46 @@ class TransactionController extends AbstractController
         $this->em->flush();
 
         return new JsonResponse($this->serialize($t), 201);
+    }
+
+    /**
+     * Delete a transaction. For Pillar 3a accounts, removing a deposit also drops the
+     * auto-generated trade rows on the same day so the 3a stays coherent — the trades
+     * only exist because the deposit was logged via the contribution flow.
+     */
+    #[Route('/{transactionId}', name: 'api_transactions_delete', methods: ['DELETE'], requirements: ['transactionId' => '[0-9a-f-]+'])]
+    public function delete(string $accountId, string $transactionId, #[CurrentUser] User $user): JsonResponse
+    {
+        $account = $this->accounts->findOneOwnedBy($accountId, $user);
+        if ($account === null) {
+            throw new NotFoundHttpException();
+        }
+        try {
+            $uuid = \Symfony\Component\Uid\Uuid::fromString($transactionId);
+        } catch (\InvalidArgumentException) {
+            throw new NotFoundHttpException();
+        }
+        $tx = $this->transactions->findOneBy(['id' => $uuid, 'account' => $account]);
+        if ($tx === null) {
+            throw new NotFoundHttpException();
+        }
+
+        $cascaded = 0;
+        if ($account->getType() === AccountType::Pillar3a && $tx->getType() === TransactionType::Deposit) {
+            $cascaded = (int) $this->em->getConnection()->executeStatement(
+                "DELETE FROM transactions
+                 WHERE account_id = :a AND occurred_at = :d AND type IN ('trade_buy', 'trade_sell')",
+                [
+                    'a' => $account->getId()->toBinary(),
+                    'd' => $tx->getOccurredAt()->format('Y-m-d'),
+                ],
+            );
+        }
+
+        $this->em->remove($tx);
+        $this->em->flush();
+
+        return new JsonResponse(['deletedId' => $transactionId, 'cascadedTradeCount' => $cascaded], 200);
     }
 
     private function serialize(Transaction $t): array

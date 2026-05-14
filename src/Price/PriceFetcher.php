@@ -72,6 +72,11 @@ final class PriceFetcher
                 if ($asset->getCurrency() === null) {
                     $asset->setCurrency($quote->currency);
                 }
+                // Fill in the human name from Yahoo if we don't have one yet — keeps
+                // strategy/allocation UIs readable.
+                if ($asset->getName() === null && $quote->name !== null) {
+                    $asset->setName($quote->name);
+                }
 
                 $this->storePrice($asset, $quote);
                 $updated++;
@@ -126,6 +131,9 @@ final class PriceFetcher
 
                 if ($asset->getCurrency() === null && $history[0]->currency !== '') {
                     $asset->setCurrency($history[0]->currency);
+                }
+                if ($asset->getName() === null && $history[0]->name !== null) {
+                    $asset->setName($history[0]->name);
                 }
 
                 $existing = $this->existingPriceDatesFor($asset);

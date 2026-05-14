@@ -81,6 +81,18 @@ export const useAccountsStore = defineStore('accounts', () => {
     return api.get<Holding[]>(`/api/accounts/${accountId}/holdings`)
   }
 
+  async function deleteTransaction(accountId: string, transactionId: string): Promise<{ cascadedTradeCount: number }> {
+    const res = await fetch(`/api/accounts/${accountId}/transactions/${transactionId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error((body as { error?: string }).error ?? `Delete failed (${res.status})`)
+    }
+    return res.json()
+  }
+
   async function addTransaction(accountId: string, input: NewTransaction): Promise<Transaction> {
     const created = await api.post<Transaction>(`/api/accounts/${accountId}/transactions`, input)
     const acc = accounts.value.find((a) => a.id === accountId)
@@ -91,5 +103,5 @@ export const useAccountsStore = defineStore('accounts', () => {
     return created
   }
 
-  return { accounts, loaded, fetchAll, create, remove, fetchTransactions, fetchHoldings, addTransaction }
+  return { accounts, loaded, fetchAll, create, remove, fetchTransactions, fetchHoldings, addTransaction, deleteTransaction }
 })

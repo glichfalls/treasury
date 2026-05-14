@@ -55,6 +55,26 @@ class AccountController extends AbstractController
         ));
     }
 
+    #[Route('/assets/catalog', name: 'api_assets_catalog', methods: ['GET'])]
+    public function assetCatalog(): JsonResponse
+    {
+        // Plain securities — exclude commodity-backed coins (precious metals) and the
+        // gold spot reference, since they have their own pickers / valuation rules.
+        $rows = $this->em->getConnection()->fetchAllAssociative(
+            "SELECT isin, ticker, name, currency
+             FROM assets
+             WHERE unit_weight_grams IS NULL
+               AND isin NOT LIKE 'SPOT:%'
+             ORDER BY ticker IS NULL, ticker ASC, name ASC",
+        );
+        return new JsonResponse(array_map(fn($r) => [
+            'isin' => $r['isin'],
+            'ticker' => $r['ticker'],
+            'name' => $r['name'],
+            'currency' => $r['currency'],
+        ], $rows));
+    }
+
     #[Route('/coins/catalog', name: 'api_coins_catalog', methods: ['GET'])]
     public function coinCatalog(): JsonResponse
     {

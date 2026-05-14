@@ -7,10 +7,13 @@ import NewTransactionForm from '@/components/NewTransactionForm.vue'
 import ImportDropzone from '@/components/ImportDropzone.vue'
 import HoldingsTable from '@/components/HoldingsTable.vue'
 import AddCoinForm from '@/components/AddCoinForm.vue'
+import AllocationEditor from '@/components/AllocationEditor.vue'
+import AddContributionForm from '@/components/AddContributionForm.vue'
+import OpeningBalanceForm from '@/components/OpeningBalanceForm.vue'
 import NetWorthChart from '@/components/NetWorthChart.vue'
 import AllocationDonut from '@/components/AllocationDonut.vue'
 import AssetPriceChart from '@/components/AssetPriceChart.vue'
-import { ChevronLeft, Inbox } from 'lucide-vue-next'
+import { ChevronLeft, Inbox, Trash2 } from 'lucide-vue-next'
 
 const route = useRoute()
 const accounts = useAccountsStore()
@@ -72,6 +75,16 @@ function shortDate(iso: string): string {
 function toggleHolding(isin: string) {
   expandedHolding.value = expandedHolding.value === isin ? null : isin
 }
+
+async function deleteTransaction(t: Transaction) {
+  const isPillar3aDeposit = account.value?.type === 'pillar_3a' && t.type === 'deposit'
+  const msg = isPillar3aDeposit
+    ? 'Delete this contribution? Auto-generated trade rows from the same day will also be removed.'
+    : `Delete this transaction (${t.description ?? t.type})?`
+  if (!confirm(msg)) return
+  await accounts.deleteTransaction(accountId.value, t.id)
+  await reloadAfterImport()
+}
 </script>
 
 <template>
@@ -120,7 +133,23 @@ function toggleHolding(isin: string) {
         <AllocationDonut :endpoint="`/api/accounts/${account.id}/allocation`" />
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div v-if="account.type === 'pillar_3a'" class="space-y-4">
+        <AllocationEditor :account-id="account.id" @saved="reloadAfterImport" />
+        <div class="flex flex-wrap items-start gap-3">
+          <OpeningBalanceForm
+            :account-id="account.id"
+            :currency="account.currency"
+            @created="reloadAfterImport"
+          />
+          <AddContributionForm
+            :account-id="account.id"
+            :currency="account.currency"
+            @created="reloadAfterImport"
+          />
+        </div>
+      </div>
+
+      <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ImportDropzone v-if="account.type !== 'precious_metals'" :account-id="account.id" @imported="reloadAfterImport" />
         <div v-if="account.type === 'precious_metals'" class="flex items-start">
           <AddCoinForm
@@ -204,10 +233,16 @@ function toggleHolding(isin: string) {
                 <th>Description</th>
                 <th class="text-right w-32">Quantity</th>
                 <th class="text-right w-32">Amount</th>
+                <th class="w-10"></th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="t in transactions" :key="t.id">
+              <tr
+                v-for="t in transactions.filter((tx) =>
+                  account?.type !== 'pillar_3a' || (tx.type !== 'trade_buy' && tx.type !== 'trade_sell')
+                )"
+                :key="t.id"
+              >
                 <td class="text-[var(--color-text-muted)] tabular">{{ shortDate(t.occurredAt) }}</td>
                 <td>
                   <span class="badge">{{ typeLabels[t.type ?? 'other'] ?? t.type }}</span>
@@ -226,6 +261,16 @@ function toggleHolding(isin: string) {
                   :class="BigInt(t.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'"
                 >
                   {{ formatMinor(t.amountMinor, t.currency) }}
+                </td>
+                <td class="text-right">
+                  <button
+                    class="p-1.5 rounded transition-colors text-[var(--color-text-dim)] hover:text-[var(--color-negative)] hover:bg-[var(--color-surface-hover)]"
+                    type="button"
+                    aria-label="Delete transaction"
+                    @click="deleteTransaction(t)"
+                  >
+                    <Trash2 :size="14" />
+                  </button>
                 </td>
               </tr>
             </tbody>

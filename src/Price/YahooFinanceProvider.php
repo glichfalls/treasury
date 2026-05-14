@@ -73,7 +73,20 @@ final class YahooFinanceProvider implements PriceProvider
             currency: $normCcy,
             asOf: (new \DateTimeImmutable())->setTimestamp((int) $ts)->setTime(0, 0),
             resolvedTicker: (string) ($meta['symbol'] ?? $ticker),
+            name: $this->pickName($meta),
         );
+    }
+
+    /** Yahoo gives us shortName / longName depending on the asset; prefer the shorter one. */
+    private function pickName(array $meta): ?string
+    {
+        foreach (['shortName', 'longName'] as $key) {
+            $value = $meta[$key] ?? null;
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+        return null;
     }
 
     public function fetchLatestFx(string $from, string $to): ?float
@@ -99,13 +112,15 @@ final class YahooFinanceProvider implements PriceProvider
         }
         $rawCurrency = (string) ($data['meta']['currency'] ?? 'USD');
         $resolved = (string) ($data['meta']['symbol'] ?? $ticker);
-        return $this->parseHistory($data, function (float $price, \DateTimeImmutable $date) use ($rawCurrency, $resolved) {
+        $name = $this->pickName(is_array($data['meta'] ?? null) ? $data['meta'] : []);
+        return $this->parseHistory($data, function (float $price, \DateTimeImmutable $date) use ($rawCurrency, $resolved, $name) {
             [$normPrice, $normCcy] = $this->normalizeUnits($price, $rawCurrency);
             return new PriceQuote(
                 price: $normPrice,
                 currency: $normCcy,
                 asOf: $date,
                 resolvedTicker: $resolved,
+                name: $name,
             );
         });
     }

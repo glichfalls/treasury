@@ -16,6 +16,7 @@ const accountTypes = [
   { value: 'real_estate', label: 'Real estate' },
   { value: 'vehicle', label: 'Vehicle' },
   { value: 'precious_metals', label: 'Precious metals' },
+  { value: 'pillar_3a', label: 'Pillar 3a' },
   { value: 'other', label: 'Other' },
 ]
 

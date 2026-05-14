@@ -38,6 +38,7 @@ const typeLabels: Record<string, string> = {
   real_estate: 'Real estate',
   vehicle: 'Vehicle',
   precious_metals: 'Precious metals',
+  pillar_3a: 'Pillar 3a',
   other: 'Other',
 }
 

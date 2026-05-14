@@ -14,5 +14,6 @@ enum AccountType: string
     case RealEstate = 'real_estate';
     case Vehicle = 'vehicle';
     case PreciousMetals = 'precious_metals';
+    case Pillar3a = 'pillar_3a';
     case Other = 'other';
 }
