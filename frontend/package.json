@@ -11,7 +11,8 @@
     "type-check": "vue-tsc --build",
     "lint": "run-s lint:*",
     "lint:oxlint": "oxlint . --fix",
-    "lint:eslint": "eslint . --fix --cache"
+    "lint:eslint": "eslint . --fix --cache",
+    "screenshots": "node scripts/capture-screenshots.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",
@@ -25,6 +26,7 @@
     "vue-router": "^5.0.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tsconfig/node24": "^24.0.4",
     "@types/node": "^24.12.2",
     "@vitejs/plugin-vue": "^6.0.6",

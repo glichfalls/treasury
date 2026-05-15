@@ -16,13 +16,17 @@ import {
   FileJson,
   Github,
   Check,
+  Tag as TagIcon,
+  Repeat,
+  Target,
+  Search,
 } from 'lucide-vue-next'
 import BrandMark from '@/components/BrandMark.vue'
 
 const stats = [
-  { value: '3', label: 'Bank importers (ZKB, Degiro, IBKR)' },
-  { value: '7+', label: 'Currencies + FX history' },
-  { value: 'MIT', label: 'Open source on GitHub' },
+  { value: '12', label: 'Account types (bank, broker, crypto, 3a, gold, …)' },
+  { value: '3', label: 'CSV importers (ZKB, Degiro, IBKR)' },
+  { value: 'FX', label: 'Historical rates for honest totals' },
   { value: '0', label: 'Trackers, ads or telemetry' },
 ]
 
@@ -48,11 +52,7 @@ onBeforeUnmount(() => observer?.disconnect())
 
 <template>
   <div class="landing">
-    <!-- Decorative background: yellow + violet radial glows.
-         Painted absolutely into the hero section only — not fixed across the
-         whole page — to avoid per-scroll-frame compositor work that made scroll
-         feel laggy. The glow is concentrated where it actually adds visual
-         interest (the hero) and lets the rest of the page scroll plain-black. -->
+    <!-- Hero glow — yellow only (brand palette is yellow-on-black). -->
     <div class="hero-glow" aria-hidden="true" />
 
     <!-- Top bar -->
@@ -93,9 +93,9 @@ onBeforeUnmount(() => observer?.disconnect())
         </h1>
 
         <p class="text-lg sm:text-xl text-[var(--color-text-muted)] max-w-2xl mx-auto leading-relaxed">
-          Treasury pulls your bank exports, broker statements and manual valuables into a single
-          tracker. Net worth, performance, allocations — all in one place. Use the hosted
-          instance, or run the open-source app on your own server.
+          Net worth, performance, cashflow categories, tags, recurring rules and a retirement
+          projection — all from your bank exports and a handful of manual entries. Use the
+          hosted instance, or self-host the open-source app.
         </p>
 
         <div class="flex flex-wrap justify-center gap-3 pt-3">
@@ -114,7 +114,7 @@ onBeforeUnmount(() => observer?.disconnect())
         </div>
       </div>
 
-      <!-- Screenshot with glow -->
+      <!-- Hero screenshot -->
       <div class="mx-auto max-w-6xl mt-16 sm:mt-20 px-2 sm:px-0 reveal delay-2">
         <div class="screenshot-frame">
           <img
@@ -148,19 +148,16 @@ onBeforeUnmount(() => observer?.disconnect())
       </div>
     </section>
 
-    <!-- Feature 1: text left, illustration right -->
+    <!-- Feature 1: Net worth — text left, inline mock right -->
     <section class="relative z-10 px-6 py-20 sm:py-28">
       <div class="mx-auto max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-12 items-center reveal">
         <div class="space-y-5">
-          <div class="inline-flex items-center justify-center w-12 h-12 rounded-lg"
-            :style="{ backgroundColor: 'color-mix(in srgb, var(--color-accent) 12%, transparent)',
-                      color: 'var(--color-accent)' }">
+          <div class="inline-flex items-center justify-center w-12 h-12 rounded-lg feature-badge">
             <TrendingUp :size="22" />
           </div>
           <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">
             Watch your net worth, <span class="text-[var(--color-accent)]">honestly</span>.
           </h2>
-          <!-- (heading already uses solid accent color, no gradient to remove) -->
           <p class="text-[var(--color-text-muted)] leading-relaxed">
             Weekly snapshots of cash + holdings across every account, valued in your base
             currency. Pillar 3a, brokerage, crypto, real estate — all on the same chart.
@@ -176,12 +173,12 @@ onBeforeUnmount(() => observer?.disconnect())
             </li>
             <li class="flex items-start gap-2.5">
               <Check :size="16" class="mt-0.5 shrink-0 text-[var(--color-positive)]" />
-              <span>Green for up, red for down — same as you'd expect</span>
+              <span>Per-account-type UI — no performance charts on a checking account</span>
             </li>
           </ul>
         </div>
 
-        <!-- Mock chart card -->
+        <!-- Inline mock chart (kept as SVG — no screenshot needed for an abstract example) -->
         <div class="card p-5 space-y-4 mock-chart">
           <div class="flex items-baseline justify-between">
             <div>
@@ -220,41 +217,26 @@ onBeforeUnmount(() => observer?.disconnect())
       </div>
     </section>
 
-    <!-- Feature 2: illustration left, text right -->
+    <!-- Feature 2: Performance — screenshot left, text right -->
     <section class="relative z-10 px-6 py-20 sm:py-28"
       style="background-color: color-mix(in srgb, var(--color-surface) 60%, transparent);">
       <div class="mx-auto max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-12 items-center reveal">
-        <!-- Mock allocation card (placed first in DOM so the order can flip on lg via order utility) -->
-        <div class="card p-5 space-y-4 lg:order-1">
-          <p class="label">Allocation</p>
-          <div class="flex items-center gap-6">
-            <svg viewBox="0 0 100 100" class="w-32 h-32 shrink-0">
-              <circle cx="50" cy="50" r="38" fill="none" stroke="#facc15" stroke-width="14"
-                stroke-dasharray="120 240" stroke-dashoffset="0" transform="rotate(-90 50 50)" />
-              <circle cx="50" cy="50" r="38" fill="none" stroke="#a78bfa" stroke-width="14"
-                stroke-dasharray="80 240" stroke-dashoffset="-120" transform="rotate(-90 50 50)" />
-              <circle cx="50" cy="50" r="38" fill="none" stroke="#22c55e" stroke-width="14"
-                stroke-dasharray="50 240" stroke-dashoffset="-200" transform="rotate(-90 50 50)" />
-              <circle cx="50" cy="50" r="38" fill="none" stroke="#fb923c" stroke-width="14"
-                stroke-dasharray="30 240" stroke-dashoffset="-250" transform="rotate(-90 50 50)" />
-            </svg>
-            <ul class="flex-1 space-y-1.5 text-sm">
-              <li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm" style="background:#facc15"></span><span class="flex-1">Equities</span><span class="tabular text-[var(--color-text-muted)]">50%</span></li>
-              <li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm" style="background:#a78bfa"></span><span class="flex-1">Cash</span><span class="tabular text-[var(--color-text-muted)]">33%</span></li>
-              <li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm" style="background:#22c55e"></span><span class="flex-1">Gold</span><span class="tabular text-[var(--color-text-muted)]">12%</span></li>
-              <li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm" style="background:#fb923c"></span><span class="flex-1">Crypto</span><span class="tabular text-[var(--color-text-muted)]">5%</span></li>
-            </ul>
-          </div>
+        <div class="lg:order-1 inline-screenshot">
+          <img
+            src="/screenshot-performance.png"
+            alt="Performance comparison on an investment account"
+            class="w-full block rounded-lg"
+            loading="lazy"
+            decoding="async"
+          />
         </div>
 
         <div class="space-y-5 lg:order-2">
-          <div class="inline-flex items-center justify-center w-12 h-12 rounded-lg"
-            :style="{ backgroundColor: 'color-mix(in srgb, var(--color-highlight) 15%, transparent)',
-                      color: 'var(--color-highlight)' }">
+          <div class="inline-flex items-center justify-center w-12 h-12 rounded-lg feature-badge">
             <LineChart :size="22" />
           </div>
           <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">
-            Performance, <span class="text-[var(--color-highlight)]">two honest ways</span>.
+            Performance, <span class="text-[var(--color-accent)]">two honest ways</span>.
           </h2>
           <p class="text-[var(--color-text-muted)] leading-relaxed">
             Return-versus-deposits tells you how much your money has grown beyond contributions.
@@ -279,61 +261,149 @@ onBeforeUnmount(() => observer?.disconnect())
       </div>
     </section>
 
-    <!-- Feature 3: text left, illustration right -->
+    <!-- Feature 3: Categorize + tag — text left, screenshot right -->
     <section class="relative z-10 px-6 py-20 sm:py-28">
       <div class="mx-auto max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-12 items-center reveal">
         <div class="space-y-5">
-          <div class="inline-flex items-center justify-center w-12 h-12 rounded-lg"
-            :style="{ backgroundColor: 'color-mix(in srgb, var(--color-positive) 15%, transparent)',
-                      color: 'var(--color-positive)' }">
-            <ShieldCheck :size="22" />
+          <div class="inline-flex items-center justify-center w-12 h-12 rounded-lg feature-badge">
+            <TagIcon :size="22" />
           </div>
           <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">
-            Hosted or self-hosted.
-            <span class="text-[var(--color-positive)]">Your call</span>.
+            Categorise, tag, <span class="text-[var(--color-accent)]">find the pattern</span>.
           </h2>
           <p class="text-[var(--color-text-muted)] leading-relaxed">
-            Sign up on the hosted instance and start tracking in minutes. Or grab the source
-            from GitHub and run it on your own VPS — same code, same backup format. Move
-            between them any time.
+            Categories slot every banking transaction into "groceries", "rent", "subscriptions" —
+            monthly cashflow charts emerge automatically. Tags add free-form grouping that cuts
+            across categories: <em>netflix</em>, <em>annual-fees</em>, <em>kids</em>. Tag once,
+            Treasury applies it to everything matching.
           </p>
           <ul class="space-y-2.5 text-sm">
             <li class="flex items-start gap-2.5">
               <Check :size="16" class="mt-0.5 shrink-0 text-[var(--color-positive)]" />
-              <span>Open source — audit it, fork it, host it</span>
+              <span>Auto-tagging — type "netflix" once, every Netflix charge gets tagged</span>
             </li>
             <li class="flex items-start gap-2.5">
               <Check :size="16" class="mt-0.5 shrink-0 text-[var(--color-positive)]" />
-              <span>One-click JSON export so your data is never trapped</span>
+              <span>Tag detail pages with monthly totals + signed net</span>
             </li>
             <li class="flex items-start gap-2.5">
               <Check :size="16" class="mt-0.5 shrink-0 text-[var(--color-positive)]" />
-              <span>No analytics, no telemetry, no third-party trackers</span>
+              <span>Cashflow-by-category chart per banking account</span>
             </li>
           </ul>
         </div>
 
-        <!-- Trust card stack -->
-        <div class="grid grid-cols-2 gap-3">
-          <div class="card p-5 space-y-2">
-            <Lock :size="18" class="text-[var(--color-accent)]" />
-            <p class="font-medium text-sm">No tracking</p>
-            <p class="text-xs text-[var(--color-text-muted)]">No analytics, ads, or telemetry.</p>
+        <div class="inline-screenshot">
+          <img
+            src="/screenshot-categories.png"
+            alt="Cashflow by category and tag totals"
+            class="w-full block rounded-lg"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+      </div>
+    </section>
+
+    <!-- Feature 4: Find anything — screenshot left, text right -->
+    <section class="relative z-10 px-6 py-20 sm:py-28"
+      style="background-color: color-mix(in srgb, var(--color-surface) 60%, transparent);">
+      <div class="mx-auto max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-12 items-center reveal">
+        <div class="lg:order-1 inline-screenshot">
+          <img
+            src="/screenshot-search.png"
+            alt="Global search modal with grouped results"
+            class="w-full block rounded-lg"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+
+        <div class="space-y-5 lg:order-2">
+          <div class="inline-flex items-center justify-center w-12 h-12 rounded-lg feature-badge">
+            <Search :size="22" />
           </div>
-          <div class="card p-5 space-y-2">
-            <FileJson :size="18" class="text-[var(--color-highlight)]" />
-            <p class="font-medium text-sm">JSON backup</p>
-            <p class="text-xs text-[var(--color-text-muted)]">Export the entire DB anytime.</p>
+          <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">
+            Find anything, <span class="text-[var(--color-accent)]">in milliseconds</span>.
+          </h2>
+          <p class="text-[var(--color-text-muted)] leading-relaxed">
+            Hit ⌘K from anywhere. Search spans accounts, transactions, assets, tags and recurring
+            rules. The dedicated results page adds filters (account, date, type) and surfaces
+            spending stats for the query — like a tag detail page, but for any text.
+          </p>
+          <ul class="space-y-2.5 text-sm">
+            <li class="flex items-start gap-2.5">
+              <Check :size="16" class="mt-0.5 shrink-0 text-[var(--color-positive)]" />
+              <span>Command-palette modal with grouped sections + "View all"</span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <Check :size="16" class="mt-0.5 shrink-0 text-[var(--color-positive)]" />
+              <span>Spending stats per query — net, spent, received, monthly</span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <Check :size="16" class="mt-0.5 shrink-0 text-[var(--color-positive)]" />
+              <span>Filter by account, date range, transaction type</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Compact "everything else" feature grid -->
+    <section class="relative z-10 px-6 py-20 sm:py-28">
+      <div class="mx-auto max-w-6xl space-y-10">
+        <div class="text-center space-y-3 reveal">
+          <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight">Plus everything you'd expect.</h2>
+          <p class="text-[var(--color-text-muted)]">The pieces that make the whole thing work.</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 reveal delay-1">
+          <div class="card p-5 space-y-3">
+            <div class="feature-pill"><Repeat :size="18" /></div>
+            <h3 class="font-medium">Recurring transactions</h3>
+            <p class="text-sm text-[var(--color-text-muted)]">
+              Rent, subscriptions, paychecks — define them once and Treasury materialises them on schedule.
+            </p>
           </div>
-          <div class="card p-5 space-y-2">
-            <Coins :size="18" class="text-[var(--color-accent)]" />
-            <p class="font-medium text-sm">Multi-currency</p>
-            <p class="text-xs text-[var(--color-text-muted)]">CHF, USD, EUR, GBP, JPY…</p>
+
+          <div class="card p-5 space-y-3">
+            <div class="feature-pill"><Target :size="18" /></div>
+            <h3 class="font-medium">Retirement projection</h3>
+            <p class="text-sm text-[var(--color-text-muted)]">
+              Set savings rate, return and horizon. See the curve. Stress-test before you commit.
+            </p>
           </div>
-          <div class="card p-5 space-y-2">
-            <Globe :size="18" class="text-[var(--color-highlight)]" />
-            <p class="font-medium text-sm">Open source</p>
-            <p class="text-xs text-[var(--color-text-muted)]">Self-host anytime, MIT.</p>
+
+          <div class="card p-5 space-y-3">
+            <div class="feature-pill"><Coins :size="18" /></div>
+            <h3 class="font-medium">Multi-currency, properly</h3>
+            <p class="text-sm text-[var(--color-text-muted)]">
+              Pick a base currency. Every transaction converts at its historical FX. No fake totals.
+            </p>
+          </div>
+
+          <div class="card p-5 space-y-3">
+            <div class="feature-pill"><Upload :size="18" /></div>
+            <h3 class="font-medium">CSV importers</h3>
+            <p class="text-sm text-[var(--color-text-muted)]">
+              Drop a CSV from ZKB, Degiro, or IBKR. Auto-detected format, deduped on external ref.
+            </p>
+          </div>
+
+          <div class="card p-5 space-y-3">
+            <div class="feature-pill"><FileJson :size="18" /></div>
+            <h3 class="font-medium">JSON backup &amp; restore</h3>
+            <p class="text-sm text-[var(--color-text-muted)]">
+              Export the entire database to JSON. Import it back into any Treasury instance.
+            </p>
+          </div>
+
+          <div class="card p-5 space-y-3">
+            <div class="feature-pill"><Lock :size="18" /></div>
+            <h3 class="font-medium">No tracking</h3>
+            <p class="text-sm text-[var(--color-text-muted)]">
+              No analytics, no ads, no third-party telemetry. Your data leaves only when you export it.
+            </p>
           </div>
         </div>
       </div>
@@ -356,7 +426,7 @@ onBeforeUnmount(() => observer?.disconnect())
               <h3 class="font-medium">Add your accounts</h3>
             </div>
             <p class="text-sm text-[var(--color-text-muted)]">
-              Bank, brokerage, 3a, crypto, real estate — pick a type, set the currency, done.
+              Bank, brokerage, 3a, crypto, real estate, gold — pick a type, set the currency, done.
             </p>
           </div>
 
@@ -367,7 +437,7 @@ onBeforeUnmount(() => observer?.disconnect())
               <h3 class="font-medium">Import or enter</h3>
             </div>
             <p class="text-sm text-[var(--color-text-muted)]">
-              Drop a CSV from your bank, or add transactions manually. Importers auto-detect the format.
+              Drop a CSV from your bank, or add transactions manually. Auto-tagging fills in the rest.
             </p>
           </div>
 
@@ -375,10 +445,10 @@ onBeforeUnmount(() => observer?.disconnect())
             <div class="step-number">3</div>
             <div class="flex items-center gap-2">
               <PieChart :size="16" class="text-[var(--color-accent)]" />
-              <h3 class="font-medium">Watch the picture form</h3>
+              <h3 class="font-medium">Plan the next move</h3>
             </div>
             <p class="text-sm text-[var(--color-text-muted)]">
-              Net worth, allocation, performance — all the dashboards populate as your history grows.
+              Net worth, allocation, performance, projection — every dashboard populates as your history grows.
             </p>
           </div>
         </div>
@@ -389,19 +459,16 @@ onBeforeUnmount(() => observer?.disconnect())
     <section class="relative z-10 px-6 py-20 sm:py-28">
       <div class="mx-auto max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-12 items-center reveal">
         <div class="space-y-5">
-          <div class="inline-flex items-center justify-center w-12 h-12 rounded-lg"
-            :style="{ backgroundColor: 'color-mix(in srgb, var(--color-highlight) 15%, transparent)',
-                      color: 'var(--color-highlight)' }">
+          <div class="inline-flex items-center justify-center w-12 h-12 rounded-lg feature-badge">
             <Github :size="22" />
           </div>
           <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">
-            Prefer to <span class="text-[var(--color-highlight)]">self-host</span>?
+            Hosted or <span class="text-[var(--color-accent)]">self-hosted</span>. Your call.
           </h2>
           <p class="text-[var(--color-text-muted)] leading-relaxed">
-            Treasury is fully open source. Bring Docker and a MariaDB or MySQL
-            database — clone the repo, fill in your secrets, run one command. Use
-            the CLI to create users and refresh prices; JSON export gets your data
-            out whenever you want.
+            Sign up on the hosted instance and start tracking in minutes. Or grab the source
+            from GitHub, bring Docker + MariaDB or MySQL, and run one command. Same code,
+            same backup format — move between them any time.
           </p>
           <ul class="space-y-2.5 text-sm">
             <li class="flex items-start gap-2.5">
@@ -410,11 +477,11 @@ onBeforeUnmount(() => observer?.disconnect())
             </li>
             <li class="flex items-start gap-2.5">
               <Check :size="16" class="mt-0.5 shrink-0 text-[var(--color-positive)]" />
-              <span>MariaDB 10.6+ or MySQL 8+ for storage</span>
+              <span>Migrations run automatically on boot · CLI for users + price refresh</span>
             </li>
             <li class="flex items-start gap-2.5">
               <Check :size="16" class="mt-0.5 shrink-0 text-[var(--color-positive)]" />
-              <span>Migrations run automatically · CLI for users + price refresh</span>
+              <span>MIT licence — audit it, fork it, host it</span>
             </li>
           </ul>
           <div class="flex flex-wrap gap-3 pt-2">
@@ -514,9 +581,7 @@ onBeforeUnmount(() => observer?.disconnect())
   overflow-x: hidden;
 }
 
-/* Hero glow: absolutely positioned to the top of the page so it scrolls away
-   normally — no `position: fixed`, no mask, no animation, no blur. The cheapest
-   possible decoration the browser can render. */
+/* Yellow-only hero glow (brand palette is yellow on black — no violet). */
 .hero-glow {
   position: absolute;
   top: 0;
@@ -527,13 +592,9 @@ onBeforeUnmount(() => observer?.disconnect())
   z-index: 0;
   background:
     radial-gradient(40rem 40rem at 15% 10%, rgba(250, 204, 21, 0.22), transparent 65%),
-    radial-gradient(35rem 35rem at 85% 20%, rgba(167, 139, 250, 0.20), transparent 65%);
+    radial-gradient(35rem 35rem at 85% 20%, rgba(250, 204, 21, 0.12), transparent 65%);
 }
 
-/* Reveal-on-scroll. Modest 12px translate + opacity transition, no `will-change`
-   so the browser doesn't pre-promote every reveal element to its own compositor
-   layer (which was the original cause of scroll input lag). Browsers GPU-
-   accelerate transform/opacity transitions on demand. */
 .reveal {
   opacity: 0;
   transform: translateY(12px);
@@ -558,20 +619,51 @@ onBeforeUnmount(() => observer?.disconnect())
   }
 }
 
-/* Screenshot frame with a single subtle drop-shadow. Previously had two huge
-   blurred shadows (80px and 100px) which the browser has to re-compute on every
-   paint — that paint cost during scroll showed up as scroll input lag. */
+/* Yellow-on-yellow frame for hero screenshot. */
 .screenshot-frame {
   position: relative;
   border-radius: 0.75rem;
   padding: 0.5rem;
   background: linear-gradient(135deg,
-    color-mix(in srgb, var(--color-accent) 15%, transparent),
-    color-mix(in srgb, var(--color-highlight) 15%, transparent));
+    color-mix(in srgb, var(--color-accent) 18%, transparent),
+    color-mix(in srgb, var(--color-accent) 6%, transparent));
   border: 1px solid var(--color-border);
 }
 .screenshot-frame img {
   border: 1px solid var(--color-border);
+}
+
+/* In-feature screenshots: slightly subtler frame so the screenshot itself is the focus. */
+.inline-screenshot {
+  position: relative;
+  border-radius: 0.5rem;
+  padding: 0.375rem;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--color-accent) 12%, transparent),
+    transparent);
+  border: 1px solid var(--color-border);
+}
+.inline-screenshot img {
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+}
+
+/* Yellow-tinted badge sitting above feature section headings. */
+.feature-badge {
+  background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent);
+}
+
+/* Compact icon pill used in the feature grid cards. */
+.feature-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  background-color: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-accent);
 }
 
 /* Big numbered corner for "How it works" cards */
@@ -586,7 +678,6 @@ onBeforeUnmount(() => observer?.disconnect())
   pointer-events: none;
 }
 
-/* Terminal-style code block in the self-host section */
 .terminal-mock pre {
   background-color: var(--color-bg);
   color: var(--color-text);
@@ -596,9 +687,8 @@ onBeforeUnmount(() => observer?.disconnect())
   padding: 3rem 2rem;
   border-radius: 1rem;
   background: linear-gradient(135deg,
-    color-mix(in srgb, var(--color-accent) 8%, var(--color-surface)),
-    color-mix(in srgb, var(--color-highlight) 8%, var(--color-surface)));
+    color-mix(in srgb, var(--color-accent) 10%, var(--color-surface)),
+    color-mix(in srgb, var(--color-accent) 4%, var(--color-surface)));
   border: 1px solid color-mix(in srgb, var(--color-accent) 25%, var(--color-border));
 }
-
 </style>
