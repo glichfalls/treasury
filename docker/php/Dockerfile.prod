@@ -38,7 +38,8 @@ RUN APP_SECRET=build-placeholder DATABASE_URL="mysql://u:p@db:3306/d?serverVersi
     && APP_SECRET=build-placeholder DATABASE_URL="mysql://u:p@db:3306/d?serverVersion=8.0&charset=utf8mb4" \
         php bin/console cache:warmup --env=prod --no-debug \
     && mkdir -p var/cache var/log var/sessions \
-    && chown -R www-data:www-data var
+    && chown -R www-data:www-data var \
+    && chmod +x bin/console
 
 EXPOSE 9000
 CMD ["php-fpm", "-F"]
