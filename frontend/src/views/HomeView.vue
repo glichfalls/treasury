@@ -7,6 +7,7 @@ import NewAccountForm from '@/components/NewAccountForm.vue'
 import NetWorthChart from '@/components/NetWorthChart.vue'
 import CashFlowChart from '@/components/CashFlowChart.vue'
 import AllocationDonut from '@/components/AllocationDonut.vue'
+import BackupPanel from '@/components/BackupPanel.vue'
 import { Trash2, ChevronRight, Inbox } from 'lucide-vue-next'
 
 const accounts = useAccountsStore()
@@ -151,6 +152,10 @@ async function remove(a: Account, ev: MouseEvent) {
           </tbody>
         </table>
       </div>
+    </section>
+
+    <section v-if="accounts.accounts.length > 0">
+      <BackupPanel />
     </section>
   </div>
 </template>

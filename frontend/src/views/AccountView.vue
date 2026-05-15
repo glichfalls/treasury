@@ -13,7 +13,7 @@ import OpeningBalanceForm from '@/components/OpeningBalanceForm.vue'
 import NetWorthChart from '@/components/NetWorthChart.vue'
 import AllocationDonut from '@/components/AllocationDonut.vue'
 import AssetPriceChart from '@/components/AssetPriceChart.vue'
-import { ChevronLeft, Inbox, Trash2 } from 'lucide-vue-next'
+import { ChevronLeft, Download, Inbox, Trash2 } from 'lucide-vue-next'
 
 const route = useRoute()
 const accounts = useAccountsStore()
@@ -101,7 +101,18 @@ async function deleteTransaction(t: Transaction) {
       <header class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
           <p class="label">{{ account.institution ?? account.type }}</p>
-          <h1 class="text-2xl font-semibold tracking-tight mt-1">{{ account.name }}</h1>
+          <h1 class="text-2xl font-semibold tracking-tight mt-1 flex items-center gap-2">
+            {{ account.name }}
+            <a
+              :href="`/api/accounts/${account.id}/export`"
+              download
+              class="text-[var(--color-text-dim)] hover:text-[var(--color-text)] transition-colors"
+              :aria-label="`Export ${account.name} as JSON`"
+              title="Export account as JSON"
+            >
+              <Download :size="16" />
+            </a>
+          </h1>
         </div>
         <div class="text-right">
           <p class="label">Total</p>
