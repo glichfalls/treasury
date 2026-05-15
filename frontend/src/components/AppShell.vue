@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { LogOut, Wallet, Menu, X, LayoutDashboard, Settings, Target } from 'lucide-vue-next'
+import HeaderSearch from '@/components/HeaderSearch.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -55,8 +56,11 @@ function isActive(item: (typeof navItems)[number]): boolean {
           >{{ item.label }}</RouterLink>
         </nav>
 
-        <div v-if="auth.user" class="ml-auto hidden sm:flex items-center gap-3 text-sm">
-          <span class="text-[var(--color-text-muted)] hidden md:inline">{{ auth.user.email }}</span>
+        <div v-if="auth.user" class="ml-auto hidden md:block flex-1 max-w-md">
+          <HeaderSearch />
+        </div>
+
+        <div v-if="auth.user" class="hidden sm:flex items-center gap-3 text-sm" :class="{ 'ml-auto': true }">
           <button class="btn btn-ghost" @click="signOut">
             <LogOut :size="16" />
             <span>Sign out</span>
