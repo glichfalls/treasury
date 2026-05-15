@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
-import { useAccountsStore, type Transaction, type Holding } from '@/stores/accounts'
+import { useAccountsStore, type Account, type Transaction, type Holding } from '@/stores/accounts'
 import { formatMinor } from '@/lib/money'
 import NewTransactionForm from '@/components/NewTransactionForm.vue'
 import ImportDropzone from '@/components/ImportDropzone.vue'
@@ -15,11 +15,14 @@ import AllocationDonut from '@/components/AllocationDonut.vue'
 import AssetPriceChart from '@/components/AssetPriceChart.vue'
 import PerformanceChart from '@/components/PerformanceChart.vue'
 import EditTransactionForm from '@/components/EditTransactionForm.vue'
+import EditAccountForm from '@/components/EditAccountForm.vue'
 import DateField from '@/components/DateField.vue'
+import { useToastsStore } from '@/stores/toasts'
 import { ChevronLeft, Download, Inbox, Pencil, Trash2 } from 'lucide-vue-next'
 
 const route = useRoute()
 const accounts = useAccountsStore()
+const toasts = useToastsStore()
 
 const accountId = computed(() => String(route.params.id))
 const account = computed(() => accounts.accounts.find((a) => a.id === accountId.value))
@@ -135,11 +138,22 @@ function toggleHolding(isin: string) {
   expandedHolding.value = expandedHolding.value === isin ? null : isin
 }
 
+const editingAccount = ref<Account | null>(null)
+const activeTab = ref<'holdings' | 'transactions'>('transactions')
+
+// Default to Holdings tab when an account actually has holdings, otherwise Transactions.
+watch(holdings, (h) => {
+  if (h.length > 0 && activeTab.value === 'transactions' && transactions.value.length === 0) {
+    activeTab.value = 'holdings'
+  }
+}, { immediate: false })
+
 const editingTransaction = ref<Transaction | null>(null)
 function startEditTransaction(t: Transaction) {
   editingTransaction.value = t
 }
 async function onTransactionSaved() {
+  toasts.success('Transaction updated')
   await load()
   await accounts.fetchAll()
 }
@@ -150,15 +164,23 @@ async function deleteTransaction(t: Transaction) {
     ? 'Delete this contribution? Auto-generated trade rows from the same day will also be removed.'
     : `Delete this transaction (${t.description ?? t.type})?`
   if (!confirm(msg)) return
-  await accounts.deleteTransaction(accountId.value, t.id)
-  await reloadAfterImport()
+  try {
+    const res = await accounts.deleteTransaction(accountId.value, t.id)
+    const cascaded = res.cascadedTradeCount > 0
+      ? ` (${res.cascadedTradeCount} linked trade rows also removed)`
+      : ''
+    toasts.success('Transaction deleted' + cascaded)
+    await reloadAfterImport()
+  } catch (e) {
+    toasts.error(e instanceof Error ? e.message : String(e))
+  }
 }
 </script>
 
 <template>
-  <div class="mx-auto max-w-6xl px-6 py-10 space-y-8">
+  <div class="space-y-8">
     <RouterLink
-      :to="{ name: 'home' }"
+      :to="{ name: 'accounts' }"
       class="inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
     >
       <ChevronLeft :size="16" />
@@ -166,37 +188,82 @@ async function deleteTransaction(t: Transaction) {
     </RouterLink>
 
     <template v-if="account">
-      <header class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-        <div>
-          <p class="label">{{ account.institution ?? account.type }}</p>
-          <h1 class="text-2xl font-semibold tracking-tight mt-1 flex items-center gap-2">
-            {{ account.name }}
+      <!-- Header: meta + total on top, action bar below -->
+      <header class="space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <div>
+            <p class="label">{{ account.institution ?? account.type.replace('_', ' ') }}</p>
+            <h1 class="text-2xl font-semibold tracking-tight mt-1">{{ account.name }}</h1>
+          </div>
+          <div class="text-right">
+            <p class="label">Total</p>
+            <p class="text-3xl font-semibold tracking-tight tabular mt-1">
+              {{ formatMinor(account.balanceMinor, account.currency) }}
+            </p>
+            <p
+              v-if="BigInt(account.holdingsMinor) !== 0n"
+              class="text-xs text-[var(--color-text-dim)] tabular mt-1"
+            >
+              {{ formatMinor(account.cashMinor, account.currency) }} cash &middot;
+              {{ formatMinor(account.holdingsMinor, account.currency) }} holdings
+            </p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 pt-2 border-t" style="border-color: var(--color-border);">
+          <!-- Primary actions: vary by account type -->
+          <template v-if="account.type === 'pillar_3a'">
+            <AddContributionForm
+              :account-id="account.id"
+              :currency="account.currency"
+              @created="reloadAfterImport"
+            />
+            <OpeningBalanceForm
+              :account-id="account.id"
+              :currency="account.currency"
+              @created="reloadAfterImport"
+            />
+          </template>
+          <template v-else>
+            <NewTransactionForm
+              :account-id="account.id"
+              :currency="account.currency"
+              @created="load"
+            />
+            <AddCoinForm
+              v-if="account.type === 'precious_metals'"
+              :account-id="account.id"
+              :currency="account.currency"
+              @created="load"
+            />
+            <ImportDropzone
+              v-if="account.type !== 'precious_metals'"
+              :account-id="account.id"
+              @imported="reloadAfterImport"
+            />
+          </template>
+
+          <!-- Secondary actions: pushed to the right -->
+          <div class="ml-auto flex items-center gap-1">
+            <button class="btn btn-ghost" type="button" @click="editingAccount = account">
+              <Pencil :size="14" />
+              <span>Edit</span>
+            </button>
             <a
               :href="`/api/accounts/${account.id}/export`"
               download
-              class="text-[var(--color-text-dim)] hover:text-[var(--color-text)] transition-colors"
+              class="btn btn-ghost"
               :aria-label="`Export ${account.name} as JSON`"
               title="Export account as JSON"
             >
-              <Download :size="16" />
+              <Download :size="14" />
+              <span>Export</span>
             </a>
-          </h1>
-        </div>
-        <div class="text-right">
-          <p class="label">Total</p>
-          <p class="text-3xl font-semibold tracking-tight tabular mt-1">
-            {{ formatMinor(account.balanceMinor, account.currency) }}
-          </p>
-          <p
-            v-if="BigInt(account.holdingsMinor) !== 0n"
-            class="text-xs text-[var(--color-text-dim)] tabular mt-1"
-          >
-            {{ formatMinor(account.cashMinor, account.currency) }} cash &middot;
-            {{ formatMinor(account.holdingsMinor, account.currency) }} holdings
-          </p>
+          </div>
         </div>
       </header>
 
+      <!-- Charts -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div class="lg:col-span-2">
           <NetWorthChart
@@ -220,45 +287,41 @@ async function deleteTransaction(t: Transaction) {
         @update:range="range = $event"
       />
 
-      <div v-if="account.type === 'pillar_3a'" class="space-y-4">
-        <AllocationEditor :account-id="account.id" @saved="reloadAfterImport" />
-        <div class="flex flex-wrap items-start gap-3">
-          <OpeningBalanceForm
-            :account-id="account.id"
-            :currency="account.currency"
-            @created="reloadAfterImport"
-          />
-          <AddContributionForm
-            :account-id="account.id"
-            :currency="account.currency"
-            @created="reloadAfterImport"
-          />
-        </div>
-      </div>
+      <!-- Pillar 3a strategy editor stays prominent as it's how contributions get split -->
+      <AllocationEditor
+        v-if="account.type === 'pillar_3a'"
+        :account-id="account.id"
+        @saved="reloadAfterImport"
+      />
 
-      <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ImportDropzone v-if="account.type !== 'precious_metals'" :account-id="account.id" @imported="reloadAfterImport" />
-        <div v-if="account.type === 'precious_metals'" class="flex items-start">
-          <AddCoinForm
-            :account-id="account.id"
-            :currency="account.currency"
-            class="w-full"
-            @created="load"
-          />
+      <!-- Tabs for holdings + transactions -->
+      <section class="space-y-4">
+        <div class="flex items-center border-b" style="border-color: var(--color-border);">
+          <button
+            v-if="holdings.length > 0"
+            type="button"
+            class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors"
+            :class="activeTab === 'holdings'
+              ? 'text-[var(--color-text)] border-[var(--color-accent)]'
+              : 'text-[var(--color-text-muted)] border-transparent hover:text-[var(--color-text)]'"
+            @click="activeTab = 'holdings'"
+          >
+            Holdings <span class="text-[var(--color-text-dim)] ml-1">{{ holdings.length }}</span>
+          </button>
+          <button
+            type="button"
+            class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors"
+            :class="activeTab === 'transactions'
+              ? 'text-[var(--color-text)] border-[var(--color-accent)]'
+              : 'text-[var(--color-text-muted)] border-transparent hover:text-[var(--color-text)]'"
+            @click="activeTab = 'transactions'"
+          >
+            Transactions <span class="text-[var(--color-text-dim)] ml-1">{{ totalTransactions }}</span>
+          </button>
         </div>
-        <div class="flex items-start">
-          <NewTransactionForm
-            :account-id="account.id"
-            :currency="account.currency"
-            class="w-full"
-            @created="load"
-          />
-        </div>
-      </div>
 
-      <section v-if="holdings.length > 0" class="space-y-4">
-        <h2 class="text-lg font-medium">Holdings</h2>
-        <div class="card overflow-hidden">
+        <!-- Holdings tab -->
+        <div v-if="activeTab === 'holdings' && holdings.length > 0" class="card overflow-hidden">
           <table class="table">
             <thead>
               <tr>
@@ -296,138 +359,132 @@ async function deleteTransaction(t: Transaction) {
             </tbody>
           </table>
         </div>
-      </section>
 
-      <section class="space-y-4">
-        <div class="flex items-center justify-between gap-3">
-          <h2 class="text-lg font-medium">Transactions</h2>
-          <span class="text-xs text-[var(--color-text-muted)] tabular">
-            {{ totalTransactions }} total
-          </span>
-        </div>
-
-        <div class="card p-3">
-          <div class="flex flex-wrap items-end gap-3">
-            <div class="space-y-1 flex-1 min-w-[10rem]">
-              <label class="label">Search</label>
-              <input
-                v-model="filterQ"
-                placeholder="Description or ISIN"
-                class="input"
-                @input="onFilterChange"
-              />
+        <!-- Transactions tab -->
+        <div v-if="activeTab === 'transactions'" class="space-y-4">
+          <div class="card p-3">
+            <div class="flex flex-wrap items-end gap-3">
+              <div class="space-y-1 flex-1 min-w-[10rem]">
+                <label class="label">Search</label>
+                <input
+                  v-model="filterQ"
+                  placeholder="Description or ISIN"
+                  class="input"
+                  @input="onFilterChange"
+                />
+              </div>
+              <div class="space-y-1">
+                <label class="label">Type</label>
+                <select v-model="filterType" class="input" @change="onFilterChange">
+                  <option value="">All types</option>
+                  <option v-for="(label, value) in typeLabels" :key="value" :value="value">{{ label }}</option>
+                </select>
+              </div>
+              <div class="space-y-1">
+                <label class="label">From</label>
+                <DateField v-model="filterFrom" clearable placeholder="From" @update:model-value="onFilterChange" />
+              </div>
+              <div class="space-y-1">
+                <label class="label">To</label>
+                <DateField v-model="filterTo" clearable placeholder="To" @update:model-value="onFilterChange" />
+              </div>
+              <button
+                v-if="hasFilters"
+                type="button"
+                class="btn btn-ghost"
+                @click="clearFilters"
+              >
+                Clear
+              </button>
             </div>
-            <div class="space-y-1">
-              <label class="label">Type</label>
-              <select v-model="filterType" class="input" @change="onFilterChange">
-                <option value="">All types</option>
-                <option v-for="(label, value) in typeLabels" :key="value" :value="value">{{ label }}</option>
-              </select>
-            </div>
-            <div class="space-y-1">
-              <label class="label">From</label>
-              <DateField v-model="filterFrom" clearable placeholder="From" @update:model-value="onFilterChange" />
-            </div>
-            <div class="space-y-1">
-              <label class="label">To</label>
-              <DateField v-model="filterTo" clearable placeholder="To" @update:model-value="onFilterChange" />
-            </div>
-            <button
-              v-if="hasFilters"
-              type="button"
-              class="btn btn-ghost"
-              @click="clearFilters"
-            >
-              Clear
-            </button>
           </div>
-        </div>
 
-        <div v-if="loading" class="card p-10 text-center text-[var(--color-text-muted)]">Loading…</div>
-        <div v-else-if="transactions.length === 0" class="card p-10 text-center space-y-2">
-          <div class="flex justify-center text-[var(--color-text-dim)]">
-            <Inbox :size="40" />
+          <div v-if="loading" class="card p-10 text-center text-[var(--color-text-muted)]">Loading…</div>
+          <div v-else-if="transactions.length === 0" class="card p-10 text-center space-y-2">
+            <div class="flex justify-center text-[var(--color-text-dim)]">
+              <Inbox :size="40" />
+            </div>
+            <p class="font-medium">{{ hasFilters ? 'No transactions match the filters' : 'No transactions yet' }}</p>
+            <p class="text-sm text-[var(--color-text-muted)]">
+              {{ hasFilters ? 'Try clearing some filters.' : 'Import a CSV or add one manually.' }}
+            </p>
           </div>
-          <p class="font-medium">{{ hasFilters ? 'No transactions match the filters' : 'No transactions yet' }}</p>
-          <p class="text-sm text-[var(--color-text-muted)]">
-            {{ hasFilters ? 'Try clearing some filters.' : 'Import a CSV or add one manually.' }}
-          </p>
-        </div>
-        <div v-else class="card overflow-hidden">
-          <table class="table">
-            <thead>
-              <tr>
-                <th class="w-28">Date</th>
-                <th class="w-28">Type</th>
-                <th>Description</th>
-                <th class="text-right w-32">Quantity</th>
-                <th class="text-right w-32">Amount</th>
-                <th class="w-10"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="t in transactions" :key="t.id">
-                <td class="text-[var(--color-text-muted)] tabular">{{ shortDate(t.occurredAt) }}</td>
-                <td>
-                  <span class="badge">{{ typeLabels[t.type ?? 'other'] ?? t.type }}</span>
-                </td>
-                <td>
-                  <div class="truncate max-w-md">{{ t.description ?? '—' }}</div>
-                  <div v-if="t.assetIsin" class="text-xs text-[var(--color-text-dim)] mt-0.5">
-                    {{ t.assetIsin }}
-                  </div>
-                </td>
-                <td class="text-right tabular text-[var(--color-text-muted)]">
-                  {{ t.assetQuantity ?? '' }}
-                </td>
-                <td
-                  class="text-right tabular font-medium"
-                  :class="BigInt(t.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'"
-                >
-                  {{ formatMinor(t.amountMinor, t.currency) }}
-                </td>
-                <td class="text-right">
-                  <div class="flex justify-end gap-0.5">
-                    <button
-                      class="p-1.5 rounded transition-colors text-[var(--color-text-dim)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]"
-                      type="button"
-                      aria-label="Edit transaction"
-                      @click="startEditTransaction(t)"
-                    >
-                      <Pencil :size="14" />
-                    </button>
-                    <button
-                      class="p-1.5 rounded transition-colors text-[var(--color-text-dim)] hover:text-[var(--color-negative)] hover:bg-[var(--color-surface-hover)]"
-                      type="button"
-                      aria-label="Delete transaction"
-                      @click="deleteTransaction(t)"
-                    >
-                      <Trash2 :size="14" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+          <div v-else class="card overflow-hidden">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th class="w-28">Date</th>
+                  <th class="w-28">Type</th>
+                  <th>Description</th>
+                  <th class="text-right w-32">Quantity</th>
+                  <th class="text-right w-32">Amount</th>
+                  <th class="w-10"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="t in transactions" :key="t.id">
+                  <td class="text-[var(--color-text-muted)] tabular">{{ shortDate(t.occurredAt) }}</td>
+                  <td>
+                    <span class="badge">{{ typeLabels[t.type ?? 'other'] ?? t.type }}</span>
+                  </td>
+                  <td>
+                    <div class="truncate max-w-md">{{ t.description ?? '—' }}</div>
+                    <div v-if="t.assetIsin" class="text-xs text-[var(--color-text-dim)] mt-0.5">
+                      {{ t.assetIsin }}
+                    </div>
+                  </td>
+                  <td class="text-right tabular text-[var(--color-text-muted)]">
+                    {{ t.assetQuantity ?? '' }}
+                  </td>
+                  <td
+                    class="text-right tabular font-medium"
+                    :class="BigInt(t.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'"
+                  >
+                    {{ formatMinor(t.amountMinor, t.currency) }}
+                  </td>
+                  <td class="text-right">
+                    <div class="flex justify-end gap-0.5">
+                      <button
+                        class="p-1.5 rounded transition-colors text-[var(--color-text-dim)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]"
+                        type="button"
+                        aria-label="Edit transaction"
+                        @click="startEditTransaction(t)"
+                      >
+                        <Pencil :size="14" />
+                      </button>
+                      <button
+                        class="p-1.5 rounded transition-colors text-[var(--color-text-dim)] hover:text-[var(--color-negative)] hover:bg-[var(--color-surface-hover)]"
+                        type="button"
+                        aria-label="Delete transaction"
+                        @click="deleteTransaction(t)"
+                      >
+                        <Trash2 :size="14" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <div v-if="totalTransactions > pageSize" class="flex items-center justify-between gap-3">
-          <span class="text-xs text-[var(--color-text-muted)] tabular">
-            Page {{ page }} of {{ totalPages }}
-          </span>
-          <div class="flex items-center gap-1">
-            <button
-              type="button"
-              class="btn btn-ghost text-xs"
-              :disabled="page <= 1 || loading"
-              @click="goToPage(page - 1)"
-            >Previous</button>
-            <button
-              type="button"
-              class="btn btn-ghost text-xs"
-              :disabled="page >= totalPages || loading"
-              @click="goToPage(page + 1)"
-            >Next</button>
+          <div v-if="totalTransactions > pageSize" class="flex items-center justify-between gap-3">
+            <span class="text-xs text-[var(--color-text-muted)] tabular">
+              Page {{ page }} of {{ totalPages }}
+            </span>
+            <div class="flex items-center gap-1">
+              <button
+                type="button"
+                class="btn btn-ghost text-xs"
+                :disabled="page <= 1 || loading"
+                @click="goToPage(page - 1)"
+              >Previous</button>
+              <button
+                type="button"
+                class="btn btn-ghost text-xs"
+                :disabled="page >= totalPages || loading"
+                @click="goToPage(page + 1)"
+              >Next</button>
+            </div>
           </div>
         </div>
       </section>
@@ -436,5 +493,6 @@ async function deleteTransaction(t: Transaction) {
     <p v-else class="text-[var(--color-text-muted)]">Account not found.</p>
 
     <EditTransactionForm v-model:transaction="editingTransaction" @saved="onTransactionSaved" />
+    <EditAccountForm v-model:account="editingAccount" @saved="() => toasts.success('Account updated')" />
   </div>
 </template>

@@ -17,7 +17,7 @@ async function submit() {
   loading.value = true
   try {
     await auth.login(email.value, password.value)
-    await router.push({ name: 'home' })
+    await router.push({ name: 'dashboard' })
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {

@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { api } from '@/lib/api'
+import { useToastsStore } from '@/stores/toasts'
 import { parseMajor } from '@/lib/money'
 import { PiggyBank } from 'lucide-vue-next'
 import BaseModal from '@/components/BaseModal.vue'
 import DateField from '@/components/DateField.vue'
+
+const toasts = useToastsStore()
 
 const props = defineProps<{ accountId: string; currency: string }>()
 const emit = defineEmits<{ created: [] }>()
@@ -35,6 +38,11 @@ async function submit() {
       { occurredAt: occurredAt.value, amountMinor },
     )
     missing.value = res.missingPrices
+    if (res.missingPrices.length > 0) {
+      toasts.info(`Contribution saved (no price data for ${res.missingPrices.length} slice(s))`)
+    } else {
+      toasts.success('Contribution saved')
+    }
     amount.value = ''
     open.value = false
     emit('created')

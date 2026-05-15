@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ApiError } from '@/lib/api'
-import { Upload, CheckCircle2, AlertCircle } from 'lucide-vue-next'
+import { useToastsStore } from '@/stores/toasts'
+import { Upload, AlertCircle } from 'lucide-vue-next'
+import BaseModal from '@/components/BaseModal.vue'
 
 const props = defineProps<{ accountId: string }>()
 const emit = defineEmits<{ imported: [] }>()
@@ -13,15 +15,16 @@ interface ImportResult {
   errors: string[]
 }
 
+const toasts = useToastsStore()
+
+const open = ref(false)
 const dragging = ref(false)
 const submitting = ref(false)
-const result = ref<ImportResult | null>(null)
 const error = ref<string | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 
 async function upload(file: File) {
   error.value = null
-  result.value = null
   submitting.value = true
   try {
     const form = new FormData()
@@ -35,7 +38,13 @@ async function upload(file: File) {
     if (!res.ok) {
       throw new ApiError(res.status, body.error ?? res.statusText)
     }
-    result.value = body
+    const summary = `Imported ${body.imported} from ${body.importer ?? 'CSV'} · skipped ${body.skipped}`
+    if (body.errors.length > 0) {
+      toasts.error(`${summary} · ${body.errors.length} errors: ${body.errors[0]}`)
+    } else {
+      toasts.success(summary)
+    }
+    open.value = false
     emit('imported')
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
@@ -55,52 +64,44 @@ function onFilePicked(ev: Event) {
   const file = (ev.target as HTMLInputElement).files?.[0]
   if (file) void upload(file)
 }
+
+function reset() {
+  error.value = null
+  submitting.value = false
+}
 </script>
 
 <template>
-  <div
-    class="card p-6 transition-colors cursor-pointer"
-    :class="{ 'border-[var(--color-accent)]': dragging }"
-    @dragenter.prevent="dragging = true"
-    @dragover.prevent="dragging = true"
-    @dragleave.prevent="dragging = false"
-    @drop="onDrop"
-    @click="fileInput?.click()"
-  >
-    <input ref="fileInput" type="file" accept=".csv,text/csv" hidden @change="onFilePicked" />
+  <button class="btn btn-secondary" @click="open = true">
+    <Upload :size="16" />
+    <span>Import CSV</span>
+  </button>
 
-    <div class="flex items-start gap-4">
-      <div
-        class="flex items-center justify-center w-10 h-10 rounded-md shrink-0"
-        :style="{ backgroundColor: 'color-mix(in srgb, var(--color-accent) 15%, transparent)', color: 'var(--color-accent)' }"
-      >
-        <Upload :size="20" />
+  <BaseModal v-model:open="open" title="Import CSV" @close="reset">
+    <div
+      class="rounded-md border-2 border-dashed p-8 transition-colors cursor-pointer text-center"
+      :style="{ borderColor: dragging ? 'var(--color-accent)' : 'var(--color-border)' }"
+      @dragenter.prevent="dragging = true"
+      @dragover.prevent="dragging = true"
+      @dragleave.prevent="dragging = false"
+      @drop="onDrop"
+      @click="fileInput?.click()"
+    >
+      <input ref="fileInput" type="file" accept=".csv,text/csv" hidden @change="onFilePicked" />
+      <div class="flex justify-center mb-3 text-[var(--color-accent)]">
+        <Upload :size="28" />
       </div>
-
-      <div class="flex-1 min-w-0">
-        <p v-if="submitting" class="font-medium">Importing…</p>
-        <template v-else-if="result">
-          <p class="font-medium flex items-center gap-1.5">
-            <CheckCircle2 :size="16" class="text-[var(--color-positive)]" />
-            Imported from {{ result.importer }}
-          </p>
-          <p class="text-sm text-[var(--color-text-muted)] mt-0.5">
-            {{ result.imported }} new · {{ result.skipped }} duplicates skipped
-            <span v-if="result.errors.length > 0" class="text-[var(--color-negative)]"> · {{ result.errors.length }} errors</span>
-          </p>
-        </template>
-        <template v-else>
-          <p class="font-medium">Import CSV</p>
-          <p class="text-sm text-[var(--color-text-muted)] mt-0.5">
-            Drag a file here or click to browse. Auto-detects ZKB, Degiro trades, and IBKR Statement of Funds.
-          </p>
-        </template>
-
-        <p v-if="error" class="mt-2 text-sm text-[var(--color-negative)] flex items-center gap-1.5">
-          <AlertCircle :size="14" />
-          {{ error }}
+      <p v-if="submitting" class="font-medium">Importing…</p>
+      <template v-else>
+        <p class="font-medium">Drop a CSV here or click to browse</p>
+        <p class="text-sm text-[var(--color-text-muted)] mt-1">
+          Auto-detects ZKB, Degiro trades, and IBKR Statement of Funds.
         </p>
-      </div>
+      </template>
     </div>
-  </div>
+    <p v-if="error" class="mt-3 text-sm text-[var(--color-negative)] flex items-center gap-1.5">
+      <AlertCircle :size="14" />
+      {{ error }}
+    </p>
+  </BaseModal>
 </template>

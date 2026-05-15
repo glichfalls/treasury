@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { api } from '@/lib/api'
+import { useToastsStore } from '@/stores/toasts'
 import { parseMajor } from '@/lib/money'
 import { Sparkles } from 'lucide-vue-next'
 import BaseModal from '@/components/BaseModal.vue'
 import DateField from '@/components/DateField.vue'
+
+const toasts = useToastsStore()
 
 const props = defineProps<{ accountId: string; currency: string }>()
 const emit = defineEmits<{ created: [] }>()
@@ -35,6 +38,7 @@ async function submit() {
       { occurredAt: occurredAt.value, amountMinor, description: 'Opening balance' },
     )
     missing.value = res.missingPrices
+    toasts.success('Starting balance saved')
     amount.value = ''
     open.value = false
     emit('created')

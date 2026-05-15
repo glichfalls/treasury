@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useAccountsStore } from '@/stores/accounts'
-import { Download, Upload, AlertCircle, CheckCircle2 } from 'lucide-vue-next'
+import { useToastsStore } from '@/stores/toasts'
+import { Download, Upload } from 'lucide-vue-next'
 
 const accounts = useAccountsStore()
+const toasts = useToastsStore()
 const mode = ref<'skip' | 'replace'>('skip')
 const importing = ref(false)
-const importResult = ref<{ imported: number; skipped: number; errors: string[] } | null>(null)
-const importError = ref<string | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 
 async function pickAndImport(ev: Event) {
@@ -19,8 +19,6 @@ async function pickAndImport(ev: Event) {
   }
 
   importing.value = true
-  importResult.value = null
-  importError.value = null
   try {
     const text = await file.text()
     const res = await fetch(`/api/accounts/import?mode=${mode.value}`, {
@@ -31,10 +29,16 @@ async function pickAndImport(ev: Event) {
     })
     const body = await res.json()
     if (!res.ok) throw new Error(body.error ?? res.statusText)
-    importResult.value = body
     await accounts.fetchAll()
+
+    const summary = `Imported ${body.imported} · skipped ${body.skipped}`
+    if (body.errors.length > 0) {
+      toasts.error(`${summary} · ${body.errors.length} errors: ${body.errors[0]}`)
+    } else {
+      toasts.success(summary)
+    }
   } catch (e) {
-    importError.value = e instanceof Error ? e.message : String(e)
+    toasts.error(e instanceof Error ? e.message : String(e))
   } finally {
     importing.value = false
     if (fileInput.value) fileInput.value.value = ''
@@ -80,25 +84,5 @@ async function pickAndImport(ev: Event) {
     </div>
 
     <p v-if="importing" class="text-sm text-[var(--color-text-muted)]">Importing…</p>
-
-    <p v-if="importResult" class="text-sm flex items-center gap-1.5">
-      <CheckCircle2 :size="14" class="text-[var(--color-positive)]" />
-      Imported {{ importResult.imported }} · skipped {{ importResult.skipped }}<span
-        v-if="importResult.errors.length > 0"
-        class="text-[var(--color-negative)]"
-      >
-        · {{ importResult.errors.length }} errors</span>
-    </p>
-    <ul
-      v-if="importResult && importResult.errors.length > 0"
-      class="text-xs text-[var(--color-negative)] space-y-0.5 pl-5 list-disc"
-    >
-      <li v-for="(err, i) in importResult.errors" :key="i">{{ err }}</li>
-    </ul>
-
-    <p v-if="importError" class="text-sm text-[var(--color-negative)] flex items-center gap-1.5">
-      <AlertCircle :size="14" />
-      {{ importError }}
-    </p>
   </div>
 </template>

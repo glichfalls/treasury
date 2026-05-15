@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useAccountsStore } from '@/stores/accounts'
+import { useToastsStore } from '@/stores/toasts'
 import { Plus } from 'lucide-vue-next'
 import BaseModal from '@/components/BaseModal.vue'
 
 const accounts = useAccountsStore()
+const toasts = useToastsStore()
 
 const accountTypes = [
   { value: 'bank_checking', label: 'Bank — Checking' },
@@ -41,12 +43,13 @@ async function submit() {
   error.value = null
   submitting.value = true
   try {
-    await accounts.create({
+    const created = await accounts.create({
       name: name.value.trim(),
       institution: institution.value.trim() || null,
       type: type.value,
       currency: currency.value.trim().toUpperCase(),
     })
+    toasts.success(`Created ${created.name}`)
     reset()
     open.value = false
   } catch (e) {

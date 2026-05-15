@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { api } from '@/lib/api'
+import { useToastsStore } from '@/stores/toasts'
 import { parseMajor } from '@/lib/money'
 import { Coins } from 'lucide-vue-next'
 import BaseModal from '@/components/BaseModal.vue'
 import DateField from '@/components/DateField.vue'
+
+const toasts = useToastsStore()
 
 interface CatalogEntry {
   isin: string
@@ -54,6 +57,7 @@ async function submit() {
       assetQuantity: quantity.value,
       description: `${quantity.value}× ${catalog.value.find((c) => c.isin === isin.value)?.name ?? isin.value}`,
     })
+    toasts.success(`Added ${quantity.value}× ${catalog.value.find((c) => c.isin === isin.value)?.name ?? 'coin'}`)
     reset()
     open.value = false
     emit('created')

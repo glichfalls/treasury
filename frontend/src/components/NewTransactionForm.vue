@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useAccountsStore } from '@/stores/accounts'
+import { useToastsStore } from '@/stores/toasts'
 import { parseMajor } from '@/lib/money'
 import { Plus } from 'lucide-vue-next'
 import BaseModal from '@/components/BaseModal.vue'
@@ -10,6 +11,7 @@ const props = defineProps<{ accountId: string; currency: string }>()
 const emit = defineEmits<{ created: [] }>()
 
 const accounts = useAccountsStore()
+const toasts = useToastsStore()
 
 const today = new Date().toISOString().slice(0, 10)
 const open = ref(false)
@@ -36,6 +38,7 @@ async function submit() {
       amountMinor,
       description: description.value.trim() || null,
     })
+    toasts.success('Transaction saved')
     reset()
     open.value = false
     emit('created')
