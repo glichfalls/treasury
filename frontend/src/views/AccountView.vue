@@ -12,7 +12,6 @@ import AddContributionForm from '@/components/AddContributionForm.vue'
 import OpeningBalanceForm from '@/components/OpeningBalanceForm.vue'
 import NetWorthChart from '@/components/NetWorthChart.vue'
 import AllocationDonut from '@/components/AllocationDonut.vue'
-import AssetPriceChart from '@/components/AssetPriceChart.vue'
 import PerformanceChart from '@/components/PerformanceChart.vue'
 import EditTransactionForm from '@/components/EditTransactionForm.vue'
 import EditAccountForm from '@/components/EditAccountForm.vue'
@@ -32,7 +31,6 @@ const totalTransactions = ref(0)
 const holdings = ref<Holding[]>([])
 const loading = ref(false)
 const range = ref<'1w' | '1m' | '6mo' | '1y' | '2y' | '5y' | 'all'>('1y')
-const expandedHolding = ref<string | null>(null)
 
 // Filter / pagination state.
 const page = ref(1)
@@ -137,10 +135,6 @@ const typeLabels: Record<string, string> = {
 function shortDate(iso: string): string {
   const d = new Date(iso)
   return d.toLocaleDateString('de-CH', { year: 'numeric', month: 'short', day: '2-digit' })
-}
-
-function toggleHolding(isin: string) {
-  expandedHolding.value = expandedHolding.value === isin ? null : isin
 }
 
 const editingAccount = ref<Account | null>(null)
@@ -339,28 +333,23 @@ async function deleteTransaction(t: Transaction) {
               </tr>
             </thead>
             <tbody>
-              <template v-for="h in holdings" :key="h.isin">
-                <tr class="cursor-pointer" @click="toggleHolding(h.isin)">
-                  <td>
-                    <div class="font-medium">{{ h.ticker ?? '—' }}</div>
-                    <div class="text-xs text-[var(--color-text-dim)]">{{ h.isin }}</div>
-                  </td>
-                  <td class="text-[var(--color-text-muted)] truncate max-w-xs">{{ h.name ?? '—' }}</td>
-                  <td class="text-right tabular">{{ h.quantity }}</td>
-                  <td class="text-right tabular text-[var(--color-text-muted)]">
-                    {{ h.priceMinor && h.priceCurrency ? formatMinor(h.priceMinor, h.priceCurrency) : '—' }}
-                  </td>
-                  <td class="text-right tabular font-medium">
-                    {{ h.valueBaseMinor ? formatMinor(h.valueBaseMinor, h.baseCurrency) : '—' }}
-                  </td>
-                  <td class="text-xs text-[var(--color-text-dim)]">{{ h.priceAsOf ?? '—' }}</td>
-                </tr>
-                <tr v-if="expandedHolding === h.isin">
-                  <td colspan="6" class="bg-[var(--color-bg)]/50 p-4">
-                    <AssetPriceChart :isin="h.isin" />
-                  </td>
-                </tr>
-              </template>
+              <tr v-for="h in holdings" :key="h.isin">
+                <td>
+                  <RouterLink :to="{ name: 'asset', params: { isin: h.isin } }" class="font-medium hover:text-[var(--color-accent)] transition-colors">
+                    {{ h.ticker ?? '—' }}
+                  </RouterLink>
+                  <div class="text-xs text-[var(--color-text-dim)]">{{ h.isin }}</div>
+                </td>
+                <td class="text-[var(--color-text-muted)] truncate max-w-xs">{{ h.name ?? '—' }}</td>
+                <td class="text-right tabular">{{ h.quantity }}</td>
+                <td class="text-right tabular text-[var(--color-text-muted)]">
+                  {{ h.priceMinor && h.priceCurrency ? formatMinor(h.priceMinor, h.priceCurrency) : '—' }}
+                </td>
+                <td class="text-right tabular font-medium">
+                  {{ h.valueBaseMinor ? formatMinor(h.valueBaseMinor, h.baseCurrency) : '—' }}
+                </td>
+                <td class="text-xs text-[var(--color-text-dim)]">{{ h.priceAsOf ?? '—' }}</td>
+              </tr>
             </tbody>
           </table>
         </div>
