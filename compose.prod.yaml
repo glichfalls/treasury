@@ -13,7 +13,11 @@ services:
     expose:
       - "9000"
     volumes:
-      - php_var:/app/var
+      # Persist *only* sessions across deploys so users stay logged in. The Symfony
+      # compiled cache (var/cache) must come from the image — mounting all of /app/var
+      # like before shadowed the freshly-warmed cache with stale content from a previous
+      # build and broke DI when constructor signatures changed.
+      - php_sessions:/app/var/sessions
 
   web:
     image: ghcr.io/${GHCR_OWNER}/treasury-web:${IMAGE_TAG:-latest}
@@ -25,4 +29,4 @@ services:
       - "127.0.0.1:8080:80"
 
 volumes:
-  php_var:
+  php_sessions:
