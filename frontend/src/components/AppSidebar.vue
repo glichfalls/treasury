@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { LayoutDashboard, Wallet, Settings, Menu, X } from 'lucide-vue-next'
+import BrandMark from '@/components/BrandMark.vue'
 
 const route = useRoute()
 
@@ -44,7 +45,7 @@ function isActive(item: (typeof items)[number]): boolean {
   >
     <div class="flex items-center justify-between px-5 pt-5 pb-6">
       <RouterLink :to="{ name: 'dashboard' }" class="flex items-center gap-2 font-semibold tracking-tight">
-        <Wallet :size="18" class="text-[var(--color-accent)]" />
+        <BrandMark :size="22" />
         <span>Treasury</span>
       </RouterLink>
       <button

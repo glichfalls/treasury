@@ -17,6 +17,7 @@ import {
   Github,
   Check,
 } from 'lucide-vue-next'
+import BrandMark from '@/components/BrandMark.vue'
 
 const stats = [
   { value: '3', label: 'Bank importers (ZKB, Degiro, IBKR)' },
@@ -58,7 +59,7 @@ onBeforeUnmount(() => observer?.disconnect())
     <header class="relative z-10 px-6 py-5">
       <div class="mx-auto max-w-6xl flex items-center justify-between">
         <div class="flex items-center gap-2 font-semibold tracking-tight">
-          <Wallet :size="20" class="text-[var(--color-accent)]" />
+          <BrandMark :size="24" />
           <span>Treasury</span>
         </div>
         <div class="flex items-center gap-2">
@@ -488,7 +489,7 @@ onBeforeUnmount(() => observer?.disconnect())
     <footer class="relative z-10 px-6 py-8 border-t" style="border-color: var(--color-border);">
       <div class="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--color-text-dim)]">
         <div class="flex items-center gap-2">
-          <Wallet :size="14" class="text-[var(--color-accent)]" />
+          <BrandMark :size="16" />
           <span>Treasury &copy; 2026</span>
         </div>
         <span>Personal net-worth tracker · hosted &amp; open-source</span>

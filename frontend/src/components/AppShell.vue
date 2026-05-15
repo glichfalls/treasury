@@ -4,6 +4,7 @@ import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { LogOut, Wallet, Menu, X, LayoutDashboard, Settings, Target } from 'lucide-vue-next'
 import HeaderSearch from '@/components/HeaderSearch.vue'
+import BrandMark from '@/components/BrandMark.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -40,7 +41,7 @@ function isActive(item: (typeof navItems)[number]): boolean {
     >
       <div class="mx-auto max-w-6xl px-6 py-3 flex items-center gap-6">
         <RouterLink :to="{ name: 'dashboard' }" class="flex items-center gap-2 font-semibold tracking-tight shrink-0">
-          <Wallet :size="18" class="text-[var(--color-accent)]" />
+          <BrandMark :size="22" />
           <span>Treasury</span>
         </RouterLink>
 

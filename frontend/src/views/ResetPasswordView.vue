@@ -2,7 +2,8 @@
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useToastsStore } from '@/stores/toasts'
-import { Wallet, Key } from 'lucide-vue-next'
+import { Key } from 'lucide-vue-next'
+import BrandMark from '@/components/BrandMark.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -55,7 +56,7 @@ async function submit() {
     <div class="relative z-10 w-full max-w-sm mx-auto px-6 py-12 space-y-8 fade-in">
       <div class="flex flex-col items-center gap-3">
         <RouterLink :to="{ name: 'landing' }" class="brand-mark">
-          <Wallet :size="32" class="text-[var(--color-accent)]" />
+          <BrandMark :size="40" />
         </RouterLink>
         <div class="text-center space-y-1">
           <h1 class="text-2xl font-semibold tracking-tight">Set new password</h1>

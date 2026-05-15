@@ -3,7 +3,8 @@ import { ref } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useToastsStore } from '@/stores/toasts'
-import { Wallet, UserPlus } from 'lucide-vue-next'
+import { UserPlus } from 'lucide-vue-next'
+import BrandMark from '@/components/BrandMark.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,7 +36,7 @@ async function submit() {
   <div class="min-h-screen flex items-center justify-center px-6 py-10">
     <div class="w-full max-w-sm">
       <div class="flex items-center justify-center gap-2 mb-8">
-        <Wallet :size="28" class="text-[var(--color-accent)]" />
+        <BrandMark :size="36" />
         <span class="text-2xl font-semibold tracking-tight">Treasury</span>
       </div>
 
