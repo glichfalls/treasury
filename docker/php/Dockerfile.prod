@@ -41,5 +41,9 @@ RUN APP_SECRET=build-placeholder DATABASE_URL="mysql://u:p@db:3306/d?serverVersi
     && chown -R www-data:www-data var \
     && chmod +x bin/console
 
+COPY docker/php/entrypoint.prod.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 EXPOSE 9000
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["php-fpm", "-F"]
