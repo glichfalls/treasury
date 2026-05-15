@@ -13,10 +13,7 @@ class AuthController extends AbstractController
     #[Route('/api/login', name: 'api_login', methods: ['POST'])]
     public function login(#[CurrentUser] ?User $user): JsonResponse
     {
-        return new JsonResponse([
-            'id' => $user->getId()->toRfc4122(),
-            'email' => $user->getEmail(),
-        ]);
+        return new JsonResponse($this->serialize($user));
     }
 
     #[Route('/api/logout', name: 'api_logout', methods: ['POST'])]
@@ -28,9 +25,15 @@ class AuthController extends AbstractController
     #[Route('/api/me', name: 'api_me', methods: ['GET'])]
     public function me(#[CurrentUser] User $user): JsonResponse
     {
-        return new JsonResponse([
+        return new JsonResponse($this->serialize($user));
+    }
+
+    private function serialize(User $user): array
+    {
+        return [
             'id' => $user->getId()->toRfc4122(),
             'email' => $user->getEmail(),
-        ]);
+            'roles' => $user->getRoles(),
+        ];
     }
 }

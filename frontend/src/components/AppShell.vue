@@ -8,7 +8,7 @@ const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 
-const showShell = computed(() => route.name !== 'login')
+const showShell = computed(() => !route.meta.hideShell)
 const activeName = computed(() => String(route.name ?? ''))
 
 const navItems = [

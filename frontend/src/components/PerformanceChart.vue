@@ -71,22 +71,22 @@ function directionColor(values: Array<number | null>): { line: string; areaTop: 
   if (defined.length < 2) {
     return {
       line: chartColors.accent,
-      areaTop: 'rgba(99,102,241,0.35)',
-      areaBottom: 'rgba(99,102,241,0.00)',
+      areaTop: 'rgba(250,204,21,0.35)',
+      areaBottom: 'rgba(250,204,21,0.00)',
     }
   }
   const delta = defined[defined.length - 1]! - defined[0]!
   if (delta >= 0) {
     return {
       line: chartColors.positive,
-      areaTop: 'rgba(16,185,129,0.35)',
-      areaBottom: 'rgba(16,185,129,0.00)',
+      areaTop: 'rgba(34,197,94,0.35)',
+      areaBottom: 'rgba(34,197,94,0.00)',
     }
   }
   return {
     line: chartColors.negative,
-    areaTop: 'rgba(239,68,68,0.35)',
-    areaBottom: 'rgba(239,68,68,0.00)',
+    areaTop: 'rgba(248,113,113,0.35)',
+    areaBottom: 'rgba(248,113,113,0.00)',
   }
 }
 

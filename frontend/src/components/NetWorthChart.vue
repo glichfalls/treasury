@@ -55,22 +55,22 @@ function directionColor(values: number[]): { line: string; areaTop: string; area
   if (values.length < 2) {
     return {
       line: chartColors.accent,
-      areaTop: 'rgba(99,102,241,0.35)',
-      areaBottom: 'rgba(99,102,241,0.00)',
+      areaTop: 'rgba(250,204,21,0.35)',
+      areaBottom: 'rgba(250,204,21,0.00)',
     }
   }
   const delta = values[values.length - 1]! - values[0]!
   if (delta >= 0) {
     return {
       line: chartColors.positive,
-      areaTop: 'rgba(16,185,129,0.35)',
-      areaBottom: 'rgba(16,185,129,0.00)',
+      areaTop: 'rgba(34,197,94,0.35)',
+      areaBottom: 'rgba(34,197,94,0.00)',
     }
   }
   return {
     line: chartColors.negative,
-    areaTop: 'rgba(239,68,68,0.35)',
-    areaBottom: 'rgba(239,68,68,0.00)',
+    areaTop: 'rgba(248,113,113,0.35)',
+    areaBottom: 'rgba(248,113,113,0.00)',
   }
 }
 
@@ -156,7 +156,7 @@ const option = computed<EChartsOption>(() => {
           showSymbol: false,
           sampling: 'lttb',
           lineStyle: { width: 0 },
-          areaStyle: { color: 'rgba(99,102,241,0.45)' },
+          areaStyle: { color: 'rgba(250,204,21,0.45)' },
           data: points.value.map((p) => Number(p.cashMinor) / 100),
         },
         {
@@ -167,7 +167,7 @@ const option = computed<EChartsOption>(() => {
           showSymbol: false,
           sampling: 'lttb',
           lineStyle: { width: 0 },
-          areaStyle: { color: 'rgba(16,185,129,0.45)' },
+          areaStyle: { color: 'rgba(167,139,250,0.45)' },
           data: points.value.map((p) => Number(p.holdingsMinor) / 100),
         },
       ],

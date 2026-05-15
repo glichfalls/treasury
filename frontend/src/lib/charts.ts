@@ -29,14 +29,17 @@ export type { EChartsOption }
 
 // Shared dark theme tokens — read from the CSS variables defined in main.css.
 export const chartColors = {
-  bg: '#0a0a0c',
-  surface: '#131316',
-  border: '#26262c',
-  text: '#f4f4f5',
+  bg: '#000000',
+  surface: '#0f0f10',
+  border: '#262629',
+  text: '#fafafa',
   textMuted: '#a1a1aa',
   textDim: '#71717a',
-  accent: '#6366f1',
-  positive: '#10b981',
-  negative: '#ef4444',
-  palette: ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#a855f7', '#22c55e', '#ef4444', '#3b82f6'],
+  accent: '#facc15',
+  highlight: '#a78bfa',
+  positive: '#22c55e',
+  negative: '#f87171',
+  // Yellow first, violet second; rest are tuned to read well on pure black for donut /
+  // multi-series charts.
+  palette: ['#facc15', '#a78bfa', '#22c55e', '#fb923c', '#22d3ee', '#f472b6', '#60a5fa', '#94a3b8', '#fde047'],
 }

@@ -1,23 +1,25 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { Wallet, LogIn } from 'lucide-vue-next'
+import { Wallet, ArrowRight } from 'lucide-vue-next'
+
+const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
 
 const email = ref('')
 const password = ref('')
 const error = ref<string | null>(null)
 const loading = ref(false)
 
-const auth = useAuthStore()
-const router = useRouter()
-
 async function submit() {
   error.value = null
   loading.value = true
   try {
     await auth.login(email.value, password.value)
-    await router.push({ name: 'dashboard' })
+    const next = typeof route.query.next === 'string' ? route.query.next : '/dashboard'
+    await router.push(next)
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -27,30 +29,126 @@ async function submit() {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center px-6">
-    <div class="w-full max-w-sm">
-      <div class="flex items-center justify-center gap-2 mb-8">
-        <Wallet :size="28" class="text-[var(--color-accent)]" />
-        <span class="text-2xl font-semibold tracking-tight">Treasury</span>
+  <div class="auth-page">
+    <!-- Decorative glow (cheap radial-gradient, no fixed positioning, no animation
+         to avoid the scroll/repaint cost the landing page had before). -->
+    <div class="auth-glow" aria-hidden="true" />
+
+    <div class="relative z-10 w-full max-w-sm mx-auto px-6 py-12 space-y-8 fade-in">
+      <!-- Brand mark -->
+      <div class="flex flex-col items-center gap-3">
+        <RouterLink :to="{ name: 'landing' }" class="brand-mark">
+          <Wallet :size="32" class="text-[var(--color-accent)]" />
+        </RouterLink>
+        <div class="text-center space-y-1">
+          <h1 class="text-2xl font-semibold tracking-tight">Welcome back</h1>
+          <p class="text-sm text-[var(--color-text-muted)]">Sign in to your Treasury account</p>
+        </div>
       </div>
 
+      <!-- Form card -->
       <form class="card p-6 space-y-4" @submit.prevent="submit">
         <div class="space-y-1.5">
-          <label class="label">Email</label>
-          <input v-model="email" type="email" required autocomplete="username" class="input" />
-        </div>
-        <div class="space-y-1.5">
-          <label class="label">Password</label>
-          <input v-model="password" type="password" required autocomplete="current-password" class="input" />
+          <label class="label" for="login-email">Email</label>
+          <input
+            id="login-email"
+            v-model="email"
+            type="email"
+            required
+            autocomplete="username"
+            class="input"
+            placeholder="you@example.com"
+          />
         </div>
 
-        <button type="submit" class="btn btn-primary w-full" :disabled="loading">
-          <LogIn v-if="!loading" :size="16" />
+        <div class="space-y-1.5">
+          <div class="flex items-baseline justify-between">
+            <label class="label" for="login-password">Password</label>
+          </div>
+          <input
+            id="login-password"
+            v-model="password"
+            type="password"
+            required
+            autocomplete="current-password"
+            class="input"
+            placeholder="••••••••"
+          />
+        </div>
+
+        <button type="submit" class="btn btn-primary w-full text-base py-2.5" :disabled="loading">
           <span>{{ loading ? 'Signing in…' : 'Sign in' }}</span>
+          <ArrowRight v-if="!loading" :size="16" />
         </button>
 
-        <p v-if="error" class="text-sm text-[var(--color-negative)]">{{ error }}</p>
+        <p v-if="error" class="text-sm text-[var(--color-negative)] text-center pt-1">{{ error }}</p>
       </form>
+
+      <!-- Switch to register -->
+      <p class="text-center text-sm text-[var(--color-text-muted)]">
+        New to Treasury?
+        <RouterLink :to="{ name: 'register' }" class="text-[var(--color-accent)] hover:underline font-medium">
+          Create an account
+        </RouterLink>
+      </p>
     </div>
   </div>
 </template>
+
+<style scoped>
+.auth-page {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bg);
+  overflow: hidden;
+}
+
+/* Subtle background glow — same palette as landing, scoped to the auth pages.
+   No fixed positioning, no mask, no animation: just an absolutely-positioned
+   block painted with two radial gradients so it scrolls / repaints once. */
+.auth-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(40rem 40rem at 20% 0%, rgba(250, 204, 21, 0.18), transparent 60%),
+    radial-gradient(35rem 35rem at 80% 100%, rgba(167, 139, 250, 0.16), transparent 60%);
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.brand-mark:hover {
+  background: color-mix(in srgb, var(--color-accent) 15%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-accent) 50%, var(--color-border));
+}
+
+/* Subtle fade-in on mount so the page doesn't snap into existence */
+.fade-in {
+  animation: fade-up 0.5s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fade-in { animation: none; }
+}
+
+/* Focus ring on inputs — uses accent yellow for the new palette */
+.auth-page :deep(.input:focus) {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
+</style>

@@ -1,14 +1,17 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 export interface AuthUser {
-  id: number
+  id: string
   email: string
+  roles?: string[]
 }
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null)
   const ready = ref(false)
+
+  const isAdmin = computed(() => user.value?.roles?.includes('ROLE_ADMIN') ?? false)
 
   async function fetchMe(): Promise<AuthUser | null> {
     const res = await fetch('/api/me', { credentials: 'include' })
@@ -35,10 +38,25 @@ export const useAuthStore = defineStore('auth', () => {
     return user.value
   }
 
+  async function register(email: string, password: string, code: string): Promise<AuthUser> {
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, code }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error((body as { error?: string }).error ?? `Registration failed (${res.status})`)
+    }
+    // After register, auto-login so the session cookie is set.
+    return login(email, password)
+  }
+
   async function logout(): Promise<void> {
     await fetch('/api/logout', { method: 'POST', credentials: 'include' })
     user.value = null
   }
 
-  return { user, ready, fetchMe, login, logout }
+  return { user, ready, isAdmin, fetchMe, login, register, logout }
 })

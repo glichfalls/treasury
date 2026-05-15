@@ -25,15 +25,11 @@ const { chromium } = require('playwright');
   await page.locator('input[type=password]').fill('demo');
   await page.locator('button[type=submit]').click();
 
-  await page.waitForURL('http://frontend:5173/');
-  // Navigate to the 3a account page where the new allocation UI lives.
-  await page.goto('http://frontend:5173/accounts/019e2708-069f-7669-9011-3484b9611ee6', { waitUntil: 'networkidle' });
+  // After login the router redirects to /dashboard.
+  await page.waitForURL('**/dashboard');
   await page.waitForSelector('canvas', { state: 'visible', timeout: 20000 });
-  // Give ECharts a beat to finish animating.
-  await page.waitForTimeout(1500);
-  // Open the strategy editor so the screenshot shows edit mode.
-  await page.getByRole('button', { name: 'Edit' }).first().click();
-  await page.waitForTimeout(400);
+  // Give ECharts a beat to finish animating in.
+  await page.waitForTimeout(1800);
 
   // Hide the floating vue-devtools panel so it doesn't appear in the screenshot.
   await page.addStyleTag({ content: `
@@ -43,7 +39,9 @@ const { chromium } = require('playwright');
     iframe[id^="__vue-devtools"] { display: none !important; }
   ` });
 
-  await page.screenshot({ path: '/work/screenshot.png', fullPage: true });
+  // Viewport-only screenshot (not fullPage) — the landing page hero looks better
+  // with a fixed-aspect-ratio image rather than a tall scrolled-out dump.
+  await page.screenshot({ path: '/work/screenshot.png', fullPage: false });
 
   await browser.close();
   console.log('saved /work/screenshot.png');

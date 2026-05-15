@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import BackupPanel from '@/components/BackupPanel.vue'
+import RegistrationCodesPanel from '@/components/RegistrationCodesPanel.vue'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
 </script>
 
 <template>
@@ -10,5 +14,7 @@ import BackupPanel from '@/components/BackupPanel.vue'
     </header>
 
     <BackupPanel />
+
+    <RegistrationCodesPanel v-if="auth.isAdmin" />
   </div>
 </template>

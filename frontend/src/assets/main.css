@@ -1,18 +1,26 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0a0a0c;
-  --color-surface: #131316;
-  --color-surface-hover: #1a1a1f;
-  --color-border: #26262c;
-  --color-border-strong: #34343c;
-  --color-text: #f4f4f5;
+  --color-bg: #000000;
+  --color-surface: #0f0f10;
+  --color-surface-hover: #18181b;
+  --color-border: #262629;
+  --color-border-strong: #34343a;
+  --color-text: #fafafa;
   --color-text-muted: #a1a1aa;
   --color-text-dim: #71717a;
-  --color-accent: #6366f1;
-  --color-accent-hover: #818cf8;
-  --color-positive: #10b981;
-  --color-negative: #ef4444;
+  /* Yellow as the primary brand color. Pure-black background gives it maximum punch.
+     accent-text is the foreground when sitting on top of the yellow (e.g. the primary
+     button) — it has to be dark because yellow + white is unreadable. */
+  --color-accent: #facc15;
+  --color-accent-hover: #fde047;
+  --color-accent-text: #18181b;
+  /* Violet as the secondary — complementary to yellow on the color wheel, refined,
+     pairs without competing. Used for links, info, secondary chart series. */
+  --color-highlight: #a78bfa;
+  --color-highlight-hover: #c4b5fd;
+  --color-positive: #22c55e;
+  --color-negative: #f87171;
 
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -44,11 +52,11 @@
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
     background-color: var(--color-accent);
-    color: white;
+    color: var(--color-accent-text);
   }
   .btn-primary:hover:not(:disabled) {
     background-color: var(--color-accent-hover);
