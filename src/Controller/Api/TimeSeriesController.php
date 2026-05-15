@@ -5,6 +5,7 @@ namespace App\Controller\Api;
 use App\Entity\User;
 use App\Holdings\HoldingsService;
 use App\Repository\AccountRepository;
+use App\TimeSeries\PerformanceService;
 use App\TimeSeries\TimeSeriesService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -17,6 +18,7 @@ class TimeSeriesController extends AbstractController
 {
     public function __construct(
         private readonly TimeSeriesService $service,
+        private readonly PerformanceService $performance,
         private readonly AccountRepository $accounts,
         private readonly HoldingsService $holdings,
     ) {}
@@ -52,6 +54,26 @@ class TimeSeriesController extends AbstractController
         }
         [$from, $to, $granularity] = $this->parseRange($request);
         $series = $this->service->accountSeries($account, $from, $to, $granularity);
+        return new JsonResponse(array_map(fn($p) => $p->toArray(), $series));
+    }
+
+    #[Route('/api/performance', name: 'api_networth_performance', methods: ['GET'])]
+    public function networthPerformance(Request $request, #[CurrentUser] User $user): JsonResponse
+    {
+        [$from, $to, $granularity] = $this->parseRange($request);
+        $series = $this->performance->forUser($user, $from, $to, $granularity);
+        return new JsonResponse(array_map(fn($p) => $p->toArray(), $series));
+    }
+
+    #[Route('/api/accounts/{id}/performance', name: 'api_account_performance', methods: ['GET'])]
+    public function accountPerformance(string $id, Request $request, #[CurrentUser] User $user): JsonResponse
+    {
+        $account = $this->accounts->findOneOwnedBy($id, $user);
+        if ($account === null) {
+            throw new NotFoundHttpException();
+        }
+        [$from, $to, $granularity] = $this->parseRange($request);
+        $series = $this->performance->forAccount($account, $from, $to, $granularity);
         return new JsonResponse(array_map(fn($p) => $p->toArray(), $series));
     }
 

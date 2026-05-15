@@ -13,6 +13,7 @@ import OpeningBalanceForm from '@/components/OpeningBalanceForm.vue'
 import NetWorthChart from '@/components/NetWorthChart.vue'
 import AllocationDonut from '@/components/AllocationDonut.vue'
 import AssetPriceChart from '@/components/AssetPriceChart.vue'
+import PerformanceChart from '@/components/PerformanceChart.vue'
 import { ChevronLeft, Download, Inbox, Trash2 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -23,7 +24,7 @@ const account = computed(() => accounts.accounts.find((a) => a.id === accountId.
 const transactions = ref<Transaction[]>([])
 const holdings = ref<Holding[]>([])
 const loading = ref(false)
-const range = ref<'6mo' | '1y' | '2y' | '5y' | 'all'>('1y')
+const range = ref<'1w' | '1m' | '6mo' | '1y' | '2y' | '5y' | 'all'>('1y')
 const expandedHolding = ref<string | null>(null)
 
 async function load() {
@@ -143,6 +144,14 @@ async function deleteTransaction(t: Transaction) {
         </div>
         <AllocationDonut :endpoint="`/api/accounts/${account.id}/allocation`" />
       </div>
+
+      <PerformanceChart
+        :endpoint="`/api/accounts/${account.id}/performance`"
+        title="Account performance"
+        :range="range"
+        granularity="weekly"
+        @update:range="range = $event"
+      />
 
       <div v-if="account.type === 'pillar_3a'" class="space-y-4">
         <AllocationEditor :account-id="account.id" @saved="reloadAfterImport" />

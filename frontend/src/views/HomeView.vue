@@ -7,11 +7,12 @@ import NewAccountForm from '@/components/NewAccountForm.vue'
 import NetWorthChart from '@/components/NetWorthChart.vue'
 import CashFlowChart from '@/components/CashFlowChart.vue'
 import AllocationDonut from '@/components/AllocationDonut.vue'
+import PerformanceChart from '@/components/PerformanceChart.vue'
 import BackupPanel from '@/components/BackupPanel.vue'
 import { Trash2, ChevronRight, Inbox } from 'lucide-vue-next'
 
 const accounts = useAccountsStore()
-const range = ref<'6mo' | '1y' | '2y' | '5y' | 'all'>('2y')
+const range = ref<'1w' | '1m' | '6mo' | '1y' | '2y' | '5y' | 'all'>('2y')
 const networthMode = ref<'total' | 'stacked'>('total')
 
 onMounted(() => {
@@ -84,6 +85,14 @@ async function remove(a: Account, ev: MouseEvent) {
         title="Net worth over time"
         :range="range"
         :mode="networthMode"
+        granularity="weekly"
+        @update:range="range = $event"
+      />
+
+      <PerformanceChart
+        endpoint="/api/performance"
+        title="Portfolio performance"
+        :range="range"
         granularity="weekly"
         @update:range="range = $event"
       />

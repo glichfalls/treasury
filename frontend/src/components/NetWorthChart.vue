@@ -17,7 +17,7 @@ const props = withDefaults(
     endpoint: string
     currency?: string
     granularity?: 'daily' | 'weekly' | 'monthly'
-    range?: '6mo' | '1y' | '2y' | '5y' | 'all'
+    range?: '1w' | '1m' | '6mo' | '1y' | '2y' | '5y' | 'all'
     title?: string
     // Single line of total value (default), stacked cash+holdings, or value plus net deposits.
     mode?: 'total' | 'stacked' | 'vs-deposits'
@@ -37,12 +37,41 @@ const loading = ref(false)
 function rangeBounds(range: string): { from: string; to: string } {
   const to = new Date()
   const from = new Date()
-  if (range === '6mo') from.setMonth(from.getMonth() - 6)
+  if (range === '1w') from.setDate(from.getDate() - 7)
+  else if (range === '1m') from.setMonth(from.getMonth() - 1)
+  else if (range === '6mo') from.setMonth(from.getMonth() - 6)
   else if (range === '1y') from.setFullYear(from.getFullYear() - 1)
   else if (range === '2y') from.setFullYear(from.getFullYear() - 2)
   else if (range === '5y') from.setFullYear(from.getFullYear() - 5)
   else from.setFullYear(from.getFullYear() - 20)
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }
+}
+
+// Whole-line color based on the direction over the visible window.
+// Matches finance-app convention (Robinhood/Google Finance): green if you're up
+// vs. the start of the range, red if down. Falls back to accent when there's
+// not enough data to compute a delta.
+function directionColor(values: number[]): { line: string; areaTop: string; areaBottom: string } {
+  if (values.length < 2) {
+    return {
+      line: chartColors.accent,
+      areaTop: 'rgba(99,102,241,0.35)',
+      areaBottom: 'rgba(99,102,241,0.00)',
+    }
+  }
+  const delta = values[values.length - 1]! - values[0]!
+  if (delta >= 0) {
+    return {
+      line: chartColors.positive,
+      areaTop: 'rgba(16,185,129,0.35)',
+      areaBottom: 'rgba(16,185,129,0.00)',
+    }
+  }
+  return {
+    line: chartColors.negative,
+    areaTop: 'rgba(239,68,68,0.35)',
+    areaBottom: 'rgba(239,68,68,0.00)',
+  }
 }
 
 async function load() {
@@ -92,18 +121,6 @@ const option = computed<EChartsOption>(() => {
         },
       },
     },
-    dataZoom: [
-      { type: 'inside' as const, start: 0, end: 100 },
-      {
-        type: 'slider' as const,
-        height: 18,
-        bottom: 8,
-        borderColor: chartColors.border,
-        fillerColor: 'rgba(99,102,241,0.15)',
-        handleStyle: { color: chartColors.accent },
-        textStyle: { color: chartColors.textMuted },
-      },
-    ],
     tooltip: {
       trigger: 'axis' as const,
       backgroundColor: chartColors.surface,
@@ -158,6 +175,8 @@ const option = computed<EChartsOption>(() => {
   }
 
   if (props.mode === 'vs-deposits') {
+    const totals = points.value.map((p) => Number(p.totalMinor) / 100)
+    const dir = directionColor(totals)
     return {
       ...baseAxisStyle,
       legend: {
@@ -174,18 +193,18 @@ const option = computed<EChartsOption>(() => {
           smooth: true,
           showSymbol: false,
           sampling: 'lttb',
-          lineStyle: { color: chartColors.accent, width: 2 },
+          lineStyle: { color: dir.line, width: 2 },
           areaStyle: {
             color: {
               type: 'linear',
               x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(99,102,241,0.35)' },
-                { offset: 1, color: 'rgba(99,102,241,0.00)' },
+                { offset: 0, color: dir.areaTop },
+                { offset: 1, color: dir.areaBottom },
               ],
             },
           },
-          data: points.value.map((p) => Number(p.totalMinor) / 100),
+          data: totals,
           z: 2,
         },
         {
@@ -203,6 +222,8 @@ const option = computed<EChartsOption>(() => {
   }
 
   // default: single area
+  const totals = points.value.map((p) => Number(p.totalMinor) / 100)
+  const dir = directionColor(totals)
   return {
     ...baseAxisStyle,
     series: [{
@@ -211,18 +232,18 @@ const option = computed<EChartsOption>(() => {
       smooth: true,
       showSymbol: false,
       sampling: 'lttb',
-      lineStyle: { color: chartColors.accent, width: 2 },
+      lineStyle: { color: dir.line, width: 2 },
       areaStyle: {
         color: {
           type: 'linear',
           x: 0, y: 0, x2: 0, y2: 1,
           colorStops: [
-            { offset: 0, color: 'rgba(99,102,241,0.35)' },
-            { offset: 1, color: 'rgba(99,102,241,0.00)' },
+            { offset: 0, color: dir.areaTop },
+            { offset: 1, color: dir.areaBottom },
           ],
         },
       },
-      data: points.value.map((p) => Number(p.totalMinor) / 100),
+      data: totals,
     }],
   }
 })
@@ -234,7 +255,7 @@ const option = computed<EChartsOption>(() => {
       <h3 class="text-sm font-medium">{{ title }}</h3>
       <div class="flex gap-1">
         <button
-          v-for="r in (['6mo','1y','2y','5y','all'] as const)"
+          v-for="r in (['1w','1m','6mo','1y','2y','5y','all'] as const)"
           :key="r"
           :class="['text-xs px-2 py-0.5 rounded transition-colors',
             r === range
