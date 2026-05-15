@@ -4,6 +4,7 @@ import { useAccountsStore } from '@/stores/accounts'
 import { formatMinor } from '@/lib/money'
 import NetWorthChart from '@/components/NetWorthChart.vue'
 import CashFlowChart from '@/components/CashFlowChart.vue'
+import CashflowByCategoryChart from '@/components/CashflowByCategoryChart.vue'
 import AllocationDonut from '@/components/AllocationDonut.vue'
 import PerformanceChart from '@/components/PerformanceChart.vue'
 
@@ -80,6 +81,8 @@ const netWorthByCurrency = computed(() => {
         <CashFlowChart :months="18" />
         <AllocationDonut endpoint="/api/allocation" />
       </div>
+
+      <CashflowByCategoryChart :months="12" />
     </section>
   </div>
 </template>

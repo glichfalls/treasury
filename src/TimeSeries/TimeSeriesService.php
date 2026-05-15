@@ -31,6 +31,44 @@ final class TimeSeriesService
     }
 
     /**
+     * Monthly cashflow grouped by transaction category. Trade legs and FX
+     * conversions are excluded (they're internal money movement, not real
+     * income/expense). Uncategorized transactions are bucketed as null so the
+     * frontend can show them as "Uncategorized".
+     *
+     * @return list<array{month: string, category: ?string, amountMinor: string}>
+     */
+    public function cashFlowByCategoryMonthly(
+        \App\Entity\User $user,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): array {
+        $rows = $this->conn->fetchAllAssociative(
+            "SELECT DATE_FORMAT(t.occurred_at, '%Y-%m') AS ym,
+                    t.category,
+                    COALESCE(SUM(t.amount_minor), 0) AS total
+             FROM transactions t
+             INNER JOIN accounts a ON a.id = t.account_id
+             WHERE a.owner_id = :owner
+               AND t.occurred_at BETWEEN :from AND :to
+               AND t.type NOT IN ('trade_buy', 'trade_sell', 'fx_conversion')
+             GROUP BY ym, t.category
+             ORDER BY ym ASC",
+            [
+                'owner' => $user->getId()->toBinary(),
+                'from' => $from->format('Y-m-d'),
+                'to' => $to->format('Y-m-d'),
+            ],
+        );
+
+        return array_map(fn($r) => [
+            'month' => $r['ym'],
+            'category' => $r['category'],
+            'amountMinor' => (string) (int) $r['total'],
+        ], $rows);
+    }
+
+    /**
      * Monthly income vs expense across all accounts owned by $user.
      *
      * Trade legs (trade_buy/trade_sell) and FX conversions are excluded — they represent

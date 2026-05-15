@@ -5,6 +5,7 @@ namespace App\Repository;
 use App\Entity\Account;
 use App\Entity\AccountType;
 use App\Entity\Transaction;
+use App\Entity\TransactionCategory;
 use App\Entity\TransactionType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\Tools\Pagination\Paginator;
@@ -50,6 +51,7 @@ class TransactionRepository extends ServiceEntityRepository
         ?\DateTimeImmutable $from = null,
         ?\DateTimeImmutable $to = null,
         ?string $q = null,
+        ?TransactionCategory $category = null,
     ): array {
         $page = max(1, $page);
         $pageSize = max(1, min(200, $pageSize));
@@ -67,6 +69,9 @@ class TransactionRepository extends ServiceEntityRepository
 
         if ($type !== null) {
             $qb->andWhere('t.type = :type')->setParameter('type', $type);
+        }
+        if ($category !== null) {
+            $qb->andWhere('t.category = :category')->setParameter('category', $category);
         }
         if ($from !== null) {
             $qb->andWhere('t.occurredAt >= :from')->setParameter('from', $from);

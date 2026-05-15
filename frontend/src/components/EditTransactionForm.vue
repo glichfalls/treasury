@@ -13,6 +13,7 @@ function minorToMajorString(amountMinor: string, currency: string): string {
 }
 import BaseModal from '@/components/BaseModal.vue'
 import DateField from '@/components/DateField.vue'
+import { CATEGORIES } from '@/lib/categories'
 
 const props = defineProps<{ transaction: Transaction | null }>()
 const emit = defineEmits<{ 'update:transaction': [Transaction | null]; saved: [] }>()
@@ -35,6 +36,7 @@ const occurredAt = ref('')
 const amount = ref('')
 const description = ref('')
 const type = ref('other')
+const category = ref('')
 const error = ref<string | null>(null)
 const submitting = ref(false)
 
@@ -46,6 +48,7 @@ watch(
     amount.value = minorToMajorString(t.amountMinor, t.currency)
     description.value = t.description ?? ''
     type.value = t.type
+    category.value = t.category ?? ''
     error.value = null
   },
   { immediate: true },
@@ -66,6 +69,7 @@ async function submit() {
       amountMinor,
       description: description.value.trim() || null,
       type: type.value,
+      category: category.value || null,
     })
     emit('saved')
     close()
@@ -93,6 +97,13 @@ async function submit() {
           <label class="label">Type</label>
           <select v-model="type" class="input">
             <option v-for="t in transactionTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
+          </select>
+        </div>
+        <div class="space-y-1.5">
+          <label class="label">Category</label>
+          <select v-model="category" class="input">
+            <option value="">Uncategorized</option>
+            <option v-for="c in CATEGORIES" :key="c.value" :value="c.value">{{ c.label }}</option>
           </select>
         </div>
         <div class="space-y-1.5 sm:col-span-2">

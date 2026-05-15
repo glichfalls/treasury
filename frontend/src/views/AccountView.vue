@@ -18,6 +18,7 @@ import EditTransactionForm from '@/components/EditTransactionForm.vue'
 import EditAccountForm from '@/components/EditAccountForm.vue'
 import DateField from '@/components/DateField.vue'
 import { useToastsStore } from '@/stores/toasts'
+import { CATEGORIES, categoryMeta } from '@/lib/categories'
 import { ChevronLeft, Download, Inbox, Pencil, Trash2 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -37,13 +38,14 @@ const expandedHolding = ref<string | null>(null)
 const page = ref(1)
 const pageSize = ref(25)
 const filterType = ref('')
+const filterCategory = ref('')
 const filterFrom = ref('')
 const filterTo = ref('')
 const filterQ = ref('')
 
 const totalPages = computed(() => Math.max(1, Math.ceil(totalTransactions.value / pageSize.value)))
 const hasFilters = computed(() =>
-  filterType.value !== '' || filterFrom.value !== '' || filterTo.value !== '' || filterQ.value !== '',
+  filterType.value !== '' || filterCategory.value !== '' || filterFrom.value !== '' || filterTo.value !== '' || filterQ.value !== '',
 )
 
 async function load() {
@@ -55,6 +57,7 @@ async function load() {
         page: page.value,
         pageSize: pageSize.value,
         type: filterType.value || undefined,
+        category: filterCategory.value || undefined,
         from: filterFrom.value || undefined,
         to: filterTo.value || undefined,
         q: filterQ.value || undefined,
@@ -81,6 +84,7 @@ function onFilterChange() {
 
 function clearFilters() {
   filterType.value = ''
+  filterCategory.value = ''
   filterFrom.value = ''
   filterTo.value = ''
   filterQ.value = ''
@@ -111,6 +115,7 @@ watch(accountId, () => {
   // search on an account that doesn't hold that asset).
   page.value = 1
   filterType.value = ''
+  filterCategory.value = ''
   filterFrom.value = ''
   filterTo.value = ''
   filterQ.value = ''
@@ -381,6 +386,13 @@ async function deleteTransaction(t: Transaction) {
                 </select>
               </div>
               <div class="space-y-1">
+                <label class="label">Category</label>
+                <select v-model="filterCategory" class="input" @change="onFilterChange">
+                  <option value="">All categories</option>
+                  <option v-for="c in CATEGORIES" :key="c.value" :value="c.value">{{ c.label }}</option>
+                </select>
+              </div>
+              <div class="space-y-1">
                 <label class="label">From</label>
                 <DateField v-model="filterFrom" clearable placeholder="From" @update:model-value="onFilterChange" />
               </div>
@@ -429,8 +441,16 @@ async function deleteTransaction(t: Transaction) {
                   </td>
                   <td>
                     <div class="truncate max-w-md">{{ t.description ?? '—' }}</div>
-                    <div v-if="t.assetIsin" class="text-xs text-[var(--color-text-dim)] mt-0.5">
-                      {{ t.assetIsin }}
+                    <div class="flex items-center gap-1.5 mt-0.5 text-xs">
+                      <span
+                        v-if="categoryMeta(t.category)"
+                        class="inline-flex items-center gap-1.5"
+                        :title="categoryMeta(t.category)!.label"
+                      >
+                        <span class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: categoryMeta(t.category)!.color }"></span>
+                        <span class="text-[var(--color-text-muted)]">{{ categoryMeta(t.category)!.label }}</span>
+                      </span>
+                      <span v-if="t.assetIsin" class="text-[var(--color-text-dim)]">{{ t.assetIsin }}</span>
                     </div>
                   </td>
                   <td class="text-right tabular text-[var(--color-text-muted)]">

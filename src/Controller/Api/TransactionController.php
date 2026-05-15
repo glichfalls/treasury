@@ -4,6 +4,7 @@ namespace App\Controller\Api;
 
 use App\Entity\AccountType;
 use App\Entity\Transaction;
+use App\Entity\TransactionCategory;
 use App\Entity\TransactionSource;
 use App\Entity\TransactionType;
 use App\Entity\User;
@@ -42,6 +43,11 @@ class TransactionController extends AbstractController
             ? TransactionType::tryFrom($typeParam)
             : null;
 
+        $catParam = $request->query->get('category');
+        $category = $catParam !== null && $catParam !== ''
+            ? TransactionCategory::tryFrom($catParam)
+            : null;
+
         $fromParam = $request->query->get('from');
         $from = null;
         if ($fromParam !== null && $fromParam !== '') {
@@ -56,7 +62,7 @@ class TransactionController extends AbstractController
         $q = $request->query->get('q');
         $q = is_string($q) ? trim($q) : null;
 
-        $result = $this->transactions->findPage($account, $page, $pageSize, $type, $from, $to, $q ?: null);
+        $result = $this->transactions->findPage($account, $page, $pageSize, $type, $from, $to, $q ?: null, $category);
 
         return new JsonResponse([
             'items' => array_map($this->serialize(...), $result['items']),
@@ -109,6 +115,12 @@ class TransactionController extends AbstractController
             $typeEnum = \App\Entity\TransactionType::tryFrom($body['type']);
             if ($typeEnum !== null) {
                 $t->setType($typeEnum);
+            }
+        }
+        if (!empty($body['category']) && is_string($body['category'])) {
+            $catEnum = TransactionCategory::tryFrom($body['category']);
+            if ($catEnum !== null) {
+                $t->setCategory($catEnum);
             }
         }
 
@@ -168,6 +180,18 @@ class TransactionController extends AbstractController
             }
             $tx->setCurrency($currency);
         }
+        if (array_key_exists('category', $body)) {
+            $value = $body['category'];
+            if ($value === null || $value === '') {
+                $tx->setCategory(null);
+            } else {
+                $cat = TransactionCategory::tryFrom((string) $value);
+                if ($cat === null) {
+                    return new JsonResponse(['error' => 'Invalid category'], 422);
+                }
+                $tx->setCategory($cat);
+            }
+        }
 
         $this->em->flush();
 
@@ -225,6 +249,7 @@ class TransactionController extends AbstractController
             'description' => $t->getDescription(),
             'type' => $t->getType()->value,
             'source' => $t->getSource()->value,
+            'category' => $t->getCategory()?->value,
             'assetIsin' => $t->getAssetIsin(),
             'assetQuantity' => $t->getAssetQuantity(),
         ];

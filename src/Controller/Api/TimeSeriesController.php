@@ -39,6 +39,13 @@ class TimeSeriesController extends AbstractController
         return new JsonResponse(array_map(fn($p) => $p->toArray(), $series));
     }
 
+    #[Route('/api/cashflow/by-category', name: 'api_cashflow_by_category', methods: ['GET'])]
+    public function cashFlowByCategory(Request $request, #[CurrentUser] User $user): JsonResponse
+    {
+        [$from, $to] = $this->parseRange($request);
+        return new JsonResponse($this->service->cashFlowByCategoryMonthly($user, $from, $to));
+    }
+
     #[Route('/api/allocation', name: 'api_global_allocation', methods: ['GET'])]
     public function globalAllocation(#[CurrentUser] User $user): JsonResponse
     {

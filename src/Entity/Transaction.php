@@ -39,6 +39,9 @@ class Transaction
     #[ORM\Column(length: 16, enumType: TransactionSource::class)]
     private TransactionSource $source = TransactionSource::Manual;
 
+    #[ORM\Column(length: 32, enumType: TransactionCategory::class, nullable: true)]
+    private ?TransactionCategory $category = null;
+
     #[ORM\Column(length: 120, nullable: true)]
     private ?string $externalRef = null;
 
@@ -68,6 +71,8 @@ class Transaction
     public function setType(TransactionType $type): self { $this->type = $type; return $this; }
     public function getSource(): TransactionSource { return $this->source; }
     public function setSource(TransactionSource $source): self { $this->source = $source; return $this; }
+    public function getCategory(): ?TransactionCategory { return $this->category; }
+    public function setCategory(?TransactionCategory $category): self { $this->category = $category; return $this; }
     public function getExternalRef(): ?string { return $this->externalRef; }
     public function setExternalRef(?string $externalRef): self { $this->externalRef = $externalRef; return $this; }
     public function getAssetIsin(): ?string { return $this->assetIsin; }

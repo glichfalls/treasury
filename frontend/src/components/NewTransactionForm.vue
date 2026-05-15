@@ -6,6 +6,7 @@ import { parseMajor } from '@/lib/money'
 import { Plus } from 'lucide-vue-next'
 import BaseModal from '@/components/BaseModal.vue'
 import DateField from '@/components/DateField.vue'
+import { CATEGORIES } from '@/lib/categories'
 
 const props = defineProps<{ accountId: string; currency: string }>()
 const emit = defineEmits<{ created: [] }>()
@@ -18,6 +19,7 @@ const open = ref(false)
 const occurredAt = ref(today)
 const amount = ref('')
 const description = ref('')
+const category = ref('')
 const error = ref<string | null>(null)
 const submitting = ref(false)
 
@@ -25,6 +27,7 @@ function reset() {
   occurredAt.value = today
   amount.value = ''
   description.value = ''
+  category.value = ''
   error.value = null
 }
 
@@ -37,6 +40,7 @@ async function submit() {
       occurredAt: occurredAt.value,
       amountMinor,
       description: description.value.trim() || null,
+      category: category.value || null,
     })
     toasts.success('Transaction saved')
     reset()
@@ -67,7 +71,14 @@ async function submit() {
           <label class="label">Amount ({{ currency }})</label>
           <input v-model="amount" placeholder="-12.50 for spending" required class="input tabular" />
         </div>
-        <div class="space-y-1.5 sm:col-span-2">
+        <div class="space-y-1.5">
+          <label class="label">Category</label>
+          <select v-model="category" class="input">
+            <option value="">Uncategorized</option>
+            <option v-for="c in CATEGORIES" :key="c.value" :value="c.value">{{ c.label }}</option>
+          </select>
+        </div>
+        <div class="space-y-1.5">
           <label class="label">Description</label>
           <input v-model="description" placeholder="Groceries at Migros" class="input" />
         </div>
