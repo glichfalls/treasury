@@ -68,6 +68,12 @@ export const useAccountsStore = defineStore('accounts', () => {
     return created
   }
 
+  async function update(id: string, input: Partial<NewAccount>): Promise<Account> {
+    const updated = await api.patch<Account>(`/api/accounts/${id}`, input)
+    accounts.value = accounts.value.map((a) => (a.id === id ? updated : a))
+    return updated
+  }
+
   async function remove(id: string) {
     await api.delete(`/api/accounts/${id}`)
     accounts.value = accounts.value.filter((a) => a.id !== id)
@@ -103,5 +109,25 @@ export const useAccountsStore = defineStore('accounts', () => {
     return created
   }
 
-  return { accounts, loaded, fetchAll, create, remove, fetchTransactions, fetchHoldings, addTransaction, deleteTransaction }
+  async function updateTransaction(
+    accountId: string,
+    transactionId: string,
+    input: Partial<NewTransaction & { type: string }>,
+  ): Promise<Transaction> {
+    return api.patch<Transaction>(`/api/accounts/${accountId}/transactions/${transactionId}`, input)
+  }
+
+  return {
+    accounts,
+    loaded,
+    fetchAll,
+    create,
+    update,
+    remove,
+    fetchTransactions,
+    fetchHoldings,
+    addTransaction,
+    updateTransaction,
+    deleteTransaction,
+  }
 })

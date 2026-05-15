@@ -90,6 +90,62 @@ class TransactionController extends AbstractController
         return new JsonResponse($this->serialize($t), 201);
     }
 
+    #[Route('/{transactionId}', name: 'api_transactions_update', methods: ['PATCH'], requirements: ['transactionId' => '[0-9a-f-]+'])]
+    public function update(string $accountId, string $transactionId, Request $request, #[CurrentUser] User $user): JsonResponse
+    {
+        $account = $this->accounts->findOneOwnedBy($accountId, $user);
+        if ($account === null) {
+            throw new NotFoundHttpException();
+        }
+        try {
+            $uuid = \Symfony\Component\Uid\Uuid::fromString($transactionId);
+        } catch (\InvalidArgumentException) {
+            throw new NotFoundHttpException();
+        }
+        $tx = $this->transactions->findOneBy(['id' => $uuid, 'account' => $account]);
+        if ($tx === null) {
+            throw new NotFoundHttpException();
+        }
+
+        $body = json_decode($request->getContent(), true, flags: JSON_THROW_ON_ERROR);
+
+        if (array_key_exists('occurredAt', $body)) {
+            try {
+                $tx->setOccurredAt(new \DateTimeImmutable((string) $body['occurredAt']));
+            } catch (\Exception) {
+                return new JsonResponse(['error' => 'Invalid occurredAt'], 422);
+            }
+        }
+        if (array_key_exists('amountMinor', $body)) {
+            if (!is_string($body['amountMinor']) || !preg_match('/^-?\d+$/', $body['amountMinor'])) {
+                return new JsonResponse(['error' => 'amountMinor must be an integer string'], 422);
+            }
+            $tx->setAmountMinor($body['amountMinor']);
+        }
+        if (array_key_exists('description', $body)) {
+            $desc = $body['description'];
+            $tx->setDescription(is_string($desc) && trim($desc) !== '' ? trim($desc) : null);
+        }
+        if (array_key_exists('type', $body)) {
+            $typeEnum = TransactionType::tryFrom((string) $body['type']);
+            if ($typeEnum === null) {
+                return new JsonResponse(['error' => 'Invalid transaction type'], 422);
+            }
+            $tx->setType($typeEnum);
+        }
+        if (array_key_exists('currency', $body)) {
+            $currency = strtoupper(trim((string) $body['currency']));
+            if (!preg_match('/^[A-Z]{3}$/', $currency)) {
+                return new JsonResponse(['error' => 'Currency must be a 3-letter code'], 422);
+            }
+            $tx->setCurrency($currency);
+        }
+
+        $this->em->flush();
+
+        return new JsonResponse($this->serialize($tx));
+    }
+
     /**
      * Delete a transaction. For Pillar 3a accounts, removing a deposit also drops the
      * auto-generated trade rows on the same day so the 3a stays coherent — the trades

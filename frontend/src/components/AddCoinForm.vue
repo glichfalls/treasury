@@ -2,7 +2,8 @@
 import { onMounted, ref } from 'vue'
 import { api } from '@/lib/api'
 import { parseMajor } from '@/lib/money'
-import { Coins, Plus, X } from 'lucide-vue-next'
+import { Coins } from 'lucide-vue-next'
+import BaseModal from '@/components/BaseModal.vue'
 
 interface CatalogEntry {
   isin: string
@@ -32,11 +33,17 @@ onMounted(async () => {
   }
 })
 
+function reset() {
+  quantity.value = '1'
+  amount.value = ''
+  occurredAt.value = today
+  error.value = null
+}
+
 async function submit() {
   error.value = null
   submitting.value = true
   try {
-    // Negative cash flow because it's a purchase.
     const amountMinor = '-' + parseMajor(amount.value, props.currency)
     await api.post(`/api/accounts/${props.accountId}/transactions`, {
       occurredAt: occurredAt.value,
@@ -46,8 +53,7 @@ async function submit() {
       assetQuantity: quantity.value,
       description: `${quantity.value}× ${catalog.value.find((c) => c.isin === isin.value)?.name ?? isin.value}`,
     })
-    amount.value = ''
-    quantity.value = '1'
+    reset()
     open.value = false
     emit('created')
   } catch (e) {
@@ -59,52 +65,44 @@ async function submit() {
 </script>
 
 <template>
-  <button v-if="!open" class="btn btn-secondary" @click="open = true">
+  <button class="btn btn-secondary" @click="open = true">
     <Coins :size="16" />
     <span>Add coin</span>
   </button>
 
-  <form v-else class="card p-5 space-y-4" @submit.prevent="submit">
-    <div class="flex items-center justify-between">
-      <h3 class="font-medium flex items-center gap-2">
-        <Coins :size="16" class="text-[var(--color-accent)]" />
-        New coin purchase
-      </h3>
-      <button type="button" class="btn btn-ghost p-1" @click="open = false">
-        <X :size="16" />
-      </button>
-    </div>
+  <BaseModal v-model:open="open" title="New coin purchase" @close="reset">
+    <form id="add-coin-form" class="space-y-4" @submit.prevent="submit">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="space-y-1.5 sm:col-span-2">
+          <label class="label">Coin</label>
+          <select v-model="isin" class="input">
+            <option v-for="c in catalog" :key="c.isin" :value="c.isin">
+              {{ c.name }} · {{ c.unitWeightGrams }} g
+            </option>
+          </select>
+        </div>
+        <div class="space-y-1.5">
+          <label class="label">Date</label>
+          <input v-model="occurredAt" type="date" required class="input" />
+        </div>
+        <div class="space-y-1.5">
+          <label class="label">Quantity</label>
+          <input v-model="quantity" type="number" min="0" step="any" required class="input tabular" />
+          <p class="text-xs text-[var(--color-text-dim)]">For odd-weight bars/scrap, pick the 1 g bar and enter the gram count here.</p>
+        </div>
+        <div class="space-y-1.5 sm:col-span-2">
+          <label class="label">Total paid ({{ currency }})</label>
+          <input v-model="amount" placeholder="2300" required class="input tabular" />
+        </div>
+      </div>
+      <p v-if="error" class="text-sm text-[var(--color-negative)]">{{ error }}</p>
+    </form>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <div class="space-y-1.5 sm:col-span-2">
-        <label class="label">Coin</label>
-        <select v-model="isin" class="input">
-          <option v-for="c in catalog" :key="c.isin" :value="c.isin">
-            {{ c.name }} · {{ c.unitWeightGrams }} g
-          </option>
-        </select>
-      </div>
-      <div class="space-y-1.5">
-        <label class="label">Date</label>
-        <input v-model="occurredAt" type="date" required class="input" />
-      </div>
-      <div class="space-y-1.5">
-        <label class="label">Quantity</label>
-        <input v-model="quantity" type="number" min="0" step="any" required class="input tabular" />
-        <p class="text-xs text-[var(--color-text-dim)]">For odd-weight bars/scrap, pick the 1 g bar and enter the gram count here.</p>
-      </div>
-      <div class="space-y-1.5 sm:col-span-2">
-        <label class="label">Total paid ({{ currency }})</label>
-        <input v-model="amount" placeholder="2300" required class="input tabular" />
-      </div>
-    </div>
-
-    <div class="flex items-center gap-3">
-      <button type="submit" class="btn btn-primary" :disabled="submitting">
-        <Plus v-if="!submitting" :size="16" />
+    <template #footer>
+      <button type="button" class="btn btn-ghost" @click="open = false">Cancel</button>
+      <button type="submit" form="add-coin-form" class="btn btn-primary" :disabled="submitting">
         {{ submitting ? 'Saving…' : 'Add purchase' }}
       </button>
-      <p v-if="error" class="text-sm text-[var(--color-negative)]">{{ error }}</p>
-    </div>
-  </form>
+    </template>
+  </BaseModal>
 </template>

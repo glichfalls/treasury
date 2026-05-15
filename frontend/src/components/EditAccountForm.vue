@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useAccountsStore } from '@/stores/accounts'
-import { Plus } from 'lucide-vue-next'
+import { ref, watch } from 'vue'
+import { useAccountsStore, type Account } from '@/stores/accounts'
 import BaseModal from '@/components/BaseModal.vue'
+
+const props = defineProps<{ account: Account | null }>()
+const emit = defineEmits<{ 'update:account': [Account | null]; saved: [] }>()
 
 const accounts = useAccountsStore()
 
@@ -21,7 +23,6 @@ const accountTypes = [
   { value: 'other', label: 'Other' },
 ]
 
-const open = ref(false)
 const name = ref('')
 const institution = ref('')
 const type = ref('bank_checking')
@@ -29,26 +30,37 @@ const currency = ref('CHF')
 const error = ref<string | null>(null)
 const submitting = ref(false)
 
-function reset() {
-  name.value = ''
-  institution.value = ''
-  type.value = 'bank_checking'
-  currency.value = 'CHF'
-  error.value = null
+// Re-seed the form whenever a different account is opened for editing.
+watch(
+  () => props.account,
+  (a) => {
+    if (!a) return
+    name.value = a.name
+    institution.value = a.institution ?? ''
+    type.value = a.type
+    currency.value = a.currency
+    error.value = null
+  },
+  { immediate: true },
+)
+
+function close() {
+  emit('update:account', null)
 }
 
 async function submit() {
+  if (!props.account) return
   error.value = null
   submitting.value = true
   try {
-    await accounts.create({
+    await accounts.update(props.account.id, {
       name: name.value.trim(),
       institution: institution.value.trim() || null,
       type: type.value,
       currency: currency.value.trim().toUpperCase(),
     })
-    reset()
-    open.value = false
+    emit('saved')
+    close()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -58,21 +70,16 @@ async function submit() {
 </script>
 
 <template>
-  <button class="btn btn-secondary" @click="open = true">
-    <Plus :size="16" />
-    <span>New account</span>
-  </button>
-
-  <BaseModal v-model:open="open" title="New account" @close="reset">
-    <form id="new-account-form" class="space-y-4" @submit.prevent="submit">
+  <BaseModal :open="account !== null" title="Edit account" @update:open="(v) => !v && close()">
+    <form v-if="account" id="edit-account-form" class="space-y-4" @submit.prevent="submit">
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div class="space-y-1.5">
           <label class="label">Name</label>
-          <input v-model="name" required placeholder="Salary account" class="input" autofocus />
+          <input v-model="name" required class="input" autofocus />
         </div>
         <div class="space-y-1.5">
           <label class="label">Institution</label>
-          <input v-model="institution" placeholder="ZKB" class="input" />
+          <input v-model="institution" class="input" />
         </div>
         <div class="space-y-1.5">
           <label class="label">Type</label>
@@ -89,9 +96,9 @@ async function submit() {
     </form>
 
     <template #footer>
-      <button type="button" class="btn btn-ghost" @click="open = false">Cancel</button>
-      <button type="submit" form="new-account-form" class="btn btn-primary" :disabled="submitting">
-        {{ submitting ? 'Saving…' : 'Create account' }}
+      <button type="button" class="btn btn-ghost" @click="close">Cancel</button>
+      <button type="submit" form="edit-account-form" class="btn btn-primary" :disabled="submitting">
+        {{ submitting ? 'Saving…' : 'Save changes' }}
       </button>
     </template>
   </BaseModal>

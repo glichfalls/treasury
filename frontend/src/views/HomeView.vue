@@ -9,7 +9,8 @@ import CashFlowChart from '@/components/CashFlowChart.vue'
 import AllocationDonut from '@/components/AllocationDonut.vue'
 import PerformanceChart from '@/components/PerformanceChart.vue'
 import BackupPanel from '@/components/BackupPanel.vue'
-import { Trash2, ChevronRight, Inbox } from 'lucide-vue-next'
+import EditAccountForm from '@/components/EditAccountForm.vue'
+import { Pencil, Trash2, ChevronRight, Inbox } from 'lucide-vue-next'
 
 const accounts = useAccountsStore()
 const range = ref<'1w' | '1m' | '6mo' | '1y' | '2y' | '5y' | 'all'>('2y')
@@ -49,6 +50,13 @@ async function remove(a: Account, ev: MouseEvent) {
   ev.stopPropagation()
   if (!confirm(`Delete "${a.name}" and all its transactions?`)) return
   await accounts.remove(a.id)
+}
+
+const editing = ref<Account | null>(null)
+function startEdit(a: Account, ev: MouseEvent) {
+  ev.preventDefault()
+  ev.stopPropagation()
+  editing.value = a
 }
 </script>
 
@@ -149,13 +157,22 @@ async function remove(a: Account, ev: MouseEvent) {
                 {{ formatMinor(a.balanceMinor, a.currency) }}
               </td>
               <td class="text-right">
-                <button
-                  class="btn btn-danger p-1.5"
-                  :aria-label="`Delete ${a.name}`"
-                  @click="remove(a, $event)"
-                >
-                  <Trash2 :size="14" />
-                </button>
+                <div class="flex justify-end gap-1">
+                  <button
+                    class="btn btn-ghost p-1.5"
+                    :aria-label="`Edit ${a.name}`"
+                    @click="startEdit(a, $event)"
+                  >
+                    <Pencil :size="14" />
+                  </button>
+                  <button
+                    class="btn btn-danger p-1.5"
+                    :aria-label="`Delete ${a.name}`"
+                    @click="remove(a, $event)"
+                  >
+                    <Trash2 :size="14" />
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -166,5 +183,7 @@ async function remove(a: Account, ev: MouseEvent) {
     <section v-if="accounts.accounts.length > 0">
       <BackupPanel />
     </section>
+
+    <EditAccountForm v-model:account="editing" />
   </div>
 </template>

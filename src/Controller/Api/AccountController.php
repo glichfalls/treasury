@@ -132,6 +132,52 @@ class AccountController extends AbstractController
         return new JsonResponse(null, 204);
     }
 
+    #[Route('/{id}', name: 'api_accounts_update', methods: ['PATCH'])]
+    public function update(string $id, Request $request, #[CurrentUser] User $user): JsonResponse
+    {
+        $account = $this->accounts->findOneOwnedBy($id, $user);
+        if ($account === null) {
+            throw new NotFoundHttpException();
+        }
+
+        $body = json_decode($request->getContent(), true, flags: JSON_THROW_ON_ERROR);
+
+        if (array_key_exists('name', $body)) {
+            $name = trim((string) $body['name']);
+            if ($name === '') {
+                return new JsonResponse(['error' => 'Name cannot be empty'], 422);
+            }
+            $account->setName($name);
+        }
+        if (array_key_exists('institution', $body)) {
+            $institution = $body['institution'];
+            $account->setInstitution(is_string($institution) && trim($institution) !== '' ? trim($institution) : null);
+        }
+        if (array_key_exists('type', $body)) {
+            $type = AccountType::tryFrom((string) $body['type']);
+            if ($type === null) {
+                return new JsonResponse(['error' => 'Invalid account type'], 422);
+            }
+            $account->setType($type);
+        }
+        if (array_key_exists('currency', $body)) {
+            $currency = strtoupper(trim((string) $body['currency']));
+            if (!preg_match('/^[A-Z]{3}$/', $currency)) {
+                return new JsonResponse(['error' => 'Currency must be a 3-letter code'], 422);
+            }
+            $account->setCurrency($currency);
+        }
+
+        $this->em->flush();
+
+        $cash = $this->accounts->sumBalancesMinor([$account->getId()])[$account->getId()->toRfc4122()] ?? '0';
+        $holdings = $this->holdings->forAccount($account);
+        $holdingsValue = $this->holdings->totalValueMinor($account, $holdings);
+        $total = bcadd($cash, $holdingsValue, 0);
+
+        return new JsonResponse($this->serializeAccount($account, $cash, $holdingsValue, $total));
+    }
+
     private function serializeAccount(
         Account $a,
         string $cashMinor,

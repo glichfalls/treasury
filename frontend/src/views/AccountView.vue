@@ -14,7 +14,8 @@ import NetWorthChart from '@/components/NetWorthChart.vue'
 import AllocationDonut from '@/components/AllocationDonut.vue'
 import AssetPriceChart from '@/components/AssetPriceChart.vue'
 import PerformanceChart from '@/components/PerformanceChart.vue'
-import { ChevronLeft, Download, Inbox, Trash2 } from 'lucide-vue-next'
+import EditTransactionForm from '@/components/EditTransactionForm.vue'
+import { ChevronLeft, Download, Inbox, Pencil, Trash2 } from 'lucide-vue-next'
 
 const route = useRoute()
 const accounts = useAccountsStore()
@@ -75,6 +76,15 @@ function shortDate(iso: string): string {
 
 function toggleHolding(isin: string) {
   expandedHolding.value = expandedHolding.value === isin ? null : isin
+}
+
+const editingTransaction = ref<Transaction | null>(null)
+function startEditTransaction(t: Transaction) {
+  editingTransaction.value = t
+}
+async function onTransactionSaved() {
+  await load()
+  await accounts.fetchAll()
 }
 
 async function deleteTransaction(t: Transaction) {
@@ -283,14 +293,24 @@ async function deleteTransaction(t: Transaction) {
                   {{ formatMinor(t.amountMinor, t.currency) }}
                 </td>
                 <td class="text-right">
-                  <button
-                    class="p-1.5 rounded transition-colors text-[var(--color-text-dim)] hover:text-[var(--color-negative)] hover:bg-[var(--color-surface-hover)]"
-                    type="button"
-                    aria-label="Delete transaction"
-                    @click="deleteTransaction(t)"
-                  >
-                    <Trash2 :size="14" />
-                  </button>
+                  <div class="flex justify-end gap-0.5">
+                    <button
+                      class="p-1.5 rounded transition-colors text-[var(--color-text-dim)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]"
+                      type="button"
+                      aria-label="Edit transaction"
+                      @click="startEditTransaction(t)"
+                    >
+                      <Pencil :size="14" />
+                    </button>
+                    <button
+                      class="p-1.5 rounded transition-colors text-[var(--color-text-dim)] hover:text-[var(--color-negative)] hover:bg-[var(--color-surface-hover)]"
+                      type="button"
+                      aria-label="Delete transaction"
+                      @click="deleteTransaction(t)"
+                    >
+                      <Trash2 :size="14" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -300,5 +320,7 @@ async function deleteTransaction(t: Transaction) {
     </template>
 
     <p v-else class="text-[var(--color-text-muted)]">Account not found.</p>
+
+    <EditTransactionForm v-model:transaction="editingTransaction" @saved="onTransactionSaved" />
   </div>
 </template>

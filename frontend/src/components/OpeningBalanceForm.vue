@@ -2,7 +2,8 @@
 import { ref } from 'vue'
 import { api } from '@/lib/api'
 import { parseMajor } from '@/lib/money'
-import { Sparkles, X } from 'lucide-vue-next'
+import { Sparkles } from 'lucide-vue-next'
+import BaseModal from '@/components/BaseModal.vue'
 
 const props = defineProps<{ accountId: string; currency: string }>()
 const emit = defineEmits<{ created: [] }>()
@@ -14,6 +15,13 @@ const amount = ref('')
 const error = ref<string | null>(null)
 const missing = ref<string[]>([])
 const submitting = ref(false)
+
+function reset() {
+  occurredAt.value = today
+  amount.value = ''
+  error.value = null
+  missing.value = []
+}
 
 async function submit() {
   error.value = null
@@ -38,45 +46,38 @@ async function submit() {
 </script>
 
 <template>
-  <button v-if="!open" class="btn btn-secondary" @click="open = true">
+  <button class="btn btn-secondary" @click="open = true">
     <Sparkles :size="16" />
     <span>Set starting balance</span>
   </button>
 
-  <form v-else class="card p-5 space-y-4" @submit.prevent="submit">
-    <div class="flex items-center justify-between">
-      <h3 class="font-medium flex items-center gap-2">
-        <Sparkles :size="16" class="text-[var(--color-accent)]" />
-        Set starting balance
-      </h3>
-      <button type="button" class="btn btn-ghost p-1" @click="open = false">
-        <X :size="16" />
-      </button>
-    </div>
+  <BaseModal v-model:open="open" title="Set starting balance" @close="reset">
+    <form id="opening-balance-form" class="space-y-4" @submit.prevent="submit">
+      <p class="text-xs text-[var(--color-text-dim)]">
+        Use this once when you set up an existing 3a. Enter the current value of your account — it will be split across the allocation at today's prices, and from this point onward growth is tracked from real ETF history.
+      </p>
 
-    <p class="text-xs text-[var(--color-text-dim)]">
-      Use this once when you set up an existing 3a. Enter the current value of your account — it will be split across the allocation at today's prices, and from this point onward growth is tracked from real ETF history.
-    </p>
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <div class="space-y-1.5">
-        <label class="label">As of</label>
-        <input v-model="occurredAt" type="date" required class="input" />
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="space-y-1.5">
+          <label class="label">As of</label>
+          <input v-model="occurredAt" type="date" required class="input" />
+        </div>
+        <div class="space-y-1.5">
+          <label class="label">Current value ({{ currency }})</label>
+          <input v-model="amount" placeholder="30000" required class="input tabular" />
+        </div>
       </div>
-      <div class="space-y-1.5">
-        <label class="label">Current value ({{ currency }})</label>
-        <input v-model="amount" placeholder="30000" required class="input tabular" />
-      </div>
-    </div>
+      <p v-if="missing.length > 0" class="text-xs text-[var(--color-text-dim)]">
+        No price data for: {{ missing.join(', ') }} — those slices stayed as cash.
+      </p>
+      <p v-if="error" class="text-sm text-[var(--color-negative)]">{{ error }}</p>
+    </form>
 
-    <div class="flex items-center gap-3">
-      <button type="submit" class="btn btn-primary" :disabled="submitting">
+    <template #footer>
+      <button type="button" class="btn btn-ghost" @click="open = false">Cancel</button>
+      <button type="submit" form="opening-balance-form" class="btn btn-primary" :disabled="submitting">
         {{ submitting ? 'Saving…' : 'Save starting balance' }}
       </button>
-      <p v-if="error" class="text-sm text-[var(--color-negative)]">{{ error }}</p>
-    </div>
-    <p v-if="missing.length > 0" class="text-xs text-[var(--color-text-dim)]">
-      No price data for: {{ missing.join(', ') }} — those slices stayed as cash.
-    </p>
-  </form>
+    </template>
+  </BaseModal>
 </template>

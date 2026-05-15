@@ -2,7 +2,8 @@
 import { ref } from 'vue'
 import { api } from '@/lib/api'
 import { parseMajor } from '@/lib/money'
-import { Plus, X, PiggyBank } from 'lucide-vue-next'
+import { PiggyBank } from 'lucide-vue-next'
+import BaseModal from '@/components/BaseModal.vue'
 
 const props = defineProps<{ accountId: string; currency: string }>()
 const emit = defineEmits<{ created: [] }>()
@@ -14,6 +15,13 @@ const amount = ref('')
 const error = ref<string | null>(null)
 const missing = ref<string[]>([])
 const submitting = ref(false)
+
+function reset() {
+  occurredAt.value = today
+  amount.value = ''
+  error.value = null
+  missing.value = []
+}
 
 async function submit() {
   error.value = null
@@ -38,42 +46,34 @@ async function submit() {
 </script>
 
 <template>
-  <button v-if="!open" class="btn btn-secondary" @click="open = true">
+  <button class="btn btn-secondary" @click="open = true">
     <PiggyBank :size="16" />
     <span>Add contribution</span>
   </button>
 
-  <form v-else class="card p-5 space-y-4" @submit.prevent="submit">
-    <div class="flex items-center justify-between">
-      <h3 class="font-medium flex items-center gap-2">
-        <PiggyBank :size="16" class="text-[var(--color-accent)]" />
-        New 3a contribution
-      </h3>
-      <button type="button" class="btn btn-ghost p-1" @click="open = false">
-        <X :size="16" />
-      </button>
-    </div>
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <div class="space-y-1.5">
-        <label class="label">Date</label>
-        <input v-model="occurredAt" type="date" required class="input" />
+  <BaseModal v-model:open="open" title="New 3a contribution" @close="reset">
+    <form id="add-contribution-form" class="space-y-4" @submit.prevent="submit">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="space-y-1.5">
+          <label class="label">Date</label>
+          <input v-model="occurredAt" type="date" required class="input" />
+        </div>
+        <div class="space-y-1.5">
+          <label class="label">Amount ({{ currency }})</label>
+          <input v-model="amount" placeholder="600" required class="input tabular" />
+        </div>
       </div>
-      <div class="space-y-1.5">
-        <label class="label">Amount ({{ currency }})</label>
-        <input v-model="amount" placeholder="600" required class="input tabular" />
-      </div>
-    </div>
+      <p v-if="missing.length > 0" class="text-xs text-[var(--color-text-dim)]">
+        No price data for: {{ missing.join(', ') }}. Those slices were skipped — run `app:prices:backfill` to fetch history.
+      </p>
+      <p v-if="error" class="text-sm text-[var(--color-negative)]">{{ error }}</p>
+    </form>
 
-    <div class="flex items-center gap-3">
-      <button type="submit" class="btn btn-primary" :disabled="submitting">
-        <Plus v-if="!submitting" :size="16" />
+    <template #footer>
+      <button type="button" class="btn btn-ghost" @click="open = false">Cancel</button>
+      <button type="submit" form="add-contribution-form" class="btn btn-primary" :disabled="submitting">
         {{ submitting ? 'Saving…' : 'Record contribution' }}
       </button>
-      <p v-if="error" class="text-sm text-[var(--color-negative)]">{{ error }}</p>
-    </div>
-    <p v-if="missing.length > 0" class="text-xs text-[var(--color-text-dim)]">
-      No price data for: {{ missing.join(', ') }}. Those slices were skipped — run `app:prices:backfill` to fetch history.
-    </p>
-  </form>
+    </template>
+  </BaseModal>
 </template>
