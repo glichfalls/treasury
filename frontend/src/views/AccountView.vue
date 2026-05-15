@@ -19,6 +19,7 @@ import RecurringTransactionsPanel from '@/components/RecurringTransactionsPanel.
 import DateField from '@/components/DateField.vue'
 import { useToastsStore } from '@/stores/toasts'
 import { CATEGORIES, categoryMeta } from '@/lib/categories'
+import { featuresFor } from '@/lib/accountFeatures'
 import { ChevronLeft, Download, Inbox, Pencil, Trash2 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -27,6 +28,7 @@ const toasts = useToastsStore()
 
 const accountId = computed(() => String(route.params.id))
 const account = computed(() => accounts.accounts.find((a) => a.id === accountId.value))
+const features = computed(() => featuresFor(account.value?.type ?? 'other'))
 const transactions = ref<Transaction[]>([])
 const totalTransactions = ref(0)
 const holdings = ref<Holding[]>([])
@@ -141,12 +143,15 @@ function shortDate(iso: string): string {
 
 const editingAccount = ref<Account | null>(null)
 // Holdings is the default tab — it's the primary content for investment accounts.
-// For accounts without holdings (regular bank etc.) the tab button is hidden by a
-// v-if; the watch below auto-falls-back to Transactions in that case so the page
-// doesn't end up showing nothing.
+// For cash accounts (where the holdings tab is gated off) we drop straight to
+// Transactions on load and on holdings re-fetch.
 const activeTab = ref<'holdings' | 'transactions' | 'recurring'>('holdings')
 
-watch(holdings, (h) => {
+watch([holdings, features], ([h, f]) => {
+  if (!f.showHoldings) {
+    if (activeTab.value === 'holdings') activeTab.value = 'transactions'
+    return
+  }
   if (h.length === 0 && activeTab.value === 'holdings') {
     activeTab.value = 'transactions'
   }
@@ -232,6 +237,7 @@ async function deleteTransaction(t: Transaction) {
             <NewTransactionForm
               :account-id="account.id"
               :currency="account.currency"
+              :show-categories="features.showCategories"
               @created="load"
             />
             <AddCoinForm
@@ -267,27 +273,34 @@ async function deleteTransaction(t: Transaction) {
         </div>
       </header>
 
-      <!-- Charts -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div class="lg:col-span-2">
+      <!-- Charts — NetWorth always renders (any account has value over time);
+           allocation + performance are gated on account type. -->
+      <div
+        class="grid grid-cols-1 gap-4"
+        :class="features.showAllocation ? 'lg:grid-cols-3' : ''"
+      >
+        <div :class="features.showAllocation ? 'lg:col-span-2' : ''">
           <NetWorthChart
             :endpoint="`/api/accounts/${account.id}/timeseries`"
             :title="account.type === 'brokerage' ? 'Value vs net deposits' : 'Account value over time'"
             :range="range"
             :mode="account.type === 'brokerage' ? 'vs-deposits' : 'total'"
-            granularity="weekly"
             :currency="account.currency"
+            :direction-coloring="features.showPerformance"
             @update:range="range = $event"
           />
         </div>
-        <AllocationDonut :endpoint="`/api/accounts/${account.id}/allocation`" />
+        <AllocationDonut
+          v-if="features.showAllocation"
+          :endpoint="`/api/accounts/${account.id}/allocation`"
+        />
       </div>
 
       <PerformanceChart
+        v-if="features.showPerformance"
         :endpoint="`/api/accounts/${account.id}/performance`"
         title="Account performance"
         :range="range"
-        granularity="weekly"
         @update:range="range = $event"
       />
 
@@ -298,11 +311,11 @@ async function deleteTransaction(t: Transaction) {
         @saved="reloadAfterImport"
       />
 
-      <!-- Tabs for holdings + transactions -->
+      <!-- Tabs — only the ones that make sense for this account type are shown. -->
       <section class="space-y-4">
         <div class="flex items-center border-b" style="border-color: var(--color-border);">
           <button
-            v-if="holdings.length > 0"
+            v-if="features.showHoldings && holdings.length > 0"
             type="button"
             class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors"
             :class="activeTab === 'holdings'
@@ -323,6 +336,7 @@ async function deleteTransaction(t: Transaction) {
             Transactions <span class="text-[var(--color-text-dim)] ml-1">{{ totalTransactions }}</span>
           </button>
           <button
+            v-if="features.showRecurring"
             type="button"
             class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors"
             :class="activeTab === 'recurring'
@@ -336,9 +350,10 @@ async function deleteTransaction(t: Transaction) {
 
         <!-- Recurring tab -->
         <RecurringTransactionsPanel
-          v-if="activeTab === 'recurring' && account"
+          v-if="activeTab === 'recurring' && account && features.showRecurring"
           :account-id="account.id"
           :currency="account.currency"
+          :show-categories="features.showCategories"
           @changed="reloadAfterImport"
         />
 
@@ -397,7 +412,7 @@ async function deleteTransaction(t: Transaction) {
                   <option v-for="(label, value) in typeLabels" :key="value" :value="value">{{ label }}</option>
                 </select>
               </div>
-              <div class="space-y-1">
+              <div v-if="features.showCategories" class="space-y-1">
                 <label class="label">Category</label>
                 <select v-model="filterCategory" class="input" @change="onFilterChange">
                   <option value="">All categories</option>
@@ -452,10 +467,15 @@ async function deleteTransaction(t: Transaction) {
                     <span class="badge">{{ typeLabels[t.type ?? 'other'] ?? t.type }}</span>
                   </td>
                   <td>
-                    <div class="truncate max-w-md">{{ t.description ?? '—' }}</div>
-                    <div class="flex items-center gap-1.5 mt-0.5 text-xs">
+                    <RouterLink
+                      :to="{ name: 'transaction', params: { accountId: t.accountId, id: t.id } }"
+                      class="block truncate max-w-md hover:text-[var(--color-accent)] transition-colors"
+                    >
+                      {{ t.description ?? '—' }}
+                    </RouterLink>
+                    <div class="flex flex-wrap items-center gap-1.5 mt-0.5 text-xs">
                       <span
-                        v-if="categoryMeta(t.category)"
+                        v-if="features.showCategories && categoryMeta(t.category)"
                         class="inline-flex items-center gap-1.5"
                         :title="categoryMeta(t.category)!.label"
                       >
@@ -463,6 +483,16 @@ async function deleteTransaction(t: Transaction) {
                         <span class="text-[var(--color-text-muted)]">{{ categoryMeta(t.category)!.label }}</span>
                       </span>
                       <span v-if="t.assetIsin" class="text-[var(--color-text-dim)]">{{ t.assetIsin }}</span>
+                      <RouterLink
+                        v-for="tag in (t.tags ?? [])"
+                        :key="tag"
+                        :to="{ name: 'tag', params: { tag } }"
+                        class="text-[10px] rounded px-1.5 py-0.5 hover:opacity-80 transition-opacity"
+                        style="background-color: color-mix(in srgb, var(--color-accent) 14%, transparent); color: var(--color-accent);"
+                        @click.stop
+                      >
+                        {{ tag }}
+                      </RouterLink>
                     </div>
                   </td>
                   <td class="text-right tabular text-[var(--color-text-muted)]">

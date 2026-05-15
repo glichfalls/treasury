@@ -42,6 +42,20 @@ class Transaction
     #[ORM\Column(length: 32, enumType: TransactionCategory::class, nullable: true)]
     private ?TransactionCategory $category = null;
 
+    /**
+     * Free-form tags (lowercased, deduped). Used for fine-grained grouping
+     * across categories — e.g. {"netflix", "subscriptions"} on a recurring
+     * streaming charge. Stored as JSON; aggregation queries unnest via DBAL.
+     *
+     * Nullable so Doctrine hydration tolerates rows where the JSON value is
+     * SQL/JSON NULL (happens when ALTER TABLE adds the column without a
+     * non-null default). The getter normalises null → [].
+     *
+     * @var list<string>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $tags = [];
+
     #[ORM\Column(length: 120, nullable: true)]
     private ?string $externalRef = null;
 
@@ -73,6 +87,21 @@ class Transaction
     public function setSource(TransactionSource $source): self { $this->source = $source; return $this; }
     public function getCategory(): ?TransactionCategory { return $this->category; }
     public function setCategory(?TransactionCategory $category): self { $this->category = $category; return $this; }
+    /** @return list<string> */
+    public function getTags(): array { return $this->tags ?? []; }
+    /** @param iterable<string> $tags */
+    public function setTags(iterable $tags): self
+    {
+        $normalized = [];
+        foreach ($tags as $t) {
+            $t = strtolower(trim((string) $t));
+            if ($t !== '' && !in_array($t, $normalized, true)) {
+                $normalized[] = $t;
+            }
+        }
+        $this->tags = array_values($normalized);
+        return $this;
+    }
     public function getExternalRef(): ?string { return $this->externalRef; }
     public function setExternalRef(?string $externalRef): self { $this->externalRef = $externalRef; return $this; }
     public function getAssetIsin(): ?string { return $this->assetIsin; }

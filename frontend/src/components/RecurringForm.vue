@@ -18,12 +18,13 @@ import DateField from '@/components/DateField.vue'
  * mode (modal is closed); when a rule is passed, we're editing it. Wrapped by
  * parents that pass `mode = 'create' | 'edit'`.
  */
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   accountId: string
   currency: string
   open: boolean
   rule: RecurringRule | null
-}>()
+  showCategories?: boolean
+}>(), { showCategories: true })
 const emit = defineEmits<{
   'update:open': [boolean]
   saved: [RecurringRule]
@@ -168,7 +169,7 @@ async function submit() {
             <option v-for="t in transactionTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
           </select>
         </div>
-        <div class="space-y-1.5 sm:col-span-2">
+        <div v-if="showCategories" class="space-y-1.5 sm:col-span-2">
           <label class="label">Category</label>
           <select v-model="category" class="input">
             <option value="">Uncategorized</option>

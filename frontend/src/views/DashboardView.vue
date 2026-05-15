@@ -65,7 +65,6 @@ const netWorthByCurrency = computed(() => {
         title="Net worth over time"
         :range="range"
         :mode="networthMode"
-        granularity="weekly"
         @update:range="range = $event"
       />
 
@@ -73,7 +72,6 @@ const netWorthByCurrency = computed(() => {
         endpoint="/api/performance"
         title="Portfolio performance"
         :range="range"
-        granularity="weekly"
         @update:range="range = $event"
       />
 

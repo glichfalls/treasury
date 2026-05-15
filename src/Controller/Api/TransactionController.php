@@ -123,11 +123,61 @@ class TransactionController extends AbstractController
                 $t->setCategory($catEnum);
             }
         }
+        if (isset($body['tags']) && is_array($body['tags'])) {
+            $t->setTags($body['tags']);
+        }
+
+        // Auto-tag: any existing tag whose name appears as a substring of the
+        // description gets applied. Lets the user tag "Netflix" once and have
+        // future bank rows for "NETFLIX.COM 866-579-7117" pick it up.
+        $t->setTags(array_merge($t->getTags(), $this->autoTagsFor($user, $t->getDescription(), $t->getTags())));
 
         $this->em->persist($t);
         $this->em->flush();
 
         return new JsonResponse($this->serialize($t), 201);
+    }
+
+    /**
+     * Suggest tags for a description by matching against the user's existing
+     * distinct tags. Case-insensitive substring match — simple, predictable,
+     * no surprise auto-tagging from unrelated transactions.
+     *
+     * @param list<string> $existing Tags already on the transaction (won't re-suggest these).
+     * @return list<string>
+     */
+    private function autoTagsFor(User $user, ?string $description, array $existing): array
+    {
+        if ($description === null || $description === '') return [];
+        $haystack = strtolower($description);
+
+        $rows = $this->em->getConnection()->fetchAllAssociative(
+            "SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(t.tags, '$[*]')) AS tag_blob, t.tags
+             FROM transactions t
+             INNER JOIN accounts a ON a.id = t.account_id
+             WHERE a.owner_id = :owner AND JSON_LENGTH(t.tags) > 0
+             LIMIT 500",
+            ['owner' => $user->getId()->toBinary()],
+        );
+
+        $allTags = [];
+        foreach ($rows as $r) {
+            $decoded = json_decode($r['tags'] ?? '[]', true);
+            if (is_array($decoded)) {
+                foreach ($decoded as $t) {
+                    if (is_string($t) && $t !== '') $allTags[strtolower($t)] = true;
+                }
+            }
+        }
+
+        $matches = [];
+        foreach (array_keys($allTags) as $tag) {
+            if (in_array($tag, $existing, true)) continue;
+            if (str_contains($haystack, $tag)) {
+                $matches[] = $tag;
+            }
+        }
+        return $matches;
     }
 
     #[Route('/{transactionId}', name: 'api_transactions_update', methods: ['PATCH'], requirements: ['transactionId' => '[0-9a-f-]+'])]
@@ -192,10 +242,39 @@ class TransactionController extends AbstractController
                 $tx->setCategory($cat);
             }
         }
+        if (array_key_exists('tags', $body)) {
+            if (!is_array($body['tags'])) {
+                return new JsonResponse(['error' => 'tags must be an array of strings'], 422);
+            }
+            $tx->setTags($body['tags']);
+        }
 
         $this->em->flush();
 
         return new JsonResponse($this->serialize($tx));
+    }
+
+    #[Route('/{transactionId}', name: 'api_transactions_get', methods: ['GET'], requirements: ['transactionId' => '[0-9a-f-]+'])]
+    public function get(string $accountId, string $transactionId, #[CurrentUser] User $user): JsonResponse
+    {
+        $account = $this->accounts->findOneOwnedBy($accountId, $user);
+        if ($account === null) {
+            throw new NotFoundHttpException();
+        }
+        try {
+            $uuid = \Symfony\Component\Uid\Uuid::fromString($transactionId);
+        } catch (\InvalidArgumentException) {
+            throw new NotFoundHttpException();
+        }
+        $tx = $this->transactions->findOneBy(['id' => $uuid, 'account' => $account]);
+        if ($tx === null) {
+            throw new NotFoundHttpException();
+        }
+        return new JsonResponse([
+            ...$this->serialize($tx),
+            'accountName' => $account->getName(),
+            'accountType' => $account->getType()->value,
+        ]);
     }
 
     /**
@@ -250,6 +329,7 @@ class TransactionController extends AbstractController
             'type' => $t->getType()->value,
             'source' => $t->getSource()->value,
             'category' => $t->getCategory()?->value,
+            'tags' => $t->getTags(),
             'assetIsin' => $t->getAssetIsin(),
             'assetQuantity' => $t->getAssetQuantity(),
         ];

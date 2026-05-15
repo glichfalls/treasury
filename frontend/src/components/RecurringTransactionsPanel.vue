@@ -7,7 +7,10 @@ import { useToastsStore } from '@/stores/toasts'
 import RecurringForm from '@/components/RecurringForm.vue'
 import { Plus, Pencil, Trash2, Play, Pause, Inbox } from 'lucide-vue-next'
 
-const props = defineProps<{ accountId: string; currency: string }>()
+const props = withDefaults(
+  defineProps<{ accountId: string; currency: string; showCategories?: boolean }>(),
+  { showCategories: true },
+)
 const emit = defineEmits<{ changed: [] }>()
 
 const toasts = useToastsStore()
@@ -128,7 +131,7 @@ function shortDate(iso: string | null): string {
           <tr v-for="r in rules" :key="r.id" :class="{ 'opacity-60': !r.active }">
             <td>
               <div class="font-medium">{{ r.description }}</div>
-              <div v-if="categoryMeta(r.category)" class="text-xs mt-0.5 flex items-center gap-1.5">
+              <div v-if="showCategories && categoryMeta(r.category)" class="text-xs mt-0.5 flex items-center gap-1.5">
                 <span class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: categoryMeta(r.category)!.color }"></span>
                 <span class="text-[var(--color-text-muted)]">{{ categoryMeta(r.category)!.label }}</span>
               </div>
@@ -183,6 +186,7 @@ function shortDate(iso: string | null): string {
       :account-id="accountId"
       :currency="currency"
       :rule="editing"
+      :show-categories="showCategories"
       @saved="onSaved"
     />
   </div>

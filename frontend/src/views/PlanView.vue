@@ -159,6 +159,8 @@ const option = computed<EChartsOption>(() => {
         smooth: true,
         showSymbol: false,
         sampling: 'lttb' as const,
+        color: chartColors.accent,
+        itemStyle: { color: chartColors.accent },
         lineStyle: { color: chartColors.accent, width: 2 },
         areaStyle: {
           color: {
@@ -178,6 +180,8 @@ const option = computed<EChartsOption>(() => {
         smooth: true,
         showSymbol: false,
         sampling: 'lttb' as const,
+        color: chartColors.highlight,
+        itemStyle: { color: chartColors.highlight },
         lineStyle: { color: chartColors.highlight, width: 1.5, type: 'dashed' },
         data: realSeries,
       },
@@ -187,6 +191,8 @@ const option = computed<EChartsOption>(() => {
         smooth: true,
         showSymbol: false,
         sampling: 'lttb' as const,
+        color: chartColors.textDim,
+        itemStyle: { color: chartColors.textDim },
         lineStyle: { color: chartColors.textDim, width: 1.5, type: 'dotted' },
         data: contributedSeries,
       },

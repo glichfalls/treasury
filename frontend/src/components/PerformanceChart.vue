@@ -22,9 +22,15 @@ const props = withDefaults(
   {
     title: 'Performance',
     range: '1y',
-    granularity: 'weekly',
   },
 )
+
+// Auto-pick granularity from range so short windows don't show only 2 points.
+function granularityFor(range: Range): 'daily' | 'weekly' | 'monthly' {
+  if (range === '1w' || range === '1m') return 'daily'
+  if (range === '6mo' || range === '1y' || range === '2y') return 'weekly'
+  return 'monthly'
+}
 
 const emit = defineEmits<{ 'update:range': [Range] }>()
 
@@ -49,8 +55,9 @@ async function load() {
   loading.value = true
   try {
     const { from, to } = rangeBounds(props.range)
+    const granularity = props.granularity ?? granularityFor(props.range)
     points.value = await api.get<Point[]>(
-      `${props.endpoint}?from=${from}&to=${to}&granularity=${props.granularity}`,
+      `${props.endpoint}?from=${from}&to=${to}&granularity=${granularity}`,
     )
   } finally {
     loading.value = false
@@ -142,6 +149,8 @@ const option = computed<EChartsOption>(() => {
       showSymbol: false,
       sampling: 'lttb',
       connectNulls: false,
+      color: dir.line,
+      itemStyle: { color: dir.line },
       lineStyle: { color: dir.line, width: 2 },
       areaStyle: {
         color: {

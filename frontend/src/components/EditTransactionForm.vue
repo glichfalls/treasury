@@ -11,14 +11,25 @@ function minorToMajorString(amountMinor: string, currency: string): string {
   const fracPart = exp > 0 ? digits.slice(-exp) : ''
   return (negative ? '-' : '') + intPart + (fracPart ? '.' + fracPart : '')
 }
+import { computed } from 'vue'
 import BaseModal from '@/components/BaseModal.vue'
 import DateField from '@/components/DateField.vue'
+import TagsInput from '@/components/TagsInput.vue'
 import { CATEGORIES } from '@/lib/categories'
+import { featuresFor } from '@/lib/accountFeatures'
 
 const props = defineProps<{ transaction: Transaction | null }>()
 const emit = defineEmits<{ 'update:transaction': [Transaction | null]; saved: [] }>()
 
 const accounts = useAccountsStore()
+
+// Resolve the account behind this transaction so we can hide category etc. for
+// non-bank-style accounts. Account list is in the store from earlier load().
+const features = computed(() => {
+  if (!props.transaction) return featuresFor('other')
+  const acc = accounts.accounts.find((a) => a.id === props.transaction!.accountId)
+  return featuresFor(acc?.type ?? 'other')
+})
 
 const transactionTypes = [
   { value: 'deposit', label: 'Deposit' },
@@ -37,6 +48,7 @@ const amount = ref('')
 const description = ref('')
 const type = ref('other')
 const category = ref('')
+const tags = ref<string[]>([])
 const error = ref<string | null>(null)
 const submitting = ref(false)
 
@@ -49,6 +61,7 @@ watch(
     description.value = t.description ?? ''
     type.value = t.type
     category.value = t.category ?? ''
+    tags.value = [...(t.tags ?? [])]
     error.value = null
   },
   { immediate: true },
@@ -70,6 +83,7 @@ async function submit() {
       description: description.value.trim() || null,
       type: type.value,
       category: category.value || null,
+      tags: tags.value,
     })
     emit('saved')
     close()
@@ -99,7 +113,7 @@ async function submit() {
             <option v-for="t in transactionTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
           </select>
         </div>
-        <div class="space-y-1.5">
+        <div v-if="features.showCategories" class="space-y-1.5">
           <label class="label">Category</label>
           <select v-model="category" class="input">
             <option value="">Uncategorized</option>
@@ -109,6 +123,10 @@ async function submit() {
         <div class="space-y-1.5 sm:col-span-2">
           <label class="label">Description</label>
           <input v-model="description" class="input" />
+        </div>
+        <div class="space-y-1.5 sm:col-span-2">
+          <label class="label">Tags</label>
+          <TagsInput v-model="tags" placeholder="Netflix, business, refund…" />
         </div>
       </div>
       <p v-if="error" class="text-sm text-[var(--color-negative)]">{{ error }}</p>

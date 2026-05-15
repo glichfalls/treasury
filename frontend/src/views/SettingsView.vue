@@ -3,6 +3,7 @@ import BackupPanel from '@/components/BackupPanel.vue'
 import ChangePasswordPanel from '@/components/ChangePasswordPanel.vue'
 import PreferencesPanel from '@/components/PreferencesPanel.vue'
 import RegistrationCodesPanel from '@/components/RegistrationCodesPanel.vue'
+import TagsPanel from '@/components/TagsPanel.vue'
 import UsersPanel from '@/components/UsersPanel.vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -19,6 +20,8 @@ const auth = useAuthStore()
     <PreferencesPanel />
 
     <ChangePasswordPanel />
+
+    <TagsPanel />
 
     <BackupPanel />
 

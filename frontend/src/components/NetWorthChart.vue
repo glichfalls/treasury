@@ -21,15 +21,26 @@ const props = withDefaults(
     title?: string
     // Single line of total value (default), stacked cash+holdings, or value plus net deposits.
     mode?: 'total' | 'stacked' | 'vs-deposits'
+    // When true, line color tracks direction (green up / red down). Disable for
+    // cash-style accounts where "going down" is just spending, not a loss.
+    directionColoring?: boolean
   }>(),
   {
     currency: 'CHF',
-    granularity: 'weekly',
     range: '2y',
     title: 'Net worth',
     mode: 'total',
+    directionColoring: true,
   },
 )
+
+// Auto-pick a sampling cadence based on the visible range so short windows
+// don't end up with just two data points. An explicit `granularity` prop wins.
+function granularityFor(range: string): 'daily' | 'weekly' | 'monthly' {
+  if (range === '1w' || range === '1m') return 'daily'
+  if (range === '6mo' || range === '1y' || range === '2y') return 'weekly'
+  return 'monthly'
+}
 
 const points = ref<Point[]>([])
 const loading = ref(false)
@@ -47,18 +58,20 @@ function rangeBounds(range: string): { from: string; to: string } {
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }
 }
 
-// Whole-line color based on the direction over the visible window.
-// Matches finance-app convention (Robinhood/Google Finance): green if you're up
-// vs. the start of the range, red if down. Falls back to accent when there's
+// Yellow accent + matching area gradient. Used when direction coloring is off
+// (bank accounts etc.) and as the fallback for direction coloring when there's
 // not enough data to compute a delta.
+const ACCENT_FILL = {
+  line: chartColors.accent,
+  areaTop: 'rgba(250,204,21,0.35)',
+  areaBottom: 'rgba(250,204,21,0.00)',
+}
+
+// Whole-line color based on the direction over the visible window.
+// Finance-app convention (Robinhood/Google Finance): green if you're up vs. the
+// start of the range, red if down.
 function directionColor(values: number[]): { line: string; areaTop: string; areaBottom: string } {
-  if (values.length < 2) {
-    return {
-      line: chartColors.accent,
-      areaTop: 'rgba(250,204,21,0.35)',
-      areaBottom: 'rgba(250,204,21,0.00)',
-    }
-  }
+  if (values.length < 2) return ACCENT_FILL
   const delta = values[values.length - 1]! - values[0]!
   if (delta >= 0) {
     return {
@@ -74,12 +87,18 @@ function directionColor(values: number[]): { line: string; areaTop: string; area
   }
 }
 
+/** Picks accent or direction-based fill based on the prop. */
+function fillFor(values: number[]): { line: string; areaTop: string; areaBottom: string } {
+  return props.directionColoring ? directionColor(values) : ACCENT_FILL
+}
+
 async function load() {
   loading.value = true
   try {
     const { from, to } = rangeBounds(props.range)
+    const granularity = props.granularity ?? granularityFor(props.range)
     points.value = await api.get<Point[]>(
-      `${props.endpoint}?from=${from}&to=${to}&granularity=${props.granularity}`,
+      `${props.endpoint}?from=${from}&to=${to}&granularity=${granularity}`,
     )
   } finally {
     loading.value = false
@@ -155,6 +174,11 @@ const option = computed<EChartsOption>(() => {
           smooth: true,
           showSymbol: false,
           sampling: 'lttb',
+          // Setting `color` (and matching itemStyle) gives ECharts the right
+          // legend-marker color. Without these, ECharts falls back to its
+          // built-in palette (blue) for the marker, even though the area is yellow.
+          color: '#facc15',
+          itemStyle: { color: '#facc15' },
           lineStyle: { width: 0 },
           areaStyle: { color: 'rgba(250,204,21,0.45)' },
           data: points.value.map((p) => Number(p.cashMinor) / 100),
@@ -166,6 +190,8 @@ const option = computed<EChartsOption>(() => {
           smooth: true,
           showSymbol: false,
           sampling: 'lttb',
+          color: '#a78bfa',
+          itemStyle: { color: '#a78bfa' },
           lineStyle: { width: 0 },
           areaStyle: { color: 'rgba(167,139,250,0.45)' },
           data: points.value.map((p) => Number(p.holdingsMinor) / 100),
@@ -176,7 +202,7 @@ const option = computed<EChartsOption>(() => {
 
   if (props.mode === 'vs-deposits') {
     const totals = points.value.map((p) => Number(p.totalMinor) / 100)
-    const dir = directionColor(totals)
+    const dir = fillFor(totals)
     return {
       ...baseAxisStyle,
       legend: {
@@ -193,6 +219,9 @@ const option = computed<EChartsOption>(() => {
           smooth: true,
           showSymbol: false,
           sampling: 'lttb',
+          // `color` controls the legend marker; ECharts ignores lineStyle.color for it.
+          color: dir.line,
+          itemStyle: { color: dir.line },
           lineStyle: { color: dir.line, width: 2 },
           areaStyle: {
             color: {
@@ -213,6 +242,8 @@ const option = computed<EChartsOption>(() => {
           smooth: true,
           showSymbol: false,
           sampling: 'lttb',
+          color: chartColors.textMuted,
+          itemStyle: { color: chartColors.textMuted },
           lineStyle: { color: chartColors.textMuted, width: 1.5, type: 'dashed' },
           data: points.value.map((p) => Number(p.netDepositsMinor ?? '0') / 100),
           z: 1,
@@ -223,7 +254,7 @@ const option = computed<EChartsOption>(() => {
 
   // default: single area
   const totals = points.value.map((p) => Number(p.totalMinor) / 100)
-  const dir = directionColor(totals)
+  const dir = fillFor(totals)
   return {
     ...baseAxisStyle,
     series: [{
@@ -232,6 +263,8 @@ const option = computed<EChartsOption>(() => {
       smooth: true,
       showSymbol: false,
       sampling: 'lttb',
+      color: dir.line,
+      itemStyle: { color: dir.line },
       lineStyle: { color: dir.line, width: 2 },
       areaStyle: {
         color: {
