@@ -41,6 +41,22 @@ export interface NewTransaction {
   description?: string | null
 }
 
+export interface TransactionFilters {
+  page?: number
+  pageSize?: number
+  type?: string
+  from?: string
+  to?: string
+  q?: string
+}
+
+export interface TransactionPage {
+  items: Transaction[]
+  total: number
+  page: number
+  pageSize: number
+}
+
 export interface Holding {
   isin: string
   ticker: string | null
@@ -79,8 +95,18 @@ export const useAccountsStore = defineStore('accounts', () => {
     accounts.value = accounts.value.filter((a) => a.id !== id)
   }
 
-  async function fetchTransactions(accountId: string): Promise<Transaction[]> {
-    return api.get<Transaction[]>(`/api/accounts/${accountId}/transactions`)
+  async function fetchTransactions(
+    accountId: string,
+    filters: TransactionFilters = {},
+  ): Promise<TransactionPage> {
+    const params = new URLSearchParams()
+    params.set('page', String(filters.page ?? 1))
+    params.set('pageSize', String(filters.pageSize ?? 25))
+    if (filters.type) params.set('type', filters.type)
+    if (filters.from) params.set('from', filters.from)
+    if (filters.to) params.set('to', filters.to)
+    if (filters.q) params.set('q', filters.q)
+    return api.get<TransactionPage>(`/api/accounts/${accountId}/transactions?${params.toString()}`)
   }
 
   async function fetchHoldings(accountId: string): Promise<Holding[]> {

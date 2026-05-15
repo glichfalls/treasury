@@ -4,6 +4,7 @@ import { api } from '@/lib/api'
 import { parseMajor } from '@/lib/money'
 import { Sparkles } from 'lucide-vue-next'
 import BaseModal from '@/components/BaseModal.vue'
+import DateField from '@/components/DateField.vue'
 
 const props = defineProps<{ accountId: string; currency: string }>()
 const emit = defineEmits<{ created: [] }>()
@@ -60,7 +61,7 @@ async function submit() {
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div class="space-y-1.5">
           <label class="label">As of</label>
-          <input v-model="occurredAt" type="date" required class="input" />
+          <DateField v-model="occurredAt" required />
         </div>
         <div class="space-y-1.5">
           <label class="label">Current value ({{ currency }})</label>

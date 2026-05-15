@@ -27,15 +27,43 @@ class TransactionController extends AbstractController
     ) {}
 
     #[Route('', name: 'api_transactions_list', methods: ['GET'])]
-    public function list(string $accountId, #[CurrentUser] User $user): JsonResponse
+    public function list(string $accountId, Request $request, #[CurrentUser] User $user): JsonResponse
     {
         $account = $this->accounts->findOneOwnedBy($accountId, $user);
         if ($account === null) {
             throw new NotFoundHttpException();
         }
 
-        $transactions = $this->transactions->findByAccount($account);
-        return new JsonResponse(array_map($this->serialize(...), $transactions));
+        $page = max(1, (int) $request->query->get('page', '1'));
+        $pageSize = (int) $request->query->get('pageSize', '25');
+
+        $typeParam = $request->query->get('type');
+        $type = $typeParam !== null && $typeParam !== ''
+            ? TransactionType::tryFrom($typeParam)
+            : null;
+
+        $fromParam = $request->query->get('from');
+        $from = null;
+        if ($fromParam !== null && $fromParam !== '') {
+            try { $from = new \DateTimeImmutable($fromParam); } catch (\Exception) {}
+        }
+        $toParam = $request->query->get('to');
+        $to = null;
+        if ($toParam !== null && $toParam !== '') {
+            try { $to = new \DateTimeImmutable($toParam); } catch (\Exception) {}
+        }
+
+        $q = $request->query->get('q');
+        $q = is_string($q) ? trim($q) : null;
+
+        $result = $this->transactions->findPage($account, $page, $pageSize, $type, $from, $to, $q ?: null);
+
+        return new JsonResponse([
+            'items' => array_map($this->serialize(...), $result['items']),
+            'total' => $result['total'],
+            'page' => $page,
+            'pageSize' => max(1, min(200, $pageSize)),
+        ]);
     }
 
     #[Route('', name: 'api_transactions_create', methods: ['POST'])]

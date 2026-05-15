@@ -12,6 +12,7 @@ function minorToMajorString(amountMinor: string, currency: string): string {
   return (negative ? '-' : '') + intPart + (fracPart ? '.' + fracPart : '')
 }
 import BaseModal from '@/components/BaseModal.vue'
+import DateField from '@/components/DateField.vue'
 
 const props = defineProps<{ transaction: Transaction | null }>()
 const emit = defineEmits<{ 'update:transaction': [Transaction | null]; saved: [] }>()
@@ -82,7 +83,7 @@ async function submit() {
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div class="space-y-1.5">
           <label class="label">Date</label>
-          <input v-model="occurredAt" type="date" required class="input" />
+          <DateField v-model="occurredAt" required />
         </div>
         <div class="space-y-1.5">
           <label class="label">Amount ({{ transaction.currency }})</label>

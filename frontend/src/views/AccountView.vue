@@ -15,6 +15,7 @@ import AllocationDonut from '@/components/AllocationDonut.vue'
 import AssetPriceChart from '@/components/AssetPriceChart.vue'
 import PerformanceChart from '@/components/PerformanceChart.vue'
 import EditTransactionForm from '@/components/EditTransactionForm.vue'
+import DateField from '@/components/DateField.vue'
 import { ChevronLeft, Download, Inbox, Pencil, Trash2 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -23,24 +24,70 @@ const accounts = useAccountsStore()
 const accountId = computed(() => String(route.params.id))
 const account = computed(() => accounts.accounts.find((a) => a.id === accountId.value))
 const transactions = ref<Transaction[]>([])
+const totalTransactions = ref(0)
 const holdings = ref<Holding[]>([])
 const loading = ref(false)
 const range = ref<'1w' | '1m' | '6mo' | '1y' | '2y' | '5y' | 'all'>('1y')
 const expandedHolding = ref<string | null>(null)
+
+// Filter / pagination state.
+const page = ref(1)
+const pageSize = ref(25)
+const filterType = ref('')
+const filterFrom = ref('')
+const filterTo = ref('')
+const filterQ = ref('')
+
+const totalPages = computed(() => Math.max(1, Math.ceil(totalTransactions.value / pageSize.value)))
+const hasFilters = computed(() =>
+  filterType.value !== '' || filterFrom.value !== '' || filterTo.value !== '' || filterQ.value !== '',
+)
 
 async function load() {
   if (!accountId.value) return
   loading.value = true
   try {
     const [tx, hd] = await Promise.all([
-      accounts.fetchTransactions(accountId.value),
+      accounts.fetchTransactions(accountId.value, {
+        page: page.value,
+        pageSize: pageSize.value,
+        type: filterType.value || undefined,
+        from: filterFrom.value || undefined,
+        to: filterTo.value || undefined,
+        q: filterQ.value || undefined,
+      }),
       accounts.fetchHoldings(accountId.value),
     ])
-    transactions.value = tx
+    transactions.value = tx.items
+    totalTransactions.value = tx.total
     holdings.value = hd
   } finally {
     loading.value = false
   }
+}
+
+// Debounced auto-reload when filters change (avoid a request on every keystroke).
+let filterTimer: ReturnType<typeof setTimeout> | null = null
+function onFilterChange() {
+  if (filterTimer) clearTimeout(filterTimer)
+  filterTimer = setTimeout(() => {
+    page.value = 1
+    void load()
+  }, 250)
+}
+
+function clearFilters() {
+  filterType.value = ''
+  filterFrom.value = ''
+  filterTo.value = ''
+  filterQ.value = ''
+  page.value = 1
+  void load()
+}
+
+function goToPage(p: number) {
+  page.value = Math.min(totalPages.value, Math.max(1, p))
+  void load()
 }
 
 async function reloadAfterImport() {
@@ -55,7 +102,17 @@ onMounted(async () => {
   await load()
 })
 
-watch(accountId, load)
+watch(accountId, () => {
+  // Reset filters and pagination when navigating between accounts so the user
+  // doesn't carry over filters that may not make sense (e.g. an asset ISIN
+  // search on an account that doesn't hold that asset).
+  page.value = 1
+  filterType.value = ''
+  filterFrom.value = ''
+  filterTo.value = ''
+  filterQ.value = ''
+  void load()
+})
 
 const typeLabels: Record<string, string> = {
   deposit: 'Deposit',
@@ -242,16 +299,58 @@ async function deleteTransaction(t: Transaction) {
       </section>
 
       <section class="space-y-4">
-        <h2 class="text-lg font-medium">Transactions</h2>
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-lg font-medium">Transactions</h2>
+          <span class="text-xs text-[var(--color-text-muted)] tabular">
+            {{ totalTransactions }} total
+          </span>
+        </div>
+
+        <div class="card p-3">
+          <div class="flex flex-wrap items-end gap-3">
+            <div class="space-y-1 flex-1 min-w-[10rem]">
+              <label class="label">Search</label>
+              <input
+                v-model="filterQ"
+                placeholder="Description or ISIN"
+                class="input"
+                @input="onFilterChange"
+              />
+            </div>
+            <div class="space-y-1">
+              <label class="label">Type</label>
+              <select v-model="filterType" class="input" @change="onFilterChange">
+                <option value="">All types</option>
+                <option v-for="(label, value) in typeLabels" :key="value" :value="value">{{ label }}</option>
+              </select>
+            </div>
+            <div class="space-y-1">
+              <label class="label">From</label>
+              <DateField v-model="filterFrom" clearable placeholder="From" @update:model-value="onFilterChange" />
+            </div>
+            <div class="space-y-1">
+              <label class="label">To</label>
+              <DateField v-model="filterTo" clearable placeholder="To" @update:model-value="onFilterChange" />
+            </div>
+            <button
+              v-if="hasFilters"
+              type="button"
+              class="btn btn-ghost"
+              @click="clearFilters"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
 
         <div v-if="loading" class="card p-10 text-center text-[var(--color-text-muted)]">Loading…</div>
         <div v-else-if="transactions.length === 0" class="card p-10 text-center space-y-2">
           <div class="flex justify-center text-[var(--color-text-dim)]">
             <Inbox :size="40" />
           </div>
-          <p class="font-medium">No transactions yet</p>
+          <p class="font-medium">{{ hasFilters ? 'No transactions match the filters' : 'No transactions yet' }}</p>
           <p class="text-sm text-[var(--color-text-muted)]">
-            Import a CSV or add one manually.
+            {{ hasFilters ? 'Try clearing some filters.' : 'Import a CSV or add one manually.' }}
           </p>
         </div>
         <div v-else class="card overflow-hidden">
@@ -267,12 +366,7 @@ async function deleteTransaction(t: Transaction) {
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="t in transactions.filter((tx) =>
-                  account?.type !== 'pillar_3a' || (tx.type !== 'trade_buy' && tx.type !== 'trade_sell')
-                )"
-                :key="t.id"
-              >
+              <tr v-for="t in transactions" :key="t.id">
                 <td class="text-[var(--color-text-muted)] tabular">{{ shortDate(t.occurredAt) }}</td>
                 <td>
                   <span class="badge">{{ typeLabels[t.type ?? 'other'] ?? t.type }}</span>
@@ -315,6 +409,26 @@ async function deleteTransaction(t: Transaction) {
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <div v-if="totalTransactions > pageSize" class="flex items-center justify-between gap-3">
+          <span class="text-xs text-[var(--color-text-muted)] tabular">
+            Page {{ page }} of {{ totalPages }}
+          </span>
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              class="btn btn-ghost text-xs"
+              :disabled="page <= 1 || loading"
+              @click="goToPage(page - 1)"
+            >Previous</button>
+            <button
+              type="button"
+              class="btn btn-ghost text-xs"
+              :disabled="page >= totalPages || loading"
+              @click="goToPage(page + 1)"
+            >Next</button>
+          </div>
         </div>
       </section>
     </template>

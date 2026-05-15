@@ -4,6 +4,7 @@ import { api } from '@/lib/api'
 import { parseMajor } from '@/lib/money'
 import { Coins } from 'lucide-vue-next'
 import BaseModal from '@/components/BaseModal.vue'
+import DateField from '@/components/DateField.vue'
 
 interface CatalogEntry {
   isin: string
@@ -83,7 +84,7 @@ async function submit() {
         </div>
         <div class="space-y-1.5">
           <label class="label">Date</label>
-          <input v-model="occurredAt" type="date" required class="input" />
+          <DateField v-model="occurredAt" required />
         </div>
         <div class="space-y-1.5">
           <label class="label">Quantity</label>

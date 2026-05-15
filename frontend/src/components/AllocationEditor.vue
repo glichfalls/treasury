@@ -4,6 +4,7 @@ import { api } from '@/lib/api'
 import { Pencil, Plus, Save, Trash2, History, X, Check, Copy } from 'lucide-vue-next'
 import { chartColors } from '@/lib/charts'
 import { useAccountsStore } from '@/stores/accounts'
+import DateField from '@/components/DateField.vue'
 
 interface Rule {
   assetIsin: string
@@ -388,7 +389,7 @@ async function copyFrom(sourceId: string) {
 
         <div class="space-y-1">
           <label class="label">Effective from</label>
-          <input v-model="draftEffectiveFrom" type="date" class="input" />
+          <DateField v-model="draftEffectiveFrom" />
         </div>
 
         <div class="flex items-end gap-2 ml-auto">
