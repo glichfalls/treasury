@@ -19,6 +19,19 @@ security:
                 password_path: password
             logout:
                 path: api_logout
+            # Remember-me: long-lived signed cookie that resurrects the session after
+            # the PHP session expires. Opt-in via ?_remember_me=on on the login POST
+            # (the frontend appends it when the checkbox is ticked) — json_login
+            # doesn't parse the JSON body for this flag, so query string is the
+            # reliable channel.
+            remember_me:
+                secret: '%kernel.secret%'
+                lifetime: 1209600        # 14 days
+                path: /
+                samesite: lax
+                secure: auto             # HTTPS only when the request is HTTPS
+                httponly: true
+                always_remember_me: false
 
     access_control:
         - { path: ^/api/login,            roles: PUBLIC_ACCESS }

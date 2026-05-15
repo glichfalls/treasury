@@ -10,6 +10,7 @@ const auth = useAuthStore()
 
 const email = ref('')
 const password = ref('')
+const rememberMe = ref(true)
 const error = ref<string | null>(null)
 const loading = ref(false)
 
@@ -17,7 +18,7 @@ async function submit() {
   error.value = null
   loading.value = true
   try {
-    await auth.login(email.value, password.value)
+    await auth.login(email.value, password.value, rememberMe.value)
     const next = typeof route.query.next === 'string' ? route.query.next : '/dashboard'
     await router.push(next)
   } catch (e) {
@@ -79,6 +80,15 @@ async function submit() {
             placeholder="••••••••"
           />
         </div>
+
+        <label class="flex items-center gap-2 text-sm text-[var(--color-text-muted)] cursor-pointer select-none">
+          <input
+            v-model="rememberMe"
+            type="checkbox"
+            class="accent-[var(--color-accent)] w-4 h-4 rounded"
+          />
+          <span>Keep me signed in for 14 days</span>
+        </label>
 
         <button type="submit" class="btn btn-primary w-full text-base py-2.5" :disabled="loading">
           <span>{{ loading ? 'Signing in…' : 'Sign in' }}</span>

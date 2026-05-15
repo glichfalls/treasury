@@ -24,8 +24,12 @@ export const useAuthStore = defineStore('auth', () => {
     return user.value
   }
 
-  async function login(email: string, password: string): Promise<AuthUser> {
-    const res = await fetch('/api/login', {
+  async function login(email: string, password: string, rememberMe = false): Promise<AuthUser> {
+    // Remember-me flag goes in the query string because json_login doesn't read
+    // the JSON body for it (Symfony's RememberMeFactory only inspects request
+    // params via ParameterBagUtils, which doesn't parse JSON).
+    const url = rememberMe ? '/api/login?_remember_me=on' : '/api/login'
+    const res = await fetch(url, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
