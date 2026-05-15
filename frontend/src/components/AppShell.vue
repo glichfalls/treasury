@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { LogOut, Wallet, Menu, X, LayoutDashboard, Settings } from 'lucide-vue-next'
+import { LogOut, Wallet, Menu, X, LayoutDashboard, Settings, Target } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -13,7 +13,8 @@ const activeName = computed(() => String(route.name ?? ''))
 
 const navItems = [
   { to: { name: 'dashboard' }, label: 'Dashboard', icon: LayoutDashboard, match: (n: string) => n === 'dashboard' },
-  { to: { name: 'accounts' }, label: 'Accounts', icon: Wallet, match: (n: string) => n === 'accounts' || n === 'account' },
+  { to: { name: 'accounts' }, label: 'Accounts', icon: Wallet, match: (n: string) => n === 'accounts' || n === 'account' || n === 'asset' },
+  { to: { name: 'plan' }, label: 'Plan', icon: Target, match: (n: string) => n === 'plan' },
   { to: { name: 'settings' }, label: 'Settings', icon: Settings, match: (n: string) => n === 'settings' },
 ]
 
