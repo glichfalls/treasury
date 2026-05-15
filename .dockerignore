@@ -1,0 +1,28 @@
+.git
+.github
+.idea
+.vscode
+.claude
+.phpunit.cache
+
+# dev-only compose / Dockerfiles for the dev image are NOT needed in prod context,
+# but we keep them so the dev image build still works locally; they're tiny.
+
+node_modules
+frontend/node_modules
+frontend/dist
+
+vendor
+var/cache/*
+var/log/*
+var/sessions/*
+
+tests
+docs
+samples
+
+.env.local
+.env.*.local
+.env.prod.local
+
+*.md

@@ -1,0 +1,44 @@
+FROM composer:2 AS composer-bin
+
+FROM php:8.4-fpm-alpine AS prod
+
+RUN apk add --no-cache git unzip icu-libs icu-data-full \
+    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS icu-dev linux-headers \
+    && docker-php-ext-install -j$(nproc) pdo_mysql intl opcache bcmath \
+    && apk del .build-deps
+
+COPY --from=composer-bin /usr/bin/composer /usr/bin/composer
+
+RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
+
+RUN { \
+        echo 'opcache.memory_consumption=256'; \
+        echo 'opcache.max_accelerated_files=20000'; \
+        echo 'opcache.validate_timestamps=0'; \
+        echo 'opcache.enable_cli=1'; \
+        echo 'realpath_cache_size=4096K'; \
+        echo 'realpath_cache_ttl=600'; \
+    } > /usr/local/etc/php/conf.d/zz-prod.ini
+
+ENV COMPOSER_ALLOW_SUPERUSER=1 \
+    COMPOSER_HOME=/tmp/composer \
+    APP_ENV=prod \
+    APP_DEBUG=0
+
+WORKDIR /app
+
+COPY composer.json composer.lock symfony.lock ./
+RUN composer install --no-dev --no-scripts --no-interaction --prefer-dist --optimize-autoloader --no-progress
+
+COPY . .
+
+# Build-time placeholders so Symfony cache:warmup works without leaking real secrets into the image
+RUN APP_SECRET=build-placeholder DATABASE_URL="mysql://u:p@db:3306/d?serverVersion=8.0&charset=utf8mb4" \
+    composer dump-autoload --no-dev --classmap-authoritative --optimize \
+    && APP_SECRET=build-placeholder DATABASE_URL="mysql://u:p@db:3306/d?serverVersion=8.0&charset=utf8mb4" \
+        php bin/console cache:warmup --env=prod --no-debug \
+    && mkdir -p var/cache var/log var/sessions \
+    && chown -R www-data:www-data var
+
+EXPOSE 9000
+CMD ["php-fpm", "-F"]
