@@ -14,6 +14,7 @@ const router = createRouter({
     { path: '/dashboard', name: 'dashboard', component: () => import('../views/DashboardView.vue') },
     { path: '/accounts', name: 'accounts', component: () => import('../views/AccountsView.vue') },
     { path: '/accounts/:id', name: 'account', component: () => import('../views/AccountView.vue') },
+    { path: '/assets/:isin', name: 'asset', component: () => import('../views/AssetDetailView.vue') },
     { path: '/settings', name: 'settings', component: () => import('../views/SettingsView.vue') },
   ],
 })

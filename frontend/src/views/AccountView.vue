@@ -15,6 +15,7 @@ import AllocationDonut from '@/components/AllocationDonut.vue'
 import PerformanceChart from '@/components/PerformanceChart.vue'
 import EditTransactionForm from '@/components/EditTransactionForm.vue'
 import EditAccountForm from '@/components/EditAccountForm.vue'
+import RecurringTransactionsPanel from '@/components/RecurringTransactionsPanel.vue'
 import DateField from '@/components/DateField.vue'
 import { useToastsStore } from '@/stores/toasts'
 import { CATEGORIES, categoryMeta } from '@/lib/categories'
@@ -117,6 +118,7 @@ watch(accountId, () => {
   filterFrom.value = ''
   filterTo.value = ''
   filterQ.value = ''
+  activeTab.value = 'holdings'
   void load()
 })
 
@@ -138,12 +140,15 @@ function shortDate(iso: string): string {
 }
 
 const editingAccount = ref<Account | null>(null)
-const activeTab = ref<'holdings' | 'transactions'>('transactions')
+// Holdings is the default tab — it's the primary content for investment accounts.
+// For accounts without holdings (regular bank etc.) the tab button is hidden by a
+// v-if; the watch below auto-falls-back to Transactions in that case so the page
+// doesn't end up showing nothing.
+const activeTab = ref<'holdings' | 'transactions' | 'recurring'>('holdings')
 
-// Default to Holdings tab when an account actually has holdings, otherwise Transactions.
 watch(holdings, (h) => {
-  if (h.length > 0 && activeTab.value === 'transactions' && transactions.value.length === 0) {
-    activeTab.value = 'holdings'
+  if (h.length === 0 && activeTab.value === 'holdings') {
+    activeTab.value = 'transactions'
   }
 }, { immediate: false })
 
@@ -317,7 +322,25 @@ async function deleteTransaction(t: Transaction) {
           >
             Transactions <span class="text-[var(--color-text-dim)] ml-1">{{ totalTransactions }}</span>
           </button>
+          <button
+            type="button"
+            class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors"
+            :class="activeTab === 'recurring'
+              ? 'text-[var(--color-text)] border-[var(--color-accent)]'
+              : 'text-[var(--color-text-muted)] border-transparent hover:text-[var(--color-text)]'"
+            @click="activeTab = 'recurring'"
+          >
+            Recurring
+          </button>
         </div>
+
+        <!-- Recurring tab -->
+        <RecurringTransactionsPanel
+          v-if="activeTab === 'recurring' && account"
+          :account-id="account.id"
+          :currency="account.currency"
+          @changed="reloadAfterImport"
+        />
 
         <!-- Holdings tab -->
         <div v-if="activeTab === 'holdings' && holdings.length > 0" class="card overflow-hidden">
