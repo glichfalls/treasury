@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { api } from '@/lib/api'
-import { formatMinor } from '@/lib/money'
+import { formatMinor, formatQuantity } from '@/lib/money'
 import { categoryMeta } from '@/lib/categories'
 import AssetPriceChart from '@/components/AssetPriceChart.vue'
 import { ChevronLeft, Inbox, TrendingUp, TrendingDown } from 'lucide-vue-next'
@@ -51,6 +51,11 @@ interface AssetDetail {
   currentValueMinor: string | null
   currentValueCurrency: string | null
   totalsByCurrency: CurrencyTotal[]
+  baseCurrency: string
+  baseInvestedMinor: string
+  baseDividendsMinor: string
+  baseCurrentValueMinor: string | null
+  baseFxIncomplete: boolean
   accounts: PerAccount[]
   dividends: YearTotal[]
   transactions: AssetTx[]
@@ -106,32 +111,90 @@ const dividendsByCurrency = computed(() => {
   }))
 })
 
-// Simple per-currency return: current value (when same currency) + dividends − invested.
-// Computed only for currencies where invested > 0 so we don't divide by zero.
-const returnByCurrency = computed(() => {
-  if (!data.value) return [] as Array<{ currency: string; investedMinor: string; dividendsMinor: string; valueMinor: bigint; returnMinor: bigint; returnPct: number | null }>
-  const result: Array<{ currency: string; investedMinor: string; dividendsMinor: string; valueMinor: bigint; returnMinor: bigint; returnPct: number | null }> = []
-  for (const t of data.value.totalsByCurrency) {
-    const invested = BigInt(t.investedMinor)
-    const dividends = BigInt(t.dividendsMinor)
-    // Only include current value if it's in this same currency
-    const valueMinor = data.value.currentValueCurrency === t.currency && data.value.currentValueMinor !== null
-      ? BigInt(data.value.currentValueMinor)
-      : 0n
-    const returnMinor = valueMinor + dividends - invested
-    const returnPct = invested > 0n
-      ? Number(returnMinor * 10000n / invested) / 100
-      : null
-    result.push({
-      currency: t.currency,
-      investedMinor: t.investedMinor,
-      dividendsMinor: t.dividendsMinor,
-      valueMinor,
-      returnMinor,
-      returnPct,
-    })
+// Cost basis per currency: how much actual cash was spent in each currency
+// across all trades. Just informational — no return % attempted here.
+const costBasis = computed(() => {
+  if (!data.value) return [] as Array<{ currency: string; investedMinor: string }>
+  return data.value.totalsByCurrency
+    .filter((t) => BigInt(t.investedMinor) !== 0n)
+    .map((t) => ({ currency: t.currency, investedMinor: t.investedMinor }))
+})
+
+// Return in the user's base currency, using historical FX from each transaction
+// date. This is the headline return when transactions span multiple currencies.
+const baseReturn = computed<null | {
+  currency: string
+  investedMinor: string
+  dividendsMinor: string
+  valueMinor: string
+  returnMinor: bigint
+  returnPct: number | null
+  incomplete: boolean
+}>(() => {
+  if (!data.value) return null
+  const invested = BigInt(data.value.baseInvestedMinor)
+  const dividends = BigInt(data.value.baseDividendsMinor)
+  const value = BigInt(data.value.baseCurrentValueMinor ?? '0')
+  // Nothing to show if there's been no activity in base.
+  if (invested === 0n && dividends === 0n && value === 0n) return null
+  const returnMinor = value + dividends - invested
+  const returnPct = invested > 0n
+    ? Number(returnMinor * 10000n / invested) / 100
+    : null
+  return {
+    currency: data.value.baseCurrency,
+    investedMinor: data.value.baseInvestedMinor,
+    dividendsMinor: data.value.baseDividendsMinor,
+    valueMinor: data.value.baseCurrentValueMinor ?? '0',
+    returnMinor,
+    returnPct,
+    incomplete: data.value.baseFxIncomplete,
   }
-  return result
+})
+
+// Honest return calculation: only when EVERY relevant number is in the same
+// currency. If you bought a USD stock with CHF cash and the dividends are in
+// USD, there's no single-currency answer without FX history — so we show the
+// cost-basis breakdown without a fake percentage instead.
+const singleCurrencyReturn = computed<null | {
+  currency: string
+  investedMinor: string
+  dividendsMinor: string
+  valueMinor: string
+  returnMinor: bigint
+  returnPct: number | null
+}>(() => {
+  if (!data.value) return null
+  const investedCurrencies = costBasis.value.map((c) => c.currency)
+  const dividendCurrencies = data.value.totalsByCurrency
+    .filter((t) => BigInt(t.dividendsMinor) !== 0n)
+    .map((t) => t.currency)
+  const all = [
+    ...investedCurrencies,
+    ...dividendCurrencies,
+    ...(data.value.currentValueCurrency ? [data.value.currentValueCurrency] : []),
+  ]
+  if (all.length === 0) return null
+  const unique = [...new Set(all)]
+  if (unique.length !== 1) return null
+
+  const currency = unique[0]!
+  const totals = data.value.totalsByCurrency.find((t) => t.currency === currency)
+  const invested = BigInt(totals?.investedMinor ?? '0')
+  const dividends = BigInt(totals?.dividendsMinor ?? '0')
+  const valueMinor = data.value.currentValueMinor ?? '0'
+  const returnMinor = BigInt(valueMinor) + dividends - invested
+  const returnPct = invested > 0n
+    ? Number(returnMinor * 10000n / invested) / 100
+    : null
+  return {
+    currency,
+    investedMinor: totals?.investedMinor ?? '0',
+    dividendsMinor: totals?.dividendsMinor ?? '0',
+    valueMinor,
+    returnMinor,
+    returnPct,
+  }
 })
 </script>
 
@@ -159,7 +222,7 @@ const returnByCurrency = computed(() => {
         </div>
         <div class="text-right">
           <p class="label">Holdings</p>
-          <p class="text-3xl font-semibold tracking-tight tabular mt-1">{{ data.totalQuantity }}</p>
+          <p class="text-3xl font-semibold tracking-tight tabular mt-1">{{ formatQuantity(data.totalQuantity) }}</p>
           <p v-if="data.currentValueMinor && data.currentValueCurrency" class="text-xs text-[var(--color-text-dim)] tabular mt-1">
             {{ formatMinor(data.currentValueMinor, data.currentValueCurrency) }} current value
           </p>
@@ -194,48 +257,146 @@ const returnByCurrency = computed(() => {
         </div>
       </div>
 
-      <!-- Return summary per currency -->
-      <section v-if="returnByCurrency.length > 0" class="space-y-3">
+      <!-- Return: base-currency card (using historical FX) is the headline
+           since it handles mixed-currency assets cleanly. The native-currency
+           card alongside makes the underlying numbers obvious. -->
+      <section v-if="baseReturn" class="space-y-3">
         <h2 class="text-lg font-medium">Return</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          <div
-            v-for="r in returnByCurrency"
-            :key="r.currency"
-            class="card p-5 space-y-3"
-          >
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="card p-5 space-y-3">
             <div class="flex items-baseline justify-between">
-              <span class="label">{{ r.currency }}</span>
-              <span v-if="r.returnPct !== null"
-                class="text-xs font-medium tabular"
-                :class="r.returnPct >= 0 ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
+              <span class="label">In {{ baseReturn.currency }}</span>
+              <span
+                v-if="baseReturn.returnPct !== null"
+                class="text-sm font-medium tabular"
+                :class="baseReturn.returnPct >= 0 ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
               >
-                <component :is="r.returnPct >= 0 ? TrendingUp : TrendingDown" :size="12" class="inline" />
-                {{ r.returnPct >= 0 ? '+' : '' }}{{ r.returnPct.toFixed(2) }}%
+                <component :is="baseReturn.returnPct >= 0 ? TrendingUp : TrendingDown" :size="12" class="inline" />
+                {{ baseReturn.returnPct >= 0 ? '+' : '' }}{{ baseReturn.returnPct.toFixed(2) }}%
               </span>
             </div>
             <div class="space-y-1.5 text-sm">
               <div class="flex justify-between">
                 <span class="text-[var(--color-text-muted)]">Net invested</span>
-                <span class="tabular">{{ formatMinor(r.investedMinor, r.currency) }}</span>
+                <span class="tabular">{{ formatMinor(baseReturn.investedMinor, baseReturn.currency) }}</span>
               </div>
-              <div class="flex justify-between">
+              <div v-if="BigInt(baseReturn.dividendsMinor) !== 0n" class="flex justify-between">
                 <span class="text-[var(--color-text-muted)]">+ Dividends</span>
-                <span class="tabular text-[var(--color-positive)]">{{ formatMinor(r.dividendsMinor, r.currency) }}</span>
+                <span class="tabular text-[var(--color-positive)]">{{ formatMinor(baseReturn.dividendsMinor, baseReturn.currency) }}</span>
               </div>
-              <div v-if="r.valueMinor !== 0n" class="flex justify-between">
+              <div v-if="BigInt(baseReturn.valueMinor) !== 0n" class="flex justify-between">
                 <span class="text-[var(--color-text-muted)]">Current value</span>
-                <span class="tabular">{{ formatMinor(r.valueMinor.toString(), r.currency) }}</span>
+                <span class="tabular">{{ formatMinor(baseReturn.valueMinor, baseReturn.currency) }}</span>
               </div>
               <div class="flex justify-between border-t pt-1.5 mt-1.5" style="border-color: var(--color-border);">
                 <span class="text-[var(--color-text)] font-medium">Total return</span>
                 <span
                   class="tabular font-medium"
-                  :class="r.returnMinor >= 0n ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
-                >{{ formatMinor(r.returnMinor.toString(), r.currency) }}</span>
+                  :class="baseReturn.returnMinor >= 0n ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
+                >{{ formatMinor(baseReturn.returnMinor.toString(), baseReturn.currency) }}</span>
               </div>
+            </div>
+            <p class="text-xs text-[var(--color-text-dim)]">
+              Converted at the FX rate from each transaction's date · current value at today's FX.
+              <span v-if="baseReturn.incomplete" class="text-[var(--color-negative)]">
+                Some transactions had no FX data and were skipped.
+              </span>
+            </p>
+          </div>
+
+          <!-- Native-currency card alongside -->
+          <div v-if="singleCurrencyReturn && singleCurrencyReturn.currency !== baseReturn.currency" class="card p-5 space-y-3">
+            <div class="flex items-baseline justify-between">
+              <span class="label">In {{ singleCurrencyReturn.currency }} (native)</span>
+              <span
+                v-if="singleCurrencyReturn.returnPct !== null"
+                class="text-sm font-medium tabular"
+                :class="singleCurrencyReturn.returnPct >= 0 ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
+              >
+                {{ singleCurrencyReturn.returnPct >= 0 ? '+' : '' }}{{ singleCurrencyReturn.returnPct.toFixed(2) }}%
+              </span>
+            </div>
+            <div class="space-y-1.5 text-sm">
+              <div class="flex justify-between">
+                <span class="text-[var(--color-text-muted)]">Net invested</span>
+                <span class="tabular">{{ formatMinor(singleCurrencyReturn.investedMinor, singleCurrencyReturn.currency) }}</span>
+              </div>
+              <div v-if="BigInt(singleCurrencyReturn.dividendsMinor) !== 0n" class="flex justify-between">
+                <span class="text-[var(--color-text-muted)]">+ Dividends</span>
+                <span class="tabular text-[var(--color-positive)]">{{ formatMinor(singleCurrencyReturn.dividendsMinor, singleCurrencyReturn.currency) }}</span>
+              </div>
+              <div v-if="BigInt(singleCurrencyReturn.valueMinor) !== 0n" class="flex justify-between">
+                <span class="text-[var(--color-text-muted)]">Current value</span>
+                <span class="tabular">{{ formatMinor(singleCurrencyReturn.valueMinor, singleCurrencyReturn.currency) }}</span>
+              </div>
+              <div class="flex justify-between border-t pt-1.5 mt-1.5" style="border-color: var(--color-border);">
+                <span class="text-[var(--color-text)] font-medium">Total return</span>
+                <span
+                  class="tabular font-medium"
+                  :class="singleCurrencyReturn.returnMinor >= 0n ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
+                >{{ formatMinor(singleCurrencyReturn.returnMinor.toString(), singleCurrencyReturn.currency) }}</span>
+              </div>
+            </div>
+            <p class="text-xs text-[var(--color-text-dim)]">
+              The native-currency view — what you'd see on the broker statement.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Fallback: single-currency only (no base-currency activity at all) -->
+      <section v-else-if="singleCurrencyReturn" class="space-y-3">
+        <h2 class="text-lg font-medium">Return</h2>
+        <div class="card p-5 space-y-3 max-w-md">
+          <div class="flex items-baseline justify-between">
+            <span class="label">{{ singleCurrencyReturn.currency }}</span>
+            <span
+              v-if="singleCurrencyReturn.returnPct !== null"
+              class="text-sm font-medium tabular"
+              :class="singleCurrencyReturn.returnPct >= 0 ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
+            >
+              <component :is="singleCurrencyReturn.returnPct >= 0 ? TrendingUp : TrendingDown" :size="12" class="inline" />
+              {{ singleCurrencyReturn.returnPct >= 0 ? '+' : '' }}{{ singleCurrencyReturn.returnPct.toFixed(2) }}%
+            </span>
+          </div>
+          <div class="space-y-1.5 text-sm">
+            <div class="flex justify-between">
+              <span class="text-[var(--color-text-muted)]">Net invested</span>
+              <span class="tabular">{{ formatMinor(singleCurrencyReturn.investedMinor, singleCurrencyReturn.currency) }}</span>
+            </div>
+            <div v-if="BigInt(singleCurrencyReturn.dividendsMinor) !== 0n" class="flex justify-between">
+              <span class="text-[var(--color-text-muted)]">+ Dividends</span>
+              <span class="tabular text-[var(--color-positive)]">{{ formatMinor(singleCurrencyReturn.dividendsMinor, singleCurrencyReturn.currency) }}</span>
+            </div>
+            <div v-if="BigInt(singleCurrencyReturn.valueMinor) !== 0n" class="flex justify-between">
+              <span class="text-[var(--color-text-muted)]">Current value</span>
+              <span class="tabular">{{ formatMinor(singleCurrencyReturn.valueMinor, singleCurrencyReturn.currency) }}</span>
+            </div>
+            <div class="flex justify-between border-t pt-1.5 mt-1.5" style="border-color: var(--color-border);">
+              <span class="text-[var(--color-text)] font-medium">Total return</span>
+              <span
+                class="tabular font-medium"
+                :class="singleCurrencyReturn.returnMinor >= 0n ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
+              >{{ formatMinor(singleCurrencyReturn.returnMinor.toString(), singleCurrencyReturn.currency) }}</span>
             </div>
           </div>
         </div>
+      </section>
+
+      <section v-else-if="costBasis.length > 0" class="space-y-3">
+        <h2 class="text-lg font-medium">Cost basis</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          <div v-for="c in costBasis" :key="c.currency" class="card p-5 space-y-1">
+            <p class="label">Spent in {{ c.currency }}</p>
+            <p class="text-xl font-medium tabular mt-1">{{ formatMinor(c.investedMinor, c.currency) }}</p>
+          </div>
+        </div>
+        <p class="text-xs text-[var(--color-text-dim)]">
+          You paid in {{ costBasis.map((c) => c.currency).join(' + ') }} for an asset priced in
+          {{ data.currentValueCurrency ?? data.currency ?? 'a different currency' }}.
+          A single return % isn't meaningful here without an FX rate — see Dividends below and the
+          current value in the header above for the raw figures.
+        </p>
       </section>
 
       <!-- Price chart -->
@@ -262,7 +423,7 @@ const returnByCurrency = computed(() => {
                     {{ a.accountName }}
                   </RouterLink>
                 </td>
-                <td class="text-right tabular">{{ a.quantity }}</td>
+                <td class="text-right tabular">{{ formatQuantity(a.quantity) }}</td>
               </tr>
             </tbody>
           </table>
@@ -328,7 +489,7 @@ const returnByCurrency = computed(() => {
                     </span>
                   </div>
                 </td>
-                <td class="text-right tabular text-[var(--color-text-muted)]">{{ t.assetQuantity ?? '' }}</td>
+                <td class="text-right tabular text-[var(--color-text-muted)]">{{ formatQuantity(t.assetQuantity) }}</td>
                 <td
                   class="text-right tabular font-medium"
                   :class="BigInt(t.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'"

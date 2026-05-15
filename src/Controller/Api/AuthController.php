@@ -59,12 +59,31 @@ class AuthController extends AbstractController
         return new JsonResponse(null, 204);
     }
 
+    #[Route('/api/me/preferences', name: 'api_me_update_preferences', methods: ['PATCH'])]
+    public function updatePreferences(Request $request, #[CurrentUser] User $user): JsonResponse
+    {
+        $body = json_decode($request->getContent() ?: '{}', true);
+        if (!is_array($body)) {
+            return new JsonResponse(['error' => 'Body must be a JSON object'], 422);
+        }
+        if (array_key_exists('baseCurrency', $body)) {
+            $ccy = strtoupper(trim((string) $body['baseCurrency']));
+            if (!preg_match('/^[A-Z]{3}$/', $ccy)) {
+                return new JsonResponse(['error' => 'baseCurrency must be a 3-letter code'], 422);
+            }
+            $user->setBaseCurrency($ccy);
+        }
+        $this->em->flush();
+        return new JsonResponse($this->serialize($user));
+    }
+
     private function serialize(User $user): array
     {
         return [
             'id' => $user->getId()->toRfc4122(),
             'email' => $user->getEmail(),
             'roles' => $user->getRoles(),
+            'baseCurrency' => $user->getBaseCurrency(),
         ];
     }
 }

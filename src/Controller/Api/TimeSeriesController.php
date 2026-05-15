@@ -27,7 +27,7 @@ class TimeSeriesController extends AbstractController
     public function networth(Request $request, #[CurrentUser] User $user): JsonResponse
     {
         [$from, $to, $granularity] = $this->parseRange($request);
-        $series = $this->service->netWorthSeries($user, $from, $to, $granularity);
+        $series = $this->service->netWorthSeries($user, $from, $to, $granularity, $user->getBaseCurrency());
         return new JsonResponse(array_map(fn($p) => $p->toArray(), $series));
     }
 
@@ -35,7 +35,7 @@ class TimeSeriesController extends AbstractController
     public function cashFlow(Request $request, #[CurrentUser] User $user): JsonResponse
     {
         [$from, $to] = $this->parseRange($request);
-        $series = $this->service->cashFlowMonthly($user, $from, $to);
+        $series = $this->service->cashFlowMonthly($user, $from, $to, $user->getBaseCurrency());
         return new JsonResponse(array_map(fn($p) => $p->toArray(), $series));
     }
 
@@ -43,13 +43,13 @@ class TimeSeriesController extends AbstractController
     public function cashFlowByCategory(Request $request, #[CurrentUser] User $user): JsonResponse
     {
         [$from, $to] = $this->parseRange($request);
-        return new JsonResponse($this->service->cashFlowByCategoryMonthly($user, $from, $to));
+        return new JsonResponse($this->service->cashFlowByCategoryMonthly($user, $from, $to, $user->getBaseCurrency()));
     }
 
     #[Route('/api/allocation', name: 'api_global_allocation', methods: ['GET'])]
     public function globalAllocation(#[CurrentUser] User $user): JsonResponse
     {
-        return new JsonResponse($this->service->globalAllocation($user));
+        return new JsonResponse($this->service->globalAllocation($user, $user->getBaseCurrency()));
     }
 
     #[Route('/api/accounts/{id}/timeseries', name: 'api_account_timeseries', methods: ['GET'])]

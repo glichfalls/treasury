@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { useAccountsStore, type Account, type Transaction, type Holding } from '@/stores/accounts'
-import { formatMinor } from '@/lib/money'
+import { formatMinor, formatQuantity } from '@/lib/money'
 import NewTransactionForm from '@/components/NewTransactionForm.vue'
 import ImportDropzone from '@/components/ImportDropzone.vue'
 import HoldingsTable from '@/components/HoldingsTable.vue'
@@ -364,7 +364,7 @@ async function deleteTransaction(t: Transaction) {
                   <div class="text-xs text-[var(--color-text-dim)]">{{ h.isin }}</div>
                 </td>
                 <td class="text-[var(--color-text-muted)] truncate max-w-xs">{{ h.name ?? '—' }}</td>
-                <td class="text-right tabular">{{ h.quantity }}</td>
+                <td class="text-right tabular">{{ formatQuantity(h.quantity) }}</td>
                 <td class="text-right tabular text-[var(--color-text-muted)]">
                   {{ h.priceMinor && h.priceCurrency ? formatMinor(h.priceMinor, h.priceCurrency) : '—' }}
                 </td>
@@ -466,7 +466,7 @@ async function deleteTransaction(t: Transaction) {
                     </div>
                   </td>
                   <td class="text-right tabular text-[var(--color-text-muted)]">
-                    {{ t.assetQuantity ?? '' }}
+                    {{ formatQuantity(t.assetQuantity) }}
                   </td>
                   <td
                     class="text-right tabular font-medium"

@@ -4,6 +4,7 @@ namespace App\Controller\Api;
 
 use App\Entity\Asset;
 use App\Entity\User;
+use App\Fx\FxConverter;
 use App\Repository\AssetRepository;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -18,6 +19,7 @@ class AssetController extends AbstractController
     public function __construct(
         private readonly AssetRepository $assets,
         private readonly Connection $conn,
+        private readonly FxConverter $fx,
     ) {}
 
     /**
@@ -38,6 +40,7 @@ class AssetController extends AbstractController
             throw new NotFoundHttpException();
         }
 
+        $baseCurrency = $user->getBaseCurrency();
         $ownerBin = $user->getId()->toBinary();
 
         // Pull every transaction this user has for the asset.
@@ -68,6 +71,13 @@ class AssetController extends AbstractController
 
         $transactions = [];
 
+        // Cross-currency aggregates in the user's base currency, converted via
+        // historical FX (transaction date for trades/dividends, today for current
+        // value). Flag if any conversion lookup was missing so the UI can warn.
+        $baseInvested = 0;
+        $baseDividends = 0;
+        $baseFxIncomplete = false;
+
         foreach ($rows as $r) {
             $type = $r['type'];
             $amount = (int) $r['amount_minor'];
@@ -75,6 +85,11 @@ class AssetController extends AbstractController
             $ccy = $r['currency'];
             $year = substr($r['occurred_at'], 0, 4);
             $accountId = Uuid::fromBinary($r['account_id'])->toRfc4122();
+            $txDate = new \DateTimeImmutable($r['occurred_at']);
+            $baseAmount = $this->fx->convertMinor($amount, $ccy, $baseCurrency, $txDate);
+            if ($baseAmount === null && $ccy !== $baseCurrency) {
+                $baseFxIncomplete = true;
+            }
 
             if (!isset($perAccount[$accountId])) {
                 $perAccount[$accountId] = [
@@ -93,6 +108,9 @@ class AssetController extends AbstractController
                 $perAccount[$accountId]['quantity'] = bcadd($perAccount[$accountId]['quantity'], $qty, 8);
                 // Cash impact: buy = negative amount (money out → invested up), sell = positive (invested down).
                 $totalsByCurrency[$ccy]['invested'] = bcsub($totalsByCurrency[$ccy]['invested'], (string) $amount, 0);
+                if ($baseAmount !== null) {
+                    $baseInvested -= $baseAmount;
+                }
             } elseif ($type === 'dividend') {
                 $totalsByCurrency[$ccy]['dividends'] = bcadd($totalsByCurrency[$ccy]['dividends'], (string) $amount, 0);
                 $dividendsByYear[$ccy][$year]['amountMinor'] = bcadd(
@@ -101,6 +119,9 @@ class AssetController extends AbstractController
                     0,
                 );
                 $dividendsByYear[$ccy][$year]['count'] = ($dividendsByYear[$ccy][$year]['count'] ?? 0) + 1;
+                if ($baseAmount !== null) {
+                    $baseDividends += $baseAmount;
+                }
             }
 
             $transactions[] = [
@@ -136,10 +157,20 @@ class AssetController extends AbstractController
 
         $currentValueMinor = null;
         $currentValueCurrency = null;
+        $currentValueBaseMinor = null;
         if ($latestPrice !== false && $latestPrice !== null && bccomp($totalQuantity, '0', 8) !== 0) {
             // price_minor stored as price × 100 (per unit); value = qty × price × 100.
             $currentValueMinor = (string) (int) round((float) $totalQuantity * (int) $latestPrice['price_minor']);
             $currentValueCurrency = $latestPrice['currency'];
+            // Convert current value via today's FX rate (we want present purchasing
+            // power, not historical).
+            $today = new \DateTimeImmutable('today');
+            $converted = $this->fx->convertMinor((int) $currentValueMinor, $currentValueCurrency, $baseCurrency, $today);
+            if ($converted !== null) {
+                $currentValueBaseMinor = (string) $converted;
+            } elseif ($currentValueCurrency !== $baseCurrency) {
+                $baseFxIncomplete = true;
+            }
         }
 
         // Reshape dividends by year so the frontend gets a flat list per currency.
@@ -181,6 +212,14 @@ class AssetController extends AbstractController
                 array_keys($totalsByCurrency),
                 array_values($totalsByCurrency),
             ),
+
+            // Cross-currency aggregation in the user's base currency. `baseFxIncomplete`
+            // means at least one tx had no FX coverage — totals are missing pieces.
+            'baseCurrency' => $baseCurrency,
+            'baseInvestedMinor' => (string) $baseInvested,
+            'baseDividendsMinor' => (string) $baseDividends,
+            'baseCurrentValueMinor' => $currentValueBaseMinor,
+            'baseFxIncomplete' => $baseFxIncomplete,
 
             'accounts' => $perAccount,
             'dividends' => $dividendsFlat,

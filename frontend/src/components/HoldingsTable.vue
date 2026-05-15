@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatMinor } from '@/lib/money'
+import { formatMinor, formatQuantity } from '@/lib/money'
 import type { Holding } from '@/stores/accounts'
 import { TrendingUp } from 'lucide-vue-next'
 
@@ -13,12 +13,6 @@ function formatPrice(h: Holding): string {
 function formatValue(h: Holding): string {
   if (h.valueBaseMinor === null) return '—'
   return formatMinor(h.valueBaseMinor, h.baseCurrency)
-}
-
-function formatQuantity(q: string): string {
-  const n = Number(q)
-  if (Number.isFinite(n) && Number.isInteger(n)) return n.toLocaleString('de-CH')
-  return n.toLocaleString('de-CH', { maximumFractionDigits: 4 })
 }
 </script>
 

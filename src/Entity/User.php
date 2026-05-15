@@ -26,6 +26,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(type: 'json')]
     private array $roles = [];
 
+    /** Base / display currency for aggregations. ISO 4217 3-letter code. */
+    #[ORM\Column(length: 3)]
+    private string $baseCurrency = 'CHF';
+
     public function __construct()
     {
         $this->id = Uuid::v7();
@@ -47,5 +51,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     public function setRoles(array $roles): self { $this->roles = $roles; return $this; }
+    public function getBaseCurrency(): string { return $this->baseCurrency; }
+    public function setBaseCurrency(string $c): self { $this->baseCurrency = strtoupper($c); return $this; }
     public function eraseCredentials(): void {}
 }

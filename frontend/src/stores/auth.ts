@@ -5,6 +5,7 @@ export interface AuthUser {
   id: string
   email: string
   roles?: string[]
+  baseCurrency?: string
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -62,5 +63,20 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   }
 
-  return { user, ready, isAdmin, fetchMe, login, register, logout }
+  async function updatePreferences(input: { baseCurrency?: string }): Promise<AuthUser> {
+    const res = await fetch('/api/me/preferences', {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error((body as { error?: string }).error ?? `Failed (${res.status})`)
+    }
+    user.value = (await res.json()) as AuthUser
+    return user.value
+  }
+
+  return { user, ready, isAdmin, fetchMe, login, register, logout, updatePreferences }
 })

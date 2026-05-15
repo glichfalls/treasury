@@ -4,6 +4,7 @@ namespace App\TimeSeries;
 
 use App\Entity\Account;
 use App\Entity\User;
+use App\Fx\FxConverter;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -22,7 +23,10 @@ use Doctrine\DBAL\Connection;
  */
 final class TimeSeriesService
 {
-    public function __construct(private readonly Connection $conn) {}
+    public function __construct(
+        private readonly Connection $conn,
+        private readonly FxConverter $fx,
+    ) {}
 
     /** Expose the connection so sibling services can run ad-hoc queries through us. */
     public function getConnection(): Connection
@@ -42,18 +46,16 @@ final class TimeSeriesService
         \App\Entity\User $user,
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
+        string $baseCurrency = 'CHF',
     ): array {
         $rows = $this->conn->fetchAllAssociative(
-            "SELECT DATE_FORMAT(t.occurred_at, '%Y-%m') AS ym,
-                    t.category,
-                    COALESCE(SUM(t.amount_minor), 0) AS total
+            "SELECT t.occurred_at, t.category, t.amount_minor, t.currency
              FROM transactions t
              INNER JOIN accounts a ON a.id = t.account_id
              WHERE a.owner_id = :owner
                AND t.occurred_at BETWEEN :from AND :to
                AND t.type NOT IN ('trade_buy', 'trade_sell', 'fx_conversion')
-             GROUP BY ym, t.category
-             ORDER BY ym ASC",
+             ORDER BY t.occurred_at ASC",
             [
                 'owner' => $user->getId()->toBinary(),
                 'from' => $from->format('Y-m-d'),
@@ -61,15 +63,29 @@ final class TimeSeriesService
             ],
         );
 
-        return array_map(fn($r) => [
-            'month' => $r['ym'],
-            'category' => $r['category'],
-            'amountMinor' => (string) (int) $r['total'],
-        ], $rows);
+        // Bucketize in PHP so we can apply FX per row. Key: "YYYY-MM|category".
+        $buckets = [];
+        foreach ($rows as $r) {
+            $amount = $this->convertCash((int) $r['amount_minor'], $r['currency'], $r['occurred_at'], $baseCurrency);
+            $month = substr($r['occurred_at'], 0, 7);
+            $cat = $r['category'];
+            $key = $month . '|' . ($cat ?? '');
+            if (!isset($buckets[$key])) {
+                $buckets[$key] = ['month' => $month, 'category' => $cat, 'amount' => 0];
+            }
+            $buckets[$key]['amount'] += $amount;
+        }
+
+        return array_values(array_map(fn($b) => [
+            'month' => $b['month'],
+            'category' => $b['category'],
+            'amountMinor' => (string) $b['amount'],
+        ], $buckets));
     }
 
     /**
-     * Monthly income vs expense across all accounts owned by $user.
+     * Monthly income vs expense across all accounts owned by $user, converted to
+     * $baseCurrency using the FX rate effective on each transaction's date.
      *
      * Trade legs (trade_buy/trade_sell) and FX conversions are excluded — they represent
      * money moving inside the system, not real income or spending. Deposits/dividends/
@@ -77,19 +93,20 @@ final class TimeSeriesService
      *
      * @return CashFlowPoint[]
      */
-    public function cashFlowMonthly(\App\Entity\User $user, \DateTimeImmutable $from, \DateTimeImmutable $to): array
-    {
+    public function cashFlowMonthly(
+        \App\Entity\User $user,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        string $baseCurrency = 'CHF',
+    ): array {
         $rows = $this->conn->fetchAllAssociative(
-            "SELECT DATE_FORMAT(t.occurred_at, '%Y-%m') AS ym,
-                    SUM(CASE WHEN t.amount_minor > 0 THEN t.amount_minor ELSE 0 END) AS income,
-                    SUM(CASE WHEN t.amount_minor < 0 THEN t.amount_minor ELSE 0 END) AS expense
+            "SELECT t.occurred_at, t.amount_minor, t.currency
              FROM transactions t
              INNER JOIN accounts a ON a.id = t.account_id
              WHERE a.owner_id = :owner
                AND t.occurred_at BETWEEN :from AND :to
                AND t.type NOT IN ('trade_buy', 'trade_sell', 'fx_conversion')
-             GROUP BY ym
-             ORDER BY ym ASC",
+             ORDER BY t.occurred_at ASC",
             [
                 'owner' => $user->getId()->toBinary(),
                 'from' => $from->format('Y-m-d'),
@@ -99,7 +116,16 @@ final class TimeSeriesService
 
         $byYm = [];
         foreach ($rows as $r) {
-            $byYm[$r['ym']] = $r;
+            $amount = $this->convertCash((int) $r['amount_minor'], $r['currency'], $r['occurred_at'], $baseCurrency);
+            $month = substr($r['occurred_at'], 0, 7);
+            if (!isset($byYm[$month])) {
+                $byYm[$month] = ['income' => 0, 'expense' => 0];
+            }
+            if ($amount > 0) {
+                $byYm[$month]['income'] += $amount;
+            } elseif ($amount < 0) {
+                $byYm[$month]['expense'] += $amount;
+            }
         }
 
         // Fill in months with no activity so the chart shows a continuous axis.
@@ -111,12 +137,26 @@ final class TimeSeriesService
             $row = $byYm[$key] ?? ['income' => 0, 'expense' => 0];
             $out[] = new CashFlowPoint(
                 month: $cursor,
-                incomeMinor: (string) (int) $row['income'],
-                expenseMinor: (string) (int) $row['expense'],
+                incomeMinor: (string) $row['income'],
+                expenseMinor: (string) $row['expense'],
             );
             $cursor = $cursor->modify('first day of next month');
         }
         return $out;
+    }
+
+    /**
+     * Convert a cash flow into $baseCurrency using historical FX on the row's
+     * date. Falls back to the raw amount when no rate is known (silent loss of
+     * cash flows would be worse than a slightly-off number you can debug).
+     */
+    private function convertCash(int $amountMinor, string $currency, string $dateStr, string $baseCurrency): int
+    {
+        if (strtoupper($currency) === strtoupper($baseCurrency)) {
+            return $amountMinor;
+        }
+        $converted = $this->fx->convertMinor($amountMinor, $currency, $baseCurrency, new \DateTimeImmutable($dateStr));
+        return $converted ?? $amountMinor;
     }
 
     /**
@@ -317,9 +357,26 @@ final class TimeSeriesService
 
             while ($txIdx < $txCount && $tx[$txIdx]['occurred_at'] <= $dateStr) {
                 $row = $tx[$txIdx];
-                $cashCum += (int) $row['amount_minor'];
+                // Cash impacts come through in the transaction's native currency
+                // (typically the account's currency). For a portfolio-wide view in
+                // a different base, convert via the FX rate on the transaction
+                // date. Same-currency rows shortcut through the converter without
+                // a DB hit.
+                $txAmount = (int) $row['amount_minor'];
+                $rowCurrency = $row['currency'];
+                $converted = $this->fx->convertMinor(
+                    $txAmount,
+                    $rowCurrency,
+                    $displayCurrency,
+                    new \DateTimeImmutable($row['occurred_at']),
+                );
+                // If no FX rate is available we fall back to the raw amount; the
+                // alternative (dropping the row) silently hides cash flows, which
+                // is worse than a slightly wrong number that you can debug.
+                $converted ??= $txAmount;
+                $cashCum += $converted;
                 if (in_array($row['type'], $depositLikeTypes, true)) {
-                    $netDepositsCum += (int) $row['amount_minor'];
+                    $netDepositsCum += $converted;
                 }
                 if ($row['asset_isin'] !== null && $row['asset_quantity'] !== null
                     && in_array($row['type'], ['trade_buy', 'trade_sell'], true)

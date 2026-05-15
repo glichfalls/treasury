@@ -27,6 +27,10 @@ final class TimeSeriesServiceTest extends KernelTestCase
 
     protected function setUp(): void
     {
+        // Force a fresh kernel per test so the singleton FxConverter doesn't
+        // carry over its cached "no rate found for USD→CHF" from a previous
+        // test where the fx_rates table was empty.
+        self::ensureKernelShutdown();
         self::bootKernel();
         $container = static::getContainer();
         $this->em = $container->get(EntityManagerInterface::class);
@@ -141,6 +145,178 @@ final class TimeSeriesServiceTest extends KernelTestCase
         $this->assertSame('162000', $aaplSlice['valueBaseMinor']);
     }
 
+    public function testForeignCurrencyCashIsConvertedAtTransactionDateRate(): void
+    {
+        // USD brokerage account. Transactions stored in USD. Portfolio-wide
+        // (netWorthSeries with displayCurrency=CHF) should convert each cash
+        // flow at the FX rate effective on its date.
+        $usdAccount = (new Account())
+            ->setOwner($this->user)->setName('IBKR')
+            ->setType(AccountType::Brokerage)->setCurrency('USD');
+        $this->em->persist($usdAccount);
+        $this->em->flush();
+
+        // Two USD deposits at different FX rates.
+        $this->addTx($usdAccount, '2025-01-10', 100_000, TransactionType::Deposit, currency: 'USD');
+        $this->addTx($usdAccount, '2025-06-10', 200_000, TransactionType::Deposit, currency: 'USD');
+
+        $this->addFx('USD', 'CHF', '0.90', '2025-01-10');
+        $this->addFx('USD', 'CHF', '0.95', '2025-06-10');
+
+        $series = $this->service->netWorthSeries(
+            $this->user,
+            new \DateTimeImmutable('2025-06-15'),
+            new \DateTimeImmutable('2025-06-15'),
+            'daily',
+            'CHF',
+        );
+
+        $this->assertCount(1, $series);
+        // Jan: 1000 USD × 0.90 = 900 CHF (90 000 minor)
+        // Jun: 2000 USD × 0.95 = 1900 CHF (190 000 minor)
+        // Total cash in CHF base: 280 000 minor
+        $this->assertSame('280000', $series[0]->cashMinor);
+        $this->assertSame('280000', $series[0]->netDepositsMinor);
+    }
+
+    public function testMixedCurrencyAccountsAggregateToBaseCurrency(): void
+    {
+        $usdAccount = (new Account())
+            ->setOwner($this->user)->setName('IBKR')
+            ->setType(AccountType::Brokerage)->setCurrency('USD');
+        $this->em->persist($usdAccount);
+        $this->em->flush();
+
+        // CHF account: 5000 CHF deposit. USD account: 1000 USD deposit at 0.90.
+        $this->addTx($this->checking, '2025-01-10', 500_000, TransactionType::Deposit);
+        $this->addTx($usdAccount, '2025-01-10', 100_000, TransactionType::Deposit, currency: 'USD');
+        $this->addFx('USD', 'CHF', '0.90', '2025-01-10');
+
+        $series = $this->service->netWorthSeries(
+            $this->user,
+            new \DateTimeImmutable('2025-01-15'),
+            new \DateTimeImmutable('2025-01-15'),
+            'daily',
+            'CHF',
+        );
+
+        // 500 000 (CHF) + 90 000 (USD→CHF) = 590 000 minor in CHF.
+        $this->assertSame('590000', $series[0]->cashMinor);
+    }
+
+    public function testCashFlowMonthlyConvertsForeignCurrencyIncome(): void
+    {
+        $usdAccount = (new Account())
+            ->setOwner($this->user)->setName('IBKR')
+            ->setType(AccountType::Brokerage)->setCurrency('USD');
+        $this->em->persist($usdAccount);
+        $this->em->flush();
+
+        // USD interest income, USD fee. Both should convert via FX.
+        $this->addTx($usdAccount, '2025-03-05', 200_00, TransactionType::Interest, currency: 'USD');
+        $this->addTx($usdAccount, '2025-03-15', -50_00, TransactionType::Fee, currency: 'USD');
+        $this->addFx('USD', 'CHF', '0.90', '2025-03-05');
+        $this->addFx('USD', 'CHF', '0.90', '2025-03-15');
+
+        $series = $this->service->cashFlowMonthly(
+            $this->user,
+            new \DateTimeImmutable('2025-03-01'),
+            new \DateTimeImmutable('2025-03-31'),
+            'CHF',
+        );
+
+        $this->assertCount(1, $series);
+        // 200 USD × 0.90 = 180 CHF → 18 000 minor
+        // -50 USD × 0.90 = -45 CHF → -4 500 minor
+        $this->assertSame('18000', $series[0]->incomeMinor);
+        $this->assertSame('-4500', $series[0]->expenseMinor);
+    }
+
+    public function testCashFlowMonthlyMixesCurrenciesIntoSingleBucket(): void
+    {
+        $usdAccount = (new Account())
+            ->setOwner($this->user)->setName('IBKR')
+            ->setType(AccountType::Brokerage)->setCurrency('USD');
+        $this->em->persist($usdAccount);
+        $this->em->flush();
+
+        // Same month: a CHF deposit + a USD deposit. Both end up as CHF income.
+        $this->addTx($this->checking, '2025-03-10', 500_00, TransactionType::Deposit);
+        $this->addTx($usdAccount, '2025-03-10', 100_00, TransactionType::Deposit, currency: 'USD');
+        $this->addFx('USD', 'CHF', '0.90', '2025-03-10');
+
+        $series = $this->service->cashFlowMonthly(
+            $this->user,
+            new \DateTimeImmutable('2025-03-01'),
+            new \DateTimeImmutable('2025-03-31'),
+            'CHF',
+        );
+
+        // 500 CHF + (100 USD × 0.90) = 500 + 90 = 590 CHF → 59 000 minor.
+        $this->assertSame('59000', $series[0]->incomeMinor);
+    }
+
+    public function testCashFlowByCategoryConvertsForeignCurrency(): void
+    {
+        $usdAccount = (new Account())
+            ->setOwner($this->user)->setName('IBKR')
+            ->setType(AccountType::Brokerage)->setCurrency('USD');
+        $this->em->persist($usdAccount);
+        $this->em->flush();
+
+        // A USD subscription expense, properly categorized.
+        $tx = (new Transaction())
+            ->setAccount($usdAccount)
+            ->setOccurredAt(new \DateTimeImmutable('2025-04-15'))
+            ->setAmountMinor('-1000')   // -10 USD
+            ->setCurrency('USD')
+            ->setType(TransactionType::Withdrawal)
+            ->setCategory(\App\Entity\TransactionCategory::Subscriptions);
+        $this->em->persist($tx);
+        $this->em->flush();
+
+        $this->addFx('USD', 'CHF', '0.90', '2025-04-15');
+
+        $result = $this->service->cashFlowByCategoryMonthly(
+            $this->user,
+            new \DateTimeImmutable('2025-04-01'),
+            new \DateTimeImmutable('2025-04-30'),
+            'CHF',
+        );
+
+        $this->assertCount(1, $result);
+        // -10 USD × 0.90 = -9 CHF → -900 minor.
+        $this->assertSame('2025-04', $result[0]['month']);
+        $this->assertSame('subscriptions', $result[0]['category']);
+        $this->assertSame('-900', $result[0]['amountMinor']);
+    }
+
+    public function testCashFlowFallsBackToRawAmountWhenFxMissing(): void
+    {
+        // Edge case: a USD transaction with NO matching FX rate. The series
+        // should still show *something* (raw amount in CHF terms) rather than
+        // silently dropping the cash flow — easier to spot + debug.
+        $usdAccount = (new Account())
+            ->setOwner($this->user)->setName('IBKR')
+            ->setType(AccountType::Brokerage)->setCurrency('USD');
+        $this->em->persist($usdAccount);
+        $this->em->flush();
+
+        $this->addTx($usdAccount, '2025-01-10', 100_000, TransactionType::Deposit, currency: 'USD');
+        // No FX rate added.
+
+        $series = $this->service->netWorthSeries(
+            $this->user,
+            new \DateTimeImmutable('2025-01-15'),
+            new \DateTimeImmutable('2025-01-15'),
+            'daily',
+            'CHF',
+        );
+
+        // Fallback: the raw 100 000 USD amount surfaces in cashMinor.
+        $this->assertSame('100000', $series[0]->cashMinor);
+    }
+
     private function addTx(
         Account $account,
         string $date,
@@ -149,12 +325,13 @@ final class TimeSeriesServiceTest extends KernelTestCase
         string $description = '',
         ?string $isin = null,
         ?string $qty = null,
+        string $currency = 'CHF',
     ): void {
         $t = (new Transaction())
             ->setAccount($account)
             ->setOccurredAt(new \DateTimeImmutable($date))
             ->setAmountMinor((string) $amountMinor)
-            ->setCurrency('CHF')
+            ->setCurrency($currency)
             ->setDescription($description ?: null)
             ->setType($type)
             ->setAssetIsin($isin)
