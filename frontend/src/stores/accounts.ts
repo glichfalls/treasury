@@ -31,6 +31,7 @@ export interface Transaction {
   type: string
   source: string
   category: string | null
+  tags: string[]
   assetIsin: string | null
   assetQuantity: string | null
 }
@@ -41,6 +42,7 @@ export interface NewTransaction {
   currency?: string
   description?: string | null
   category?: string | null
+  tags?: string[]
 }
 
 export interface TransactionFilters {
@@ -142,7 +144,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   async function updateTransaction(
     accountId: string,
     transactionId: string,
-    input: Partial<NewTransaction & { type: string; category: string | null }>,
+    input: Partial<NewTransaction & { type: string; category: string | null; tags: string[] }>,
   ): Promise<Transaction> {
     return api.patch<Transaction>(`/api/accounts/${accountId}/transactions/${transactionId}`, input)
   }
