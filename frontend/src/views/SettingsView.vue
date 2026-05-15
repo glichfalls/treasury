@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import BackupPanel from '@/components/BackupPanel.vue'
+import ChangePasswordPanel from '@/components/ChangePasswordPanel.vue'
 import RegistrationCodesPanel from '@/components/RegistrationCodesPanel.vue'
+import UsersPanel from '@/components/UsersPanel.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -10,11 +12,16 @@ const auth = useAuthStore()
   <div class="space-y-6">
     <header>
       <h1 class="text-2xl font-semibold tracking-tight">Settings</h1>
-      <p class="text-sm text-[var(--color-text-muted)] mt-1">Backup, restore, and account preferences.</p>
+      <p class="text-sm text-[var(--color-text-muted)] mt-1">Account, backup, and admin preferences.</p>
     </header>
+
+    <ChangePasswordPanel />
 
     <BackupPanel />
 
-    <RegistrationCodesPanel v-if="auth.isAdmin" />
+    <template v-if="auth.isAdmin">
+      <UsersPanel />
+      <RegistrationCodesPanel />
+    </template>
   </div>
 </template>

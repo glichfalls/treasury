@@ -9,6 +9,8 @@ const router = createRouter({
     { path: '/', name: 'landing', component: LandingView, meta: { public: true, hideShell: true } },
     { path: '/login', name: 'login', component: LoginView, meta: { public: true, hideShell: true } },
     { path: '/register', name: 'register', component: () => import('../views/RegisterView.vue'), meta: { public: true, hideShell: true } },
+    { path: '/forgot-password', name: 'forgot-password', component: () => import('../views/ForgotPasswordView.vue'), meta: { public: true, hideShell: true } },
+    { path: '/reset-password', name: 'reset-password', component: () => import('../views/ResetPasswordView.vue'), meta: { public: true, hideShell: true } },
     { path: '/dashboard', name: 'dashboard', component: () => import('../views/DashboardView.vue') },
     { path: '/accounts', name: 'accounts', component: () => import('../views/AccountsView.vue') },
     { path: '/accounts/:id', name: 'account', component: () => import('../views/AccountView.vue') },
@@ -21,8 +23,9 @@ router.beforeEach(async (to) => {
   if (!auth.ready) {
     await auth.fetchMe()
   }
-  // Authenticated users skip the landing/login/register pages.
-  if (auth.user && (to.name === 'landing' || to.name === 'login' || to.name === 'register')) {
+  // Authenticated users skip the landing/login/register/forgot pages, but should
+  // still be able to use /reset-password (e.g. clicking a link from an old email).
+  if (auth.user && (to.name === 'landing' || to.name === 'login' || to.name === 'register' || to.name === 'forgot-password')) {
     return { name: 'dashboard' }
   }
   if (!to.meta.public && !auth.user) {

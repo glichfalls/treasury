@@ -21,10 +21,12 @@ security:
                 path: api_logout
 
     access_control:
-        - { path: ^/api/login,    roles: PUBLIC_ACCESS }
-        - { path: ^/api/logout,   roles: PUBLIC_ACCESS }
-        - { path: ^/api/register, roles: PUBLIC_ACCESS, methods: [POST] }
-        - { path: ^/api,          roles: ROLE_USER }
+        - { path: ^/api/login,            roles: PUBLIC_ACCESS }
+        - { path: ^/api/logout,           roles: PUBLIC_ACCESS }
+        - { path: ^/api/register,         roles: PUBLIC_ACCESS, methods: [POST] }
+        - { path: ^/api/password/forgot,  roles: PUBLIC_ACCESS, methods: [POST] }
+        - { path: ^/api/password/reset,   roles: PUBLIC_ACCESS, methods: [POST] }
+        - { path: ^/api,                  roles: ROLE_USER }
 
 when@test:
     security:

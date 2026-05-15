@@ -67,6 +67,21 @@ Sign-up is gated by single-use **registration codes** so the instance doesn't ac
 
 Codes are one-shot — once used they can't be redeemed again. Unused codes can be revoked from the same panel.
 
+## Email (optional, for password reset)
+
+Forgot-password is wired up but the default `MAILER_DSN=null://null` drops outgoing email on the floor. The reset URL is still logged to stdout — the admin can grep the logs and share the link manually.
+
+For real delivery, point `MAILER_DSN` at Mailgun:
+
+```
+MAILER_DSN=mailgun+api://<API_KEY>:<DOMAIN>@default
+MAILER_FROM=no-reply@your-verified-domain.com
+```
+
+`<DOMAIN>` is your verified Mailgun sending domain (e.g. `mg.example.com`); `<API_KEY>` is the **Private API key** under Mailgun → API Security. `MAILER_FROM` must be on the verified domain or any verified sender.
+
+The Mailgun mailer bridge is already installed; no extra setup needed.
+
 ## Common commands
 
 ```
@@ -119,6 +134,7 @@ src/
   TimeSeries/       Net-worth, performance, cashflow computation
   Pillar3a/         Contribution → trade-leg generation
   Backup/           JSON export/import service
+  Entity/PasswordResetToken.php   Time-limited reset tokens (SHA-256 hashed)
   Command/          Console commands (user mgmt, prices, seeding)
   Schedule.php      Symfony Scheduler config (daily price refresh)
 frontend/
