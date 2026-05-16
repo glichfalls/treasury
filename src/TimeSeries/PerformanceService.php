@@ -8,8 +8,14 @@ use App\Entity\User;
 /**
  * Derives return-over-time metrics on top of a TimeSeriesPoint series.
  *
- *  - returnVsDepositsPct: (value − netDeposits) / netDeposits × 100. Intuitive
- *    "how much is my money up" number. Distorted by withdrawals (denominator shrinks).
+ * Both metrics are rebased to 0% at the first point of the requested window, so
+ * the chart always shows performance *during* the window (a 1-week chart shows
+ * that week's return, not lifetime return).
+ *
+ *  - returnVsDepositsPct: lifetime (value − netDeposits) / netDeposits × 100,
+ *    minus the same ratio at the window's start. Intuitive "how much is my money
+ *    up over this period" number. Distorted by deposits/withdrawals during the
+ *    window (denominator shifts) — prefer TWR when external flows occur.
  *
  *  - twrPct: Time-weighted return, compounded across periods, with external
  *    cash flows stripped out per period. Comparable across portfolios regardless
@@ -49,15 +55,25 @@ final class PerformanceService
     {
         $cumTwr = 1.0;
         $prev = null;
+        $vsDepositsBaseline = null;
         $out = [];
 
         foreach ($series as $p) {
             $total = (float) $p->totalMinor;
             $deposits = (float) $p->netDepositsMinor;
 
-            $vsDeposits = $deposits > 0
+            $vsDepositsLifetime = $deposits > 0
                 ? (($total - $deposits) / $deposits) * 100
                 : null;
+
+            if ($vsDepositsLifetime !== null) {
+                if ($vsDepositsBaseline === null) {
+                    $vsDepositsBaseline = $vsDepositsLifetime;
+                }
+                $vsDeposits = $vsDepositsLifetime - $vsDepositsBaseline;
+            } else {
+                $vsDeposits = null;
+            }
 
             if ($prev !== null) {
                 $prevTotal = (float) $prev->totalMinor;
