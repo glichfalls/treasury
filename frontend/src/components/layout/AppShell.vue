@@ -12,6 +12,7 @@ const router = useRouter()
 const route = useRoute()
 
 const showShell = computed(() => !route.meta.hideShell)
+const wideLayout = computed(() => Boolean(route.meta.wide))
 const activeName = computed(() => String(route.name ?? ''))
 
 const navItems = [
@@ -122,7 +123,11 @@ function isActive(item: (typeof navItems)[number]): boolean {
     </Teleport>
 
     <main class="flex-1">
-      <div v-if="showShell" class="mx-auto max-w-6xl px-6 py-10">
+      <div
+        v-if="showShell"
+        class="mx-auto px-6 py-10"
+        :class="wideLayout ? 'max-w-screen-2xl' : 'max-w-6xl'"
+      >
         <slot />
       </div>
       <slot v-else />

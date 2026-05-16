@@ -14,6 +14,29 @@ export function formatMinor(amountMinor: string | number, currency: string, loca
 }
 
 /**
+ * Compact currency formatter for tight UI spots (summary tiles, chart axis):
+ *  - >= 1B  → "1.2B"
+ *  - >= 1M  → "5.0M"
+ *  - >= 1k  → "12.3k"
+ *  -  else  → integer with grouping
+ * The currency code is appended without a symbol so it stays narrow and
+ * predictable at small font sizes.
+ */
+export function formatMinorCompact(amountMinor: string | number, currency: string, locale = 'de-CH'): string {
+  const exp = exponentOf(currency)
+  const value = Number(amountMinor) / Math.pow(10, exp)
+  const abs = Math.abs(value)
+  const sign = value < 0 ? '-' : ''
+  let body: string
+  if (abs >= 1_000_000_000) body = `${(abs / 1_000_000_000).toFixed(1)}B`
+  else if (abs >= 1_000_000) body = `${(abs / 1_000_000).toFixed(1)}M`
+  else if (abs >= 10_000) body = `${(abs / 1_000).toFixed(0)}k`
+  else if (abs >= 1_000) body = `${(abs / 1_000).toFixed(1)}k`
+  else body = abs.toLocaleString(locale, { maximumFractionDigits: 0 })
+  return `${sign}${body} ${currency}`
+}
+
+/**
  * Format an asset quantity for display. Stripping the trailing zeros from
  * "10.00000000" → "10" and "1.50000000" → "1.5". Stays exact for fractional
  * quantities like 0.12345678 (up to 8 decimals).
