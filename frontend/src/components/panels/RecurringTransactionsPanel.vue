@@ -4,7 +4,7 @@ import { recurringApi, describeSchedule, type RecurringRule } from '@/lib/recurr
 import { formatMinor } from '@/lib/money'
 import { categoryMeta } from '@/lib/categories'
 import { useToastsStore } from '@/stores/toasts'
-import RecurringForm from '@/components/RecurringForm.vue'
+import RecurringForm from '@/components/forms/RecurringForm.vue'
 import { Plus, Pencil, Trash2, Play, Pause, Inbox } from 'lucide-vue-next'
 
 const props = withDefaults(

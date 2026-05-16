@@ -3,7 +3,9 @@ import { ref } from 'vue'
 import { useAccountsStore } from '@/stores/accounts'
 import { useToastsStore } from '@/stores/toasts'
 import { Plus } from 'lucide-vue-next'
-import BaseModal from '@/components/BaseModal.vue'
+import ModalForm from '@/components/ui/ModalForm.vue'
+import TextField from '@/components/ui/TextField.vue'
+import SelectField from '@/components/ui/SelectField.vue'
 
 const accounts = useAccountsStore()
 const toasts = useToastsStore()
@@ -26,7 +28,7 @@ const accountTypes = [
 const open = ref(false)
 const name = ref('')
 const institution = ref('')
-const type = ref('bank_checking')
+const type = ref<string>('bank_checking')
 const currency = ref('CHF')
 const error = ref<string | null>(null)
 const submitting = ref(false)
@@ -61,41 +63,34 @@ async function submit() {
 </script>
 
 <template>
-  <button class="btn btn-secondary" @click="open = true">
-    <Plus :size="16" />
-    <span>New account</span>
-  </button>
-
-  <BaseModal v-model:open="open" title="New account" @close="reset">
-    <form id="new-account-form" class="space-y-4" @submit.prevent="submit">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div class="space-y-1.5">
-          <label class="label">Name</label>
-          <input v-model="name" required placeholder="Salary account" class="input" autofocus />
-        </div>
-        <div class="space-y-1.5">
-          <label class="label">Institution</label>
-          <input v-model="institution" placeholder="ZKB" class="input" />
-        </div>
-        <div class="space-y-1.5">
-          <label class="label">Type</label>
-          <select v-model="type" class="input">
-            <option v-for="t in accountTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
-          </select>
-        </div>
-        <div class="space-y-1.5">
-          <label class="label">Currency</label>
-          <input v-model="currency" required maxlength="3" pattern="[A-Za-z]{3}" class="input uppercase" />
-        </div>
-      </div>
-      <p v-if="error" class="text-sm text-[var(--color-negative)]">{{ error }}</p>
-    </form>
-
-    <template #footer>
-      <button type="button" class="btn btn-ghost" @click="open = false">Cancel</button>
-      <button type="submit" form="new-account-form" class="btn btn-primary" :disabled="submitting">
-        {{ submitting ? 'Saving…' : 'Create account' }}
+  <ModalForm
+    v-model:open="open"
+    title="New account"
+    submit-label="Create account"
+    :submitting="submitting"
+    :error="error"
+    @submit="submit"
+    @close="reset"
+  >
+    <template #trigger="{ open: openModal }">
+      <button class="btn btn-secondary" @click="openModal">
+        <Plus :size="16" />
+        <span>New account</span>
       </button>
     </template>
-  </BaseModal>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <TextField v-model="name" label="Name" placeholder="Salary account" required autofocus />
+      <TextField v-model="institution" label="Institution" placeholder="ZKB" />
+      <SelectField v-model="type" label="Type" :options="accountTypes" />
+      <TextField
+        v-model="currency"
+        label="Currency"
+        required
+        maxlength="3"
+        pattern="[A-Za-z]{3}"
+        class="uppercase"
+      />
+    </div>
+  </ModalForm>
 </template>

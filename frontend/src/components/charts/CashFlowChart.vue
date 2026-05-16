@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '@/lib/api'
 import { VChart, chartColors, type EChartsOption } from '@/lib/charts'
 import { formatMinor } from '@/lib/money'
+import ChartCard from '@/components/ui/ChartCard.vue'
 
 interface Point { month: string; incomeMinor: string; expenseMinor: string }
 
@@ -107,9 +108,8 @@ const option = computed<EChartsOption>(() => ({
 </script>
 
 <template>
-  <div class="card p-4">
-    <div class="flex items-baseline justify-between mb-2">
-      <h3 class="text-sm font-medium">Cash flow</h3>
+  <ChartCard title="Cash flow" :loading="loading" :empty="points.length === 0">
+    <template #actions>
       <div class="flex items-baseline gap-4 text-xs tabular">
         <span class="text-[var(--color-positive)]">+{{ formatMinor(summary.income.toString(), currency) }}</span>
         <span class="text-[var(--color-negative)]">{{ formatMinor(summary.expense.toString(), currency) }}</span>
@@ -120,9 +120,7 @@ const option = computed<EChartsOption>(() => ({
           Net {{ formatMinor(summary.net.toString(), currency) }}
         </span>
       </div>
-    </div>
-    <div v-if="loading" class="h-72 flex items-center justify-center text-[var(--color-text-muted)] text-sm">Loading…</div>
-    <div v-else-if="points.length === 0" class="h-72 flex items-center justify-center text-[var(--color-text-muted)] text-sm">No data.</div>
-    <VChart v-else :option="option" class="w-full" style="height: 18rem" autoresize />
-  </div>
+    </template>
+    <VChart :option="option" class="w-full" style="height: 18rem" autoresize />
+  </ChartCard>
 </template>

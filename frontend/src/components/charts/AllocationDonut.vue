@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '@/lib/api'
 import { VChart, chartColors, type EChartsOption } from '@/lib/charts'
 import { formatMinor } from '@/lib/money'
+import ChartCard from '@/components/ui/ChartCard.vue'
 
 interface Slice {
   label: string
@@ -157,14 +158,16 @@ const showOtherDetails = ref(false)
 </script>
 
 <template>
-  <div class="card p-4">
-    <div class="flex items-baseline justify-between mb-2">
-      <h3 class="text-sm font-medium">Allocation</h3>
+  <ChartCard
+    title="Allocation"
+    :loading="loading"
+    :empty="!data || data.slices.length === 0"
+    empty-text="No holdings."
+  >
+    <template #actions>
       <span class="text-xs text-[var(--color-text-muted)] tabular">{{ totalFormatted }}</span>
-    </div>
-    <div v-if="loading" class="h-72 flex items-center justify-center text-[var(--color-text-muted)] text-sm">Loading…</div>
-    <div v-else-if="!data || data.slices.length === 0" class="h-72 flex items-center justify-center text-[var(--color-text-muted)] text-sm">No holdings.</div>
-    <div v-else class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 items-center">
+    </template>
+    <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 items-center">
       <VChart :option="option" style="height: 18rem" autoresize />
       <ul class="space-y-1 text-sm overflow-y-auto" style="max-height: 18rem">
         <template v-for="(s, i) in grouped.display" :key="s.label">
@@ -200,5 +203,5 @@ const showOtherDetails = ref(false)
         </template>
       </ul>
     </div>
-  </div>
+  </ChartCard>
 </template>

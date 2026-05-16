@@ -6,7 +6,7 @@ import { formatMinor } from '@/lib/money'
 import { categoryMeta } from '@/lib/categories'
 import { describeSchedule, type RecurringFrequency } from '@/lib/recurring'
 import { useAccountsStore } from '@/stores/accounts'
-import DateField from '@/components/DateField.vue'
+import DateField from '@/components/ui/DateField.vue'
 import { VChart, chartColors, type EChartsOption } from '@/lib/charts'
 import { Search, Wallet, Receipt, TrendingUp, Repeat, Tag as TagIcon, Inbox, X } from 'lucide-vue-next'
 

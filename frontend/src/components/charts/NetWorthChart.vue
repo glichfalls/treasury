@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '@/lib/api'
-import { VChart, chartColors, type EChartsOption } from '@/lib/charts'
+import {
+  VChart, chartColors, granularityFor, rangeBounds,
+  type EChartsOption, type Granularity, type Range,
+} from '@/lib/charts'
 import { formatMinor } from '@/lib/money'
+import ChartCard from '@/components/ui/ChartCard.vue'
+import RangeSelector from '@/components/ui/RangeSelector.vue'
 
 interface Point {
   date: string
@@ -16,8 +21,8 @@ const props = withDefaults(
   defineProps<{
     endpoint: string
     currency?: string
-    granularity?: 'daily' | 'weekly' | 'monthly'
-    range?: '1w' | '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'all'
+    granularity?: Granularity
+    range?: Range
     title?: string
     // Single line of total value (default), stacked cash+holdings, or value plus net deposits.
     mode?: 'total' | 'stacked' | 'vs-deposits'
@@ -34,31 +39,10 @@ const props = withDefaults(
   },
 )
 
-// Auto-pick a sampling cadence based on the visible range so short windows
-// don't end up with just two data points. An explicit `granularity` prop wins.
-function granularityFor(range: string): 'daily' | 'weekly' | 'monthly' {
-  if (range === '1w' || range === '1m' || range === '3m') return 'daily'
-  if (range === '6m' || range === 'ytd' || range === '1y' || range === '2y') return 'weekly'
-  return 'monthly'
-}
+const emit = defineEmits<{ 'update:range': [Range] }>()
 
 const points = ref<Point[]>([])
 const loading = ref(false)
-
-function rangeBounds(range: string): { from: string; to: string } {
-  const to = new Date()
-  const from = new Date()
-  if (range === '1w') from.setDate(from.getDate() - 7)
-  else if (range === '1m') from.setMonth(from.getMonth() - 1)
-  else if (range === '3m') from.setMonth(from.getMonth() - 3)
-  else if (range === '6m') from.setMonth(from.getMonth() - 6)
-  else if (range === 'ytd') from.setMonth(0, 1)
-  else if (range === '1y') from.setFullYear(from.getFullYear() - 1)
-  else if (range === '2y') from.setFullYear(from.getFullYear() - 2)
-  else if (range === '5y') from.setFullYear(from.getFullYear() - 5)
-  else from.setFullYear(from.getFullYear() - 20)
-  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }
-}
 
 // Yellow accent + matching area gradient. Used when direction coloring is off
 // (bank accounts etc.) and as the fallback for direction coloring when there's
@@ -89,7 +73,6 @@ function directionColor(values: number[]): { line: string; areaTop: string; area
   }
 }
 
-/** Picks accent or direction-based fill based on the prop. */
 function fillFor(values: number[]): { line: string; areaTop: string; areaBottom: string } {
   return props.directionColoring ? directionColor(values) : ACCENT_FILL
 }
@@ -254,7 +237,6 @@ const option = computed<EChartsOption>(() => {
     }
   }
 
-  // default: single area
   const totals = points.value.map((p) => Number(p.totalMinor) / 100)
   const dir = fillFor(totals)
   return {
@@ -285,23 +267,10 @@ const option = computed<EChartsOption>(() => {
 </script>
 
 <template>
-  <div class="card p-4">
-    <div class="flex items-baseline justify-between mb-2">
-      <h3 class="text-sm font-medium">{{ title }}</h3>
-      <div class="flex gap-1">
-        <button
-          v-for="r in (['1w','1m','3m','6m','ytd','1y','2y','5y','all'] as const)"
-          :key="r"
-          :class="['text-xs px-2 py-0.5 rounded transition-colors',
-            r === range
-              ? 'bg-[var(--color-surface-hover)] text-[var(--color-text)]'
-              : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]']"
-          @click="$emit('update:range', r)"
-        >{{ r.toUpperCase() }}</button>
-      </div>
-    </div>
-    <div v-if="loading" class="h-72 flex items-center justify-center text-[var(--color-text-muted)] text-sm">Loading…</div>
-    <div v-else-if="points.length === 0" class="h-72 flex items-center justify-center text-[var(--color-text-muted)] text-sm">No data.</div>
-    <VChart v-else :option="option" class="w-full" style="height: 18rem" autoresize />
-  </div>
+  <ChartCard :title="title" :loading="loading" :empty="points.length === 0">
+    <template #actions>
+      <RangeSelector :model-value="range" @update:model-value="emit('update:range', $event)" />
+    </template>
+    <VChart :option="option" class="w-full" style="height: 18rem" autoresize />
+  </ChartCard>
 </template>

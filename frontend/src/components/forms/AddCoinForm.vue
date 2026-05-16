@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { api } from '@/lib/api'
 import { useToastsStore } from '@/stores/toasts'
 import { parseMajor } from '@/lib/money'
 import { Coins } from 'lucide-vue-next'
-import BaseModal from '@/components/BaseModal.vue'
-import DateField from '@/components/DateField.vue'
+import DateField from '@/components/ui/DateField.vue'
+import ModalForm from '@/components/ui/ModalForm.vue'
+import TextField from '@/components/ui/TextField.vue'
+import PriceField from '@/components/ui/PriceField.vue'
+import SelectField from '@/components/ui/SelectField.vue'
 
 const toasts = useToastsStore()
 
@@ -23,12 +26,20 @@ const emit = defineEmits<{ created: [] }>()
 const today = new Date().toISOString().slice(0, 10)
 const open = ref(false)
 const catalog = ref<CatalogEntry[]>([])
-const isin = ref('')
+const isin = ref<string>('')
 const quantity = ref('1')
 const amount = ref('')
 const occurredAt = ref(today)
 const error = ref<string | null>(null)
 const submitting = ref(false)
+
+const catalogOptions = computed(() =>
+  catalog.value.map((c) => ({
+    value: c.isin,
+    label: c.name,
+    hint: `${c.unitWeightGrams} g`,
+  })),
+)
 
 onMounted(async () => {
   catalog.value = await api.get<CatalogEntry[]>('/api/accounts/coins/catalog')
@@ -70,44 +81,43 @@ async function submit() {
 </script>
 
 <template>
-  <button class="btn btn-secondary" @click="open = true">
-    <Coins :size="16" />
-    <span>Add coin</span>
-  </button>
-
-  <BaseModal v-model:open="open" title="New coin purchase" @close="reset">
-    <form id="add-coin-form" class="space-y-4" @submit.prevent="submit">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div class="space-y-1.5 sm:col-span-2">
-          <label class="label">Coin</label>
-          <select v-model="isin" class="input">
-            <option v-for="c in catalog" :key="c.isin" :value="c.isin">
-              {{ c.name }} · {{ c.unitWeightGrams }} g
-            </option>
-          </select>
-        </div>
-        <div class="space-y-1.5">
-          <label class="label">Date</label>
-          <DateField v-model="occurredAt" required />
-        </div>
-        <div class="space-y-1.5">
-          <label class="label">Quantity</label>
-          <input v-model="quantity" type="number" min="0" step="any" required class="input tabular" />
-          <p class="text-xs text-[var(--color-text-dim)]">For odd-weight bars/scrap, pick the 1 g bar and enter the gram count here.</p>
-        </div>
-        <div class="space-y-1.5 sm:col-span-2">
-          <label class="label">Total paid ({{ currency }})</label>
-          <input v-model="amount" placeholder="2300" required class="input tabular" />
-        </div>
-      </div>
-      <p v-if="error" class="text-sm text-[var(--color-negative)]">{{ error }}</p>
-    </form>
-
-    <template #footer>
-      <button type="button" class="btn btn-ghost" @click="open = false">Cancel</button>
-      <button type="submit" form="add-coin-form" class="btn btn-primary" :disabled="submitting">
-        {{ submitting ? 'Saving…' : 'Add purchase' }}
+  <ModalForm
+    v-model:open="open"
+    title="New coin purchase"
+    submit-label="Add purchase"
+    :submitting="submitting"
+    :error="error"
+    @submit="submit"
+    @close="reset"
+  >
+    <template #trigger="{ open: openModal }">
+      <button class="btn btn-secondary" @click="openModal">
+        <Coins :size="16" />
+        <span>Add coin</span>
       </button>
     </template>
-  </BaseModal>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div class="sm:col-span-2">
+        <SelectField v-model="isin" label="Coin" :options="catalogOptions" />
+      </div>
+      <div class="space-y-1.5">
+        <label class="label">Date</label>
+        <DateField v-model="occurredAt" required />
+      </div>
+      <TextField
+        v-model="quantity"
+        label="Quantity"
+        type="number"
+        min="0"
+        step="any"
+        required
+        class="tabular"
+        hint="For odd-weight bars/scrap, pick the 1 g bar and enter the gram count here."
+      />
+      <div class="sm:col-span-2">
+        <PriceField v-model="amount" label="Total paid" :currency="currency" placeholder="2300" required />
+      </div>
+    </div>
+  </ModalForm>
 </template>

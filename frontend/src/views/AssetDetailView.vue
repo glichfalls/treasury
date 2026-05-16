@@ -4,7 +4,7 @@ import { useRoute, RouterLink } from 'vue-router'
 import { api } from '@/lib/api'
 import { formatMinor, formatQuantity } from '@/lib/money'
 import { categoryMeta } from '@/lib/categories'
-import AssetPriceChart from '@/components/AssetPriceChart.vue'
+import AssetPriceChart from '@/components/charts/AssetPriceChart.vue'
 import { ChevronLeft, Inbox, TrendingUp, TrendingDown } from 'lucide-vue-next'
 
 interface PerAccount {

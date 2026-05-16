@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { LayoutDashboard, Wallet, Settings, Menu, X } from 'lucide-vue-next'
-import BrandMark from '@/components/BrandMark.vue'
+import BrandMark from '@/components/ui/BrandMark.vue'
 
 const route = useRoute()
 

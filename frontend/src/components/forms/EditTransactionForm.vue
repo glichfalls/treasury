@@ -1,7 +1,15 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useAccountsStore, type Transaction } from '@/stores/accounts'
 import { exponentOf, parseMajor } from '@/lib/money'
+import DateField from '@/components/ui/DateField.vue'
+import TagsInput from '@/components/ui/TagsInput.vue'
+import ModalForm from '@/components/ui/ModalForm.vue'
+import TextField from '@/components/ui/TextField.vue'
+import PriceField from '@/components/ui/PriceField.vue'
+import SelectField from '@/components/ui/SelectField.vue'
+import { CATEGORIES } from '@/lib/categories'
+import { featuresFor } from '@/lib/accountFeatures'
 
 function minorToMajorString(amountMinor: string, currency: string): string {
   const exp = exponentOf(currency)
@@ -11,12 +19,6 @@ function minorToMajorString(amountMinor: string, currency: string): string {
   const fracPart = exp > 0 ? digits.slice(-exp) : ''
   return (negative ? '-' : '') + intPart + (fracPart ? '.' + fracPart : '')
 }
-import { computed } from 'vue'
-import BaseModal from '@/components/BaseModal.vue'
-import DateField from '@/components/DateField.vue'
-import TagsInput from '@/components/TagsInput.vue'
-import { CATEGORIES } from '@/lib/categories'
-import { featuresFor } from '@/lib/accountFeatures'
 
 const props = defineProps<{ transaction: Transaction | null }>()
 const emit = defineEmits<{ 'update:transaction': [Transaction | null]; saved: [] }>()
@@ -44,11 +46,13 @@ const transactionTypes = [
   { value: 'other', label: 'Other' },
 ]
 
+const categoryOptions = computed(() => CATEGORIES.map((c) => ({ value: c.value, label: c.label })))
+
 const occurredAt = ref('')
 const amount = ref('')
 const description = ref('')
-const type = ref('other')
-const category = ref('')
+const type = ref<string>('other')
+const category = ref<string | null>(null)
 const tags = ref<string[]>([])
 const error = ref<string | null>(null)
 const submitting = ref(false)
@@ -61,7 +65,7 @@ watch(
     amount.value = minorToMajorString(t.amountMinor, t.currency)
     description.value = t.description ?? ''
     type.value = t.type
-    category.value = t.category ?? ''
+    category.value = t.category ?? null
     tags.value = [...(t.tags ?? [])]
     error.value = null
   },
@@ -97,47 +101,39 @@ async function submit() {
 </script>
 
 <template>
-  <BaseModal :open="transaction !== null" title="Edit transaction" @update:open="(v) => !v && close()">
-    <form v-if="transaction" id="edit-transaction-form" class="space-y-4" @submit.prevent="submit">
+  <ModalForm
+    :open="transaction !== null"
+    title="Edit transaction"
+    submit-label="Save changes"
+    :submitting="submitting"
+    :error="error"
+    @update:open="(v) => !v && close()"
+    @submit="submit"
+  >
+    <template v-if="transaction">
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div class="space-y-1.5">
           <label class="label">Date</label>
           <DateField v-model="occurredAt" required />
         </div>
-        <div class="space-y-1.5">
-          <label class="label">Amount ({{ transaction.currency }})</label>
-          <input v-model="amount" required class="input tabular" />
-        </div>
-        <div class="space-y-1.5">
-          <label class="label">Type</label>
-          <select v-model="type" class="input">
-            <option v-for="t in transactionTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
-          </select>
-        </div>
-        <div v-if="features.showCategories" class="space-y-1.5">
-          <label class="label">Category</label>
-          <select v-model="category" class="input">
-            <option value="">Uncategorized</option>
-            <option v-for="c in CATEGORIES" :key="c.value" :value="c.value">{{ c.label }}</option>
-          </select>
-        </div>
+        <PriceField v-model="amount" label="Amount" :currency="transaction.currency" required />
+        <SelectField v-model="type" label="Type" :options="transactionTypes" />
+        <SelectField
+          v-if="features.showCategories"
+          v-model="category"
+          label="Category"
+          :options="categoryOptions"
+          allow-empty
+          empty-label="Uncategorized"
+        />
         <div class="space-y-1.5 sm:col-span-2">
-          <label class="label">Description</label>
-          <input v-model="description" class="input" />
+          <TextField v-model="description" label="Description" />
         </div>
         <div class="space-y-1.5 sm:col-span-2">
           <label class="label">Tags</label>
           <TagsInput v-model="tags" placeholder="Netflix, business, refund…" />
         </div>
       </div>
-      <p v-if="error" class="text-sm text-[var(--color-negative)]">{{ error }}</p>
-    </form>
-
-    <template #footer>
-      <button type="button" class="btn btn-ghost" @click="close">Cancel</button>
-      <button type="submit" form="edit-transaction-form" class="btn btn-primary" :disabled="submitting">
-        {{ submitting ? 'Saving…' : 'Save changes' }}
-      </button>
     </template>
-  </BaseModal>
+  </ModalForm>
 </template>

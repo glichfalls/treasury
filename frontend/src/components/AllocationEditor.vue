@@ -4,7 +4,7 @@ import { api } from '@/lib/api'
 import { Pencil, Plus, Save, Trash2, History, X, Check, Copy } from 'lucide-vue-next'
 import { chartColors } from '@/lib/charts'
 import { useAccountsStore } from '@/stores/accounts'
-import DateField from '@/components/DateField.vue'
+import DateField from '@/components/ui/DateField.vue'
 
 interface Rule {
   assetIsin: string

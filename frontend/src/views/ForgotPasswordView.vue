@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ArrowRight, MailCheck } from 'lucide-vue-next'
-import BrandMark from '@/components/BrandMark.vue'
+import BrandMark from '@/components/ui/BrandMark.vue'
 
 const email = ref('')
 const submitting = ref(false)

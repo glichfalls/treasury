@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import BackupPanel from '@/components/BackupPanel.vue'
-import ChangePasswordPanel from '@/components/ChangePasswordPanel.vue'
-import PreferencesPanel from '@/components/PreferencesPanel.vue'
-import PricesAdminPanel from '@/components/PricesAdminPanel.vue'
-import RegistrationCodesPanel from '@/components/RegistrationCodesPanel.vue'
-import TagsPanel from '@/components/TagsPanel.vue'
-import UsersPanel from '@/components/UsersPanel.vue'
+import BackupPanel from '@/components/panels/BackupPanel.vue'
+import ChangePasswordPanel from '@/components/panels/ChangePasswordPanel.vue'
+import PreferencesPanel from '@/components/panels/PreferencesPanel.vue'
+import PricesAdminPanel from '@/components/panels/PricesAdminPanel.vue'
+import RegistrationCodesPanel from '@/components/panels/RegistrationCodesPanel.vue'
+import TagsPanel from '@/components/panels/TagsPanel.vue'
+import UsersPanel from '@/components/panels/UsersPanel.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()

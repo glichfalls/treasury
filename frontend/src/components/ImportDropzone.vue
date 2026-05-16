@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { ApiError } from '@/lib/api'
 import { useToastsStore } from '@/stores/toasts'
 import { Upload, AlertCircle } from 'lucide-vue-next'
-import BaseModal from '@/components/BaseModal.vue'
+import BaseModal from '@/components/ui/BaseModal.vue'
 
 const props = defineProps<{ accountId: string }>()
 const emit = defineEmits<{ imported: [] }>()

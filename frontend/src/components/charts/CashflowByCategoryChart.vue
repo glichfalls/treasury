@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { api } from '@/lib/api'
 import { VChart, chartColors, type EChartsOption } from '@/lib/charts'
 import { categoryMeta } from '@/lib/categories'
+import ChartCard from '@/components/ui/ChartCard.vue'
 
 interface Point {
   month: string         // 'YYYY-MM'
@@ -149,13 +150,10 @@ const hasData = computed(() => rows.value.length > 0)
 </script>
 
 <template>
-  <div class="card p-4">
-    <div class="flex items-baseline justify-between mb-2">
-      <h3 class="text-sm font-medium">Cashflow by category</h3>
+  <ChartCard title="Cashflow by category" :loading="loading" :empty="!hasData">
+    <template #actions>
       <span class="text-xs text-[var(--color-text-muted)]">Last {{ months }} months</span>
-    </div>
-    <div v-if="loading" class="h-72 flex items-center justify-center text-[var(--color-text-muted)] text-sm">Loading…</div>
-    <div v-else-if="!hasData" class="h-72 flex items-center justify-center text-[var(--color-text-muted)] text-sm">No data.</div>
-    <VChart v-else :option="option" class="w-full" style="height: 18rem" autoresize />
-  </div>
+    </template>
+    <VChart :option="option" class="w-full" style="height: 18rem" autoresize />
+  </ChartCard>
 </template>

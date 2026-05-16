@@ -7,7 +7,7 @@ import { useToastsStore } from '@/stores/toasts'
 import { formatMinor, formatQuantity } from '@/lib/money'
 import { categoryMeta } from '@/lib/categories'
 import { featuresFor } from '@/lib/accountFeatures'
-import EditTransactionForm from '@/components/EditTransactionForm.vue'
+import EditTransactionForm from '@/components/forms/EditTransactionForm.vue'
 import { ChevronLeft, Pencil, Trash2, ArrowRight } from 'lucide-vue-next'
 
 interface DetailedTransaction extends Transaction {

@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ArrowRight } from 'lucide-vue-next'
-import BrandMark from '@/components/BrandMark.vue'
+import BrandMark from '@/components/ui/BrandMark.vue'
 
 const route = useRoute()
 const router = useRouter()

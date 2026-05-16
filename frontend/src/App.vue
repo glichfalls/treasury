@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
-import AppShell from '@/components/AppShell.vue'
-import ToastContainer from '@/components/ToastContainer.vue'
+import AppShell from '@/components/layout/AppShell.vue'
+import ToastContainer from '@/components/ui/ToastContainer.vue'
 </script>
 
 <template>

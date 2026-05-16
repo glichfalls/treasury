@@ -4,8 +4,9 @@ import { api } from '@/lib/api'
 import { useToastsStore } from '@/stores/toasts'
 import { parseMajor } from '@/lib/money'
 import { PiggyBank } from 'lucide-vue-next'
-import BaseModal from '@/components/BaseModal.vue'
-import DateField from '@/components/DateField.vue'
+import DateField from '@/components/ui/DateField.vue'
+import ModalForm from '@/components/ui/ModalForm.vue'
+import PriceField from '@/components/ui/PriceField.vue'
 
 const toasts = useToastsStore()
 
@@ -55,34 +56,31 @@ async function submit() {
 </script>
 
 <template>
-  <button class="btn btn-secondary" @click="open = true">
-    <PiggyBank :size="16" />
-    <span>Add contribution</span>
-  </button>
-
-  <BaseModal v-model:open="open" title="New 3a contribution" @close="reset">
-    <form id="add-contribution-form" class="space-y-4" @submit.prevent="submit">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div class="space-y-1.5">
-          <label class="label">Date</label>
-          <DateField v-model="occurredAt" required />
-        </div>
-        <div class="space-y-1.5">
-          <label class="label">Amount ({{ currency }})</label>
-          <input v-model="amount" placeholder="600" required class="input tabular" />
-        </div>
-      </div>
-      <p v-if="missing.length > 0" class="text-xs text-[var(--color-text-dim)]">
-        No price data for: {{ missing.join(', ') }}. Those slices were skipped — run `app:prices:backfill` to fetch history.
-      </p>
-      <p v-if="error" class="text-sm text-[var(--color-negative)]">{{ error }}</p>
-    </form>
-
-    <template #footer>
-      <button type="button" class="btn btn-ghost" @click="open = false">Cancel</button>
-      <button type="submit" form="add-contribution-form" class="btn btn-primary" :disabled="submitting">
-        {{ submitting ? 'Saving…' : 'Record contribution' }}
+  <ModalForm
+    v-model:open="open"
+    title="New 3a contribution"
+    submit-label="Record contribution"
+    :submitting="submitting"
+    :error="error"
+    @submit="submit"
+    @close="reset"
+  >
+    <template #trigger="{ open: openModal }">
+      <button class="btn btn-secondary" @click="openModal">
+        <PiggyBank :size="16" />
+        <span>Add contribution</span>
       </button>
     </template>
-  </BaseModal>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div class="space-y-1.5">
+        <label class="label">Date</label>
+        <DateField v-model="occurredAt" required />
+      </div>
+      <PriceField v-model="amount" label="Amount" :currency="currency" placeholder="600" required />
+    </div>
+    <p v-if="missing.length > 0" class="text-xs text-[var(--color-text-dim)]">
+      No price data for: {{ missing.join(', ') }}. Those slices were skipped — run `app:prices:backfill` to fetch history.
+    </p>
+  </ModalForm>
 </template>

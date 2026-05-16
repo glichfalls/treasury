@@ -2,11 +2,11 @@
 import { onMounted, computed, ref } from 'vue'
 import { useAccountsStore } from '@/stores/accounts'
 import { formatMinor } from '@/lib/money'
-import NetWorthChart from '@/components/NetWorthChart.vue'
-import CashFlowChart from '@/components/CashFlowChart.vue'
-import CashflowByCategoryChart from '@/components/CashflowByCategoryChart.vue'
-import AllocationDonut from '@/components/AllocationDonut.vue'
-import PerformanceChart from '@/components/PerformanceChart.vue'
+import NetWorthChart from '@/components/charts/NetWorthChart.vue'
+import CashFlowChart from '@/components/charts/CashFlowChart.vue'
+import CashflowByCategoryChart from '@/components/charts/CashflowByCategoryChart.vue'
+import AllocationDonut from '@/components/charts/AllocationDonut.vue'
+import PerformanceChart from '@/components/charts/PerformanceChart.vue'
 
 const accounts = useAccountsStore()
 const range = ref<'1w' | '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'all'>('ytd')

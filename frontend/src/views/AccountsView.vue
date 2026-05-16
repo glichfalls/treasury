@@ -4,8 +4,8 @@ import { useAccountsStore, type Account } from '@/stores/accounts'
 import { useToastsStore } from '@/stores/toasts'
 import { RouterLink } from 'vue-router'
 import { formatMinor } from '@/lib/money'
-import NewAccountForm from '@/components/NewAccountForm.vue'
-import EditAccountForm from '@/components/EditAccountForm.vue'
+import NewAccountForm from '@/components/forms/NewAccountForm.vue'
+import EditAccountForm from '@/components/forms/EditAccountForm.vue'
 import { Pencil, Trash2, ChevronRight, Inbox } from 'lucide-vue-next'
 
 const accounts = useAccountsStore()

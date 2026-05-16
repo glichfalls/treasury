@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '@/lib/api'
-import { VChart, chartColors, type EChartsOption } from '@/lib/charts'
+import { VChart, chartColors, rangeBounds, type EChartsOption, type Range } from '@/lib/charts'
 import { formatMinor } from '@/lib/money'
+import RangeSelector from '@/components/ui/RangeSelector.vue'
 
 interface PricePoint { date: string; priceMinor: string; currency: string }
 interface Response { isin: string; points: PricePoint[] }
 
 const props = defineProps<{ isin: string }>()
-
-type Range = '1w' | '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'all'
 
 const data = ref<Response | null>(null)
 const loading = ref(false)
@@ -18,19 +17,9 @@ const range = ref<Range>('ytd')
 async function load() {
   loading.value = true
   try {
-    const to = new Date()
-    const from = new Date()
-    if (range.value === '1w') from.setDate(from.getDate() - 7)
-    else if (range.value === '1m') from.setMonth(from.getMonth() - 1)
-    else if (range.value === '3m') from.setMonth(from.getMonth() - 3)
-    else if (range.value === '6m') from.setMonth(from.getMonth() - 6)
-    else if (range.value === 'ytd') from.setMonth(0, 1)
-    else if (range.value === '1y') from.setFullYear(from.getFullYear() - 1)
-    else if (range.value === '2y') from.setFullYear(from.getFullYear() - 2)
-    else if (range.value === '5y') from.setFullYear(from.getFullYear() - 5)
-    else from.setFullYear(from.getFullYear() - 20)
+    const { from, to } = rangeBounds(range.value)
     data.value = await api.get<Response>(
-      `/api/assets/${props.isin}/prices?from=${from.toISOString().slice(0, 10)}&to=${to.toISOString().slice(0, 10)}`,
+      `/api/assets/${props.isin}/prices?from=${from}&to=${to}`,
     )
   } finally {
     loading.value = false
@@ -82,23 +71,17 @@ const option = computed<EChartsOption>(() => {
     }],
   }
 })
+
+const empty = computed(() => !data.value || data.value.points.length === 0)
 </script>
 
 <template>
   <div>
     <div class="flex justify-end gap-1 mb-1">
-      <button
-        v-for="r in (['1w','1m','3m','6m','ytd','1y','2y','5y','all'] as const)"
-        :key="r"
-        :class="['text-xs px-2 py-0.5 rounded transition-colors',
-          r === range
-            ? 'bg-[var(--color-surface-hover)] text-[var(--color-text)]'
-            : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]']"
-        @click="range = r"
-      >{{ r.toUpperCase() }}</button>
+      <RangeSelector v-model="range" />
     </div>
     <div v-if="loading" class="h-40 flex items-center justify-center text-[var(--color-text-muted)] text-xs">Loading…</div>
-    <div v-else-if="!data || data.points.length === 0" class="h-40 flex items-center justify-center text-[var(--color-text-muted)] text-xs">No price data.</div>
+    <div v-else-if="empty" class="h-40 flex items-center justify-center text-[var(--color-text-muted)] text-xs">No price data.</div>
     <VChart v-else :option="option" class="w-full" style="height: 10rem" autoresize />
   </div>
 </template>
