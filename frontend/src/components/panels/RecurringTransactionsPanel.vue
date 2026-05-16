@@ -6,6 +6,7 @@ import { categoryMeta } from '@/lib/categories'
 import { useToastsStore } from '@/stores/toasts'
 import RecurringForm from '@/components/forms/RecurringForm.vue'
 import DataTable from '@/components/ui/DataTable.vue'
+import Button from '@/components/ui/Button.vue'
 import type { ColumnDef } from '@tanstack/vue-table'
 import { Plus, Pencil, Trash2, Play, Pause, Inbox } from 'lucide-vue-next'
 
@@ -140,10 +141,10 @@ const columns = computed<ColumnDef<RecurringRule, unknown>[]>(() => [
           The materializer runs nightly; use <strong>Run now</strong> to catch up immediately.
         </h3>
       </div>
-      <button type="button" class="btn btn-secondary" @click="openCreate">
+      <Button @click="openCreate">
         <Plus :size="14" />
         <span>New rule</span>
-      </button>
+      </Button>
     </div>
 
     <div v-if="loading" class="card p-10 text-center text-[var(--color-text-muted)]">Loading…</div>
@@ -180,30 +181,30 @@ const columns = computed<ColumnDef<RecurringRule, unknown>[]>(() => [
       </template>
       <template #cell-actions="{ row }">
         <div class="flex justify-end gap-1">
-          <button
-            type="button"
-            class="btn btn-ghost p-1.5"
+          <Button
+            variant="ghost"
+            icon-only
             :title="row.active ? 'Pause' : 'Resume'"
             @click="toggleActive(row)"
           >
             <Pause v-if="row.active" :size="14" />
             <Play v-else :size="14" />
-          </button>
-          <button
-            type="button"
-            class="btn btn-ghost p-1.5"
+          </Button>
+          <Button
+            variant="ghost"
+            icon-only
             title="Run now"
             :disabled="!row.active"
             @click="runNow(row)"
           >
             <span class="text-xs">▶</span>
-          </button>
-          <button type="button" class="btn btn-ghost p-1.5" title="Edit" @click="openEdit(row)">
+          </Button>
+          <Button variant="ghost" icon-only title="Edit" @click="openEdit(row)">
             <Pencil :size="14" />
-          </button>
-          <button type="button" class="btn btn-danger p-1.5" title="Delete" @click="remove(row)">
+          </Button>
+          <Button variant="danger" icon-only title="Delete" @click="remove(row)">
             <Trash2 :size="14" />
-          </button>
+          </Button>
         </div>
       </template>
     </DataTable>

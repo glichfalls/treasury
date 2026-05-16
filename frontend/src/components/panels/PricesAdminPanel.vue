@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { api } from '@/lib/api'
 import { useToastsStore } from '@/stores/toasts'
 import { RefreshCw } from 'lucide-vue-next'
+import Button from '@/components/ui/Button.vue'
 
 const toasts = useToastsStore()
 const busy = ref(false)
@@ -30,9 +31,9 @@ async function reload() {
       </p>
     </div>
 
-    <button type="button" class="btn btn-primary" :disabled="busy" @click="reload">
-      <RefreshCw :size="14" :class="busy ? 'animate-spin' : ''" />
-      {{ busy ? 'Queuing…' : 'Reload prices now' }}
-    </button>
+    <Button variant="primary" :loading="busy" loading-text="Queuing…" @click="reload">
+      <RefreshCw :size="14" />
+      Reload prices now
+    </Button>
   </div>
 </template>

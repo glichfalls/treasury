@@ -8,6 +8,7 @@ import { describeSchedule, type RecurringFrequency } from '@/lib/recurring'
 import {
   Search, Wallet, Receipt, TrendingUp, Repeat, Tag as TagIcon, ArrowRight, X,
 } from 'lucide-vue-next'
+import Button from '@/components/ui/Button.vue'
 
 interface AccountResult { id: string; name: string; institution: string | null; type: string; currency: string }
 interface TransactionResult {
@@ -206,14 +207,9 @@ const showAllParams = computed(() => ({ name: 'search', query: { q: query.value.
               class="flex-1 bg-transparent outline-none text-base"
               autocomplete="off"
             />
-            <button
-              type="button"
-              class="text-[var(--color-text-dim)] hover:text-[var(--color-text)]"
-              @click="close"
-              aria-label="Close"
-            >
+            <Button variant="ghost" size="sm" icon-only aria-label="Close" @click="close">
               <X :size="16" />
-            </button>
+            </Button>
           </div>
 
           <!-- Body -->
@@ -405,14 +401,10 @@ const showAllParams = computed(() => ({ name: 'search', query: { q: query.value.
               <span><kbd class="px-1 py-0.5 rounded border" style="border-color: var(--color-border);">↵</kbd> open</span>
               <span><kbd class="px-1 py-0.5 rounded border" style="border-color: var(--color-border);">esc</kbd> close</span>
             </div>
-            <button
-              type="button"
-              class="inline-flex items-center gap-1 text-[var(--color-accent)] hover:underline"
-              @click="viewAll"
-            >
+            <Button variant="ghost" size="sm" class="text-[var(--color-accent)] hover:underline" @click="viewAll">
               See all results
               <ArrowRight :size="12" />
-            </button>
+            </Button>
           </div>
         </div>
       </div>

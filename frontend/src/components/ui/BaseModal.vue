@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { X } from 'lucide-vue-next'
+import Button from '@/components/ui/Button.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -106,14 +107,9 @@ onBeforeUnmount(() => {
               <slot name="header">
                 <h3 class="font-medium">{{ title }}</h3>
               </slot>
-              <button
-                type="button"
-                class="btn btn-ghost p-1"
-                aria-label="Close"
-                @click="close"
-              >
+              <Button variant="ghost" size="sm" icon-only aria-label="Close" @click="close">
                 <X :size="16" />
-              </button>
+              </Button>
             </header>
             <div class="px-5 py-4">
               <slot />

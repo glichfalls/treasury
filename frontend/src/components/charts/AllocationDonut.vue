@@ -4,6 +4,7 @@ import { api } from '@/lib/api'
 import { VChart, chartColors, type EChartsOption } from '@/lib/charts'
 import { formatMinor } from '@/lib/money'
 import ChartCard from '@/components/ui/ChartCard.vue'
+import Button from '@/components/ui/Button.vue'
 
 interface Slice {
   label: string
@@ -179,13 +180,14 @@ const showOtherDetails = ref(false)
             <span class="flex-1 truncate" :class="s.isOther ? 'text-[var(--color-text-muted)]' : ''">
               {{ s.label }}
             </span>
-            <button
+            <Button
               v-if="s.isOther"
-              class="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
+              variant="ghost"
+              size="sm"
               @click="showOtherDetails = !showOtherDetails"
             >
               {{ showOtherDetails ? 'hide' : 'show' }}
-            </button>
+            </Button>
             <span class="tabular text-[var(--color-text-muted)] w-12 text-right">
               {{ s.percent.toFixed(1) }}%
             </span>

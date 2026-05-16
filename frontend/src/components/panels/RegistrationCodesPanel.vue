@@ -4,6 +4,7 @@ import { api } from '@/lib/api'
 import { useToastsStore } from '@/stores/toasts'
 import { Plus, Trash2, Copy, Check } from 'lucide-vue-next'
 import DataTable from '@/components/ui/DataTable.vue'
+import Button from '@/components/ui/Button.vue'
 import type { ColumnDef } from '@tanstack/vue-table'
 
 interface RegistrationCode {
@@ -122,10 +123,10 @@ const columns = computed<ColumnDef<RegistrationCode, unknown>[]>(() => [
         <label class="label">Label (optional)</label>
         <input v-model="newLabel" placeholder="e.g. for Alice" class="input" />
       </div>
-      <button type="submit" class="btn btn-primary" :disabled="creating">
+      <Button type="submit" variant="primary" :loading="creating" loading-text="Creating…">
         <Plus :size="14" />
-        <span>{{ creating ? 'Creating…' : 'New code' }}</span>
-      </button>
+        <span>New code</span>
+      </Button>
     </form>
 
     <div v-if="loading" class="text-sm text-[var(--color-text-muted)]">Loading…</div>
@@ -161,15 +162,15 @@ const columns = computed<ColumnDef<RegistrationCode, unknown>[]>(() => [
         {{ shortDate(row.createdAt) }}
       </template>
       <template #cell-actions="{ row }">
-        <button
+        <Button
           v-if="!row.usedAt"
-          type="button"
-          class="btn btn-danger p-1.5"
+          variant="danger"
+          icon-only
           aria-label="Revoke code"
           @click="revoke(row)"
         >
           <Trash2 :size="14" />
-        </button>
+        </Button>
       </template>
     </DataTable>
   </div>

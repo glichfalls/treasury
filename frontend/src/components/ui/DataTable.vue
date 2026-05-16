@@ -13,6 +13,7 @@ import {
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/vue'
 import { ArrowUp, ArrowDown, ChevronsUpDown, ChevronLeft, ChevronRight, Filter } from 'lucide-vue-next'
 import SelectField from '@/components/ui/SelectField.vue'
+import Button from '@/components/ui/Button.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -286,27 +287,29 @@ function isFilterActive(columnId: string): boolean {
           />
         </div>
         <div class="flex items-center gap-1">
-          <button
-            type="button"
-            class="p-1 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]"
+          <Button
+            variant="ghost"
+            size="sm"
+            icon-only
             :disabled="(page ?? 1) <= 1 || loading"
             aria-label="Previous page"
             @click="goToPage((page ?? 1) - 1)"
           >
             <ChevronLeft :size="14" />
-          </button>
+          </Button>
           <span class="tabular text-[var(--color-text-muted)] px-2">
             Page <span class="text-[var(--color-text)]">{{ page }}</span> of {{ totalPages }}
           </span>
-          <button
-            type="button"
-            class="p-1 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]"
+          <Button
+            variant="ghost"
+            size="sm"
+            icon-only
             :disabled="(page ?? 1) >= totalPages || loading"
             aria-label="Next page"
             @click="goToPage((page ?? 1) + 1)"
           >
             <ChevronRight :size="14" />
-          </button>
+          </Button>
         </div>
       </div>
     </div>

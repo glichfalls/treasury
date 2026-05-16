@@ -7,6 +7,7 @@ import { PiggyBank } from 'lucide-vue-next'
 import DateField from '@/components/ui/DateField.vue'
 import ModalForm from '@/components/ui/ModalForm.vue'
 import PriceField from '@/components/ui/PriceField.vue'
+import Button from '@/components/ui/Button.vue'
 
 const toasts = useToastsStore()
 
@@ -66,10 +67,10 @@ async function submit() {
     @close="reset"
   >
     <template #trigger="{ open: openModal }">
-      <button class="btn btn-secondary" @click="openModal">
+      <Button @click="openModal">
         <PiggyBank :size="16" />
         <span>Add contribution</span>
-      </button>
+      </Button>
     </template>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">

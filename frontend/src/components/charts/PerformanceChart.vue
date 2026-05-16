@@ -7,6 +7,7 @@ import {
 } from '@/lib/charts'
 import ChartCard from '@/components/ui/ChartCard.vue'
 import RangeSelector from '@/components/ui/RangeSelector.vue'
+import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 
 type Metric = 'vsDeposits' | 'twr'
 
@@ -207,16 +208,13 @@ const option = computed<EChartsOption>(() => {
       <RangeSelector :model-value="range" @update:model-value="emit('update:range', $event)" />
     </template>
     <template #subactions>
-      <button
-        v-for="m in (['vsDeposits','twr'] as const)"
-        :key="m"
-        type="button"
-        :class="['text-xs px-2 py-0.5 rounded transition-colors',
-          m === metric
-            ? 'bg-[var(--color-surface-hover)] text-[var(--color-text)]'
-            : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]']"
-        @click="metric = m"
-      >{{ m === 'vsDeposits' ? 'Lifetime return vs deposits' : 'Period return (TWR)' }}</button>
+      <SegmentedControl
+        v-model="metric"
+        :options="[
+          { value: 'vsDeposits', label: 'Lifetime return vs deposits' },
+          { value: 'twr', label: 'Period return (TWR)' },
+        ]"
+      />
     </template>
     <VChart :option="option" class="w-full" style="height: 18rem" autoresize />
   </ChartCard>

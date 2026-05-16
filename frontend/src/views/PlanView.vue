@@ -4,6 +4,7 @@ import { useAccountsStore } from '@/stores/accounts'
 import { formatMinor } from '@/lib/money'
 import { VChart, chartColors, type EChartsOption } from '@/lib/charts'
 import { TrendingUp, RotateCcw } from 'lucide-vue-next'
+import Button from '@/components/ui/Button.vue'
 
 const accounts = useAccountsStore()
 
@@ -222,15 +223,15 @@ const growth = computed(() => (final.value ? final.value.nominal - final.value.c
           <div class="space-y-1.5">
             <div class="flex items-baseline justify-between">
               <label class="label">Starting value ({{ baseCurrency }})</label>
-              <button
+              <Button
                 v-if="customStartingMajor !== ''"
-                type="button"
-                class="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] inline-flex items-center gap-1"
+                variant="ghost"
+                size="sm"
                 @click="resetStartingValue"
               >
                 <RotateCcw :size="12" />
                 <span>Reset</span>
-              </button>
+              </Button>
             </div>
             <input
               v-model="customStartingMajor"

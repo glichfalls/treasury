@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useAccountsStore } from '@/stores/accounts'
 import { useToastsStore } from '@/stores/toasts'
 import { Download, Upload } from 'lucide-vue-next'
+import Button from '@/components/ui/Button.vue'
 
 const accounts = useAccountsStore()
 const toasts = useToastsStore()
@@ -56,12 +57,12 @@ async function pickAndImport(ev: Event) {
     </div>
 
     <div class="flex flex-wrap items-center gap-3">
-      <a class="btn btn-primary" href="/api/accounts/export" download>
+      <Button variant="primary" href="/api/accounts/export" download>
         <Download :size="16" />
         <span>Export all</span>
-      </a>
+      </Button>
 
-      <label class="btn btn-ghost cursor-pointer">
+      <Button variant="ghost" as="label">
         <Upload :size="16" />
         <span>Import backup</span>
         <input
@@ -71,7 +72,7 @@ async function pickAndImport(ev: Event) {
           hidden
           @change="pickAndImport"
         />
-      </label>
+      </Button>
 
       <label class="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
         <input

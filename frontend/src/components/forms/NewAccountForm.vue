@@ -6,6 +6,7 @@ import { Plus } from 'lucide-vue-next'
 import ModalForm from '@/components/ui/ModalForm.vue'
 import TextField from '@/components/ui/TextField.vue'
 import SelectField from '@/components/ui/SelectField.vue'
+import Button from '@/components/ui/Button.vue'
 
 const accounts = useAccountsStore()
 const toasts = useToastsStore()
@@ -73,10 +74,10 @@ async function submit() {
     @close="reset"
   >
     <template #trigger="{ open: openModal }">
-      <button class="btn btn-secondary" @click="openModal">
+      <Button @click="openModal">
         <Plus :size="16" />
         <span>New account</span>
-      </button>
+      </Button>
     </template>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">

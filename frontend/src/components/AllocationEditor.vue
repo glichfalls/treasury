@@ -6,6 +6,7 @@ import { chartColors } from '@/lib/charts'
 import { useAccountsStore } from '@/stores/accounts'
 import DateField from '@/components/ui/DateField.vue'
 import SelectField from '@/components/ui/SelectField.vue'
+import Button from '@/components/ui/Button.vue'
 
 interface Rule {
   assetIsin: string
@@ -223,14 +224,14 @@ async function copyFrom(sourceId: string) {
         </p>
       </div>
       <div v-if="!editing" class="flex items-center gap-1">
-        <button class="btn btn-ghost text-xs" type="button" @click="toggleHistory">
+        <Button variant="ghost" size="sm" @click="toggleHistory">
           <History :size="14" />
           <span>{{ showHistory ? 'Hide history' : 'History' }}</span>
-        </button>
-        <button class="btn btn-secondary text-xs" type="button" @click="beginEdit">
+        </Button>
+        <Button size="sm" @click="beginEdit">
           <Pencil :size="14" />
           <span>Edit</span>
-        </button>
+        </Button>
       </div>
     </div>
 
@@ -315,14 +316,14 @@ async function copyFrom(sourceId: string) {
               />
               <span class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-[var(--color-text-dim)]">%</span>
             </div>
-            <button
-              class="p-1.5 rounded transition-colors text-[var(--color-text-dim)] hover:text-[var(--color-negative)] hover:bg-[var(--color-surface-hover)]"
-              type="button"
+            <Button
+              variant="danger"
+              icon-only
               :aria-label="`Remove row ${i + 1}`"
               @click="removeRow(i)"
             >
               <Trash2 :size="14" />
-            </button>
+            </Button>
           </div>
 
           <!-- Row 2: resolved name (left) + colored weight bar (right) -->
@@ -353,10 +354,10 @@ async function copyFrom(sourceId: string) {
         </li>
       </ul>
 
-      <button class="btn btn-ghost text-xs" type="button" @click="addRow">
+      <Button variant="ghost" size="sm" @click="addRow">
         <Plus :size="14" />
         <span>Add asset</span>
-      </button>
+      </Button>
 
       <!-- Footer: total + effective from + actions -->
       <div class="pt-3 border-t border-[var(--color-border)] flex flex-wrap items-center gap-3">
@@ -392,14 +393,14 @@ async function copyFrom(sourceId: string) {
         </div>
 
         <div class="flex items-end gap-2 ml-auto">
-          <button class="btn btn-ghost" type="button" @click="cancelEdit">
+          <Button variant="ghost" @click="cancelEdit">
             <X :size="14" />
             <span>Cancel</span>
-          </button>
-          <button class="btn btn-primary" type="button" :disabled="saving || !draftValid" @click="save">
+          </Button>
+          <Button variant="primary" :loading="saving" loading-text="Saving…" :disabled="!draftValid" @click="save">
             <Save :size="14" />
-            <span>{{ saving ? 'Saving…' : 'Save strategy' }}</span>
-          </button>
+            <span>Save strategy</span>
+          </Button>
         </div>
       </div>
       <p v-if="error" class="text-sm text-[var(--color-negative)]">{{ error }}</p>

@@ -18,6 +18,8 @@ import RecurringTransactionsPanel from '@/components/panels/RecurringTransaction
 import DateField from '@/components/ui/DateField.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import SelectField from '@/components/ui/SelectField.vue'
+import Button from '@/components/ui/Button.vue'
+import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import type { ColumnDef, SortingState } from '@tanstack/vue-table'
 import { useToastsStore } from '@/stores/toasts'
 import { CATEGORIES, categoryMeta } from '@/lib/categories'
@@ -245,7 +247,20 @@ const editingAccount = ref<Account | null>(null)
 // Holdings is the default tab — it's the primary content for investment accounts.
 // For cash accounts (where the holdings tab is gated off) we drop straight to
 // Transactions on load and on holdings re-fetch.
-const activeTab = ref<'holdings' | 'transactions' | 'recurring'>('holdings')
+type AccountTab = 'holdings' | 'transactions' | 'recurring'
+const activeTab = ref<AccountTab>('holdings')
+
+const tabOptions = computed(() => {
+  const opts: { value: AccountTab; label: string; count?: number }[] = []
+  if (features.value.showHoldings && holdings.value.length > 0) {
+    opts.push({ value: 'holdings', label: 'Holdings', count: holdings.value.length })
+  }
+  opts.push({ value: 'transactions', label: 'Transactions', count: totalTransactions.value })
+  if (features.value.showRecurring) {
+    opts.push({ value: 'recurring', label: 'Recurring' })
+  }
+  return opts
+})
 
 watch([holdings, features], ([h, f]) => {
   if (!f.showHoldings) {
@@ -357,20 +372,20 @@ async function deleteTransaction(t: Transaction) {
 
           <!-- Secondary actions: pushed to the right -->
           <div class="ml-auto flex items-center gap-1">
-            <button class="btn btn-ghost" type="button" @click="editingAccount = account">
+            <Button variant="ghost" @click="editingAccount = account">
               <Pencil :size="14" />
               <span>Edit</span>
-            </button>
-            <a
+            </Button>
+            <Button
+              variant="ghost"
               :href="`/api/accounts/${account.id}/export`"
               download
-              class="btn btn-ghost"
               :aria-label="`Export ${account.name} as JSON`"
               title="Export account as JSON"
             >
               <Download :size="14" />
               <span>Export</span>
-            </a>
+            </Button>
           </div>
         </div>
       </header>
@@ -415,40 +430,11 @@ async function deleteTransaction(t: Transaction) {
 
       <!-- Tabs — only the ones that make sense for this account type are shown. -->
       <section class="space-y-4">
-        <div class="flex items-center border-b" style="border-color: var(--color-border);">
-          <button
-            v-if="features.showHoldings && holdings.length > 0"
-            type="button"
-            class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors"
-            :class="activeTab === 'holdings'
-              ? 'text-[var(--color-text)] border-[var(--color-accent)]'
-              : 'text-[var(--color-text-muted)] border-transparent hover:text-[var(--color-text)]'"
-            @click="activeTab = 'holdings'"
-          >
-            Holdings <span class="text-[var(--color-text-dim)] ml-1">{{ holdings.length }}</span>
-          </button>
-          <button
-            type="button"
-            class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors"
-            :class="activeTab === 'transactions'
-              ? 'text-[var(--color-text)] border-[var(--color-accent)]'
-              : 'text-[var(--color-text-muted)] border-transparent hover:text-[var(--color-text)]'"
-            @click="activeTab = 'transactions'"
-          >
-            Transactions <span class="text-[var(--color-text-dim)] ml-1">{{ totalTransactions }}</span>
-          </button>
-          <button
-            v-if="features.showRecurring"
-            type="button"
-            class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors"
-            :class="activeTab === 'recurring'
-              ? 'text-[var(--color-text)] border-[var(--color-accent)]'
-              : 'text-[var(--color-text-muted)] border-transparent hover:text-[var(--color-text)]'"
-            @click="activeTab = 'recurring'"
-          >
-            Recurring
-          </button>
-        </div>
+        <SegmentedControl
+          v-model="activeTab"
+          variant="tabs"
+          :options="tabOptions"
+        />
 
         <!-- Recurring tab -->
         <RecurringTransactionsPanel
@@ -491,7 +477,7 @@ async function deleteTransaction(t: Transaction) {
         <!-- Transactions tab -->
         <div v-if="activeTab === 'transactions'" class="space-y-4">
           <div v-if="hasFilters" class="flex items-center justify-end">
-            <button type="button" class="btn btn-ghost text-xs" @click="clearFilters">Clear filters</button>
+            <Button variant="ghost" size="sm" @click="clearFilters">Clear filters</Button>
           </div>
 
           <div
@@ -604,22 +590,22 @@ async function deleteTransaction(t: Transaction) {
             </template>
             <template #cell-actions="{ row }">
               <div class="flex justify-end gap-0.5">
-                <button
-                  class="p-1.5 rounded transition-colors text-[var(--color-text-dim)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]"
-                  type="button"
+                <Button
+                  variant="ghost"
+                  icon-only
                   aria-label="Edit transaction"
                   @click="startEditTransaction(row)"
                 >
                   <Pencil :size="14" />
-                </button>
-                <button
-                  class="p-1.5 rounded transition-colors text-[var(--color-text-dim)] hover:text-[var(--color-negative)] hover:bg-[var(--color-surface-hover)]"
-                  type="button"
+                </Button>
+                <Button
+                  variant="danger"
+                  icon-only
                   aria-label="Delete transaction"
                   @click="deleteTransaction(row)"
                 >
                   <Trash2 :size="14" />
-                </button>
+                </Button>
               </div>
             </template>
           </DataTable>

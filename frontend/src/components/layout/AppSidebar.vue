@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { LayoutDashboard, Wallet, Settings, Menu, X } from 'lucide-vue-next'
 import BrandMark from '@/components/ui/BrandMark.vue'
+import Button from '@/components/ui/Button.vue'
 
 const route = useRoute()
 
@@ -22,14 +23,15 @@ function isActive(item: (typeof items)[number]): boolean {
 
 <template>
   <!-- Mobile toggle: shown only below sm breakpoint -->
-  <button
-    type="button"
-    class="sm:hidden fixed top-3 left-3 z-30 p-2 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)]"
+  <Button
+    variant="secondary"
+    icon-only
+    class="sm:hidden fixed top-3 left-3 z-30"
     aria-label="Open navigation"
     @click="open = true"
   >
     <Menu :size="18" />
-  </button>
+  </Button>
 
   <!-- Backdrop for mobile drawer -->
   <div
@@ -48,14 +50,16 @@ function isActive(item: (typeof items)[number]): boolean {
         <BrandMark :size="22" />
         <span>Treasury</span>
       </RouterLink>
-      <button
-        type="button"
-        class="sm:hidden p-1 text-[var(--color-text-muted)]"
+      <Button
+        variant="ghost"
+        size="sm"
+        icon-only
+        class="sm:hidden"
         aria-label="Close navigation"
         @click="open = false"
       >
         <X :size="16" />
-      </button>
+      </Button>
     </div>
 
     <nav class="px-3 flex-1 space-y-0.5">

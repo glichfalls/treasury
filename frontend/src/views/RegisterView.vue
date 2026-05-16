@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useToastsStore } from '@/stores/toasts'
 import { UserPlus } from 'lucide-vue-next'
 import BrandMark from '@/components/ui/BrandMark.vue'
+import Button from '@/components/ui/Button.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -78,10 +79,16 @@ async function submit() {
           <p class="text-xs text-[var(--color-text-dim)]">Min. 8 characters.</p>
         </div>
 
-        <button type="submit" class="btn btn-primary w-full" :disabled="submitting">
-          <UserPlus v-if="!submitting" :size="16" />
-          <span>{{ submitting ? 'Creating…' : 'Create account' }}</span>
-        </button>
+        <Button
+          type="submit"
+          variant="primary"
+          full-width
+          :loading="submitting"
+          loading-text="Creating…"
+        >
+          <UserPlus :size="16" />
+          <span>Create account</span>
+        </Button>
 
         <p v-if="error" class="text-sm text-[var(--color-negative)]">{{ error }}</p>
 

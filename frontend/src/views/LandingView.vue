@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount } from 'vue'
-import { RouterLink } from 'vue-router'
 import {
   Wallet,
   TrendingUp,
@@ -22,6 +21,7 @@ import {
   Search,
 } from 'lucide-vue-next'
 import BrandMark from '@/components/ui/BrandMark.vue'
+import Button from '@/components/ui/Button.vue'
 
 const stats = [
   { value: '12', label: 'Account types (bank, broker, crypto, 3a, gold, …)' },
@@ -63,11 +63,11 @@ onBeforeUnmount(() => observer?.disconnect())
           <span>Treasury</span>
         </div>
         <div class="flex items-center gap-2">
-          <RouterLink :to="{ name: 'login' }" class="btn btn-ghost">Sign in</RouterLink>
-          <RouterLink :to="{ name: 'register' }" class="btn btn-primary">
+          <Button variant="ghost" :to="{ name: 'login' }">Sign in</Button>
+          <Button variant="primary" :to="{ name: 'register' }">
             <span>Get started</span>
             <ArrowRight :size="14" />
-          </RouterLink>
+          </Button>
         </div>
       </div>
     </header>
@@ -99,13 +99,13 @@ onBeforeUnmount(() => observer?.disconnect())
         </p>
 
         <div class="flex flex-wrap justify-center gap-3 pt-3">
-          <RouterLink :to="{ name: 'register' }" class="btn btn-primary text-base px-6 py-3">
+          <Button variant="primary" size="xl" :to="{ name: 'register' }">
             <span>Create your account</span>
             <ArrowRight :size="16" />
-          </RouterLink>
-          <RouterLink :to="{ name: 'login' }" class="btn btn-secondary text-base px-6 py-3">
+          </Button>
+          <Button variant="secondary" size="xl" :to="{ name: 'login' }">
             I already have an account
-          </RouterLink>
+          </Button>
         </div>
 
         <div class="flex items-center justify-center gap-1.5 text-xs text-[var(--color-text-dim)] pt-2">
@@ -485,16 +485,17 @@ onBeforeUnmount(() => observer?.disconnect())
             </li>
           </ul>
           <div class="flex flex-wrap gap-3 pt-2">
-            <a
+            <Button
+              variant="primary"
+              size="lg"
               href="https://github.com/glichfalls/treasury"
               target="_blank"
               rel="noopener"
-              class="btn btn-primary text-base px-5 py-2.5"
             >
               <Github :size="16" />
               <span>View on GitHub</span>
               <ArrowRight :size="14" />
-            </a>
+            </Button>
           </div>
         </div>
 
@@ -535,19 +536,20 @@ onBeforeUnmount(() => observer?.disconnect())
           and run it yourself.
         </p>
         <div class="flex flex-wrap justify-center gap-3 pt-2">
-          <RouterLink :to="{ name: 'login' }" class="btn btn-primary text-base px-6 py-3">
+          <Button variant="primary" size="xl" :to="{ name: 'login' }">
             <span>Sign in</span>
             <ArrowRight :size="16" />
-          </RouterLink>
-          <a
+          </Button>
+          <Button
+            variant="secondary"
+            size="xl"
             href="https://github.com/glichfalls/treasury"
             target="_blank"
             rel="noopener"
-            class="btn btn-secondary text-base px-6 py-3"
           >
             <Github :size="16" />
             <span>Self-host on GitHub</span>
-          </a>
+          </Button>
         </div>
       </div>
     </section>

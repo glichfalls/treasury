@@ -4,6 +4,7 @@ import { ApiError } from '@/lib/api'
 import { useToastsStore } from '@/stores/toasts'
 import { Upload, AlertCircle } from 'lucide-vue-next'
 import BaseModal from '@/components/ui/BaseModal.vue'
+import Button from '@/components/ui/Button.vue'
 
 const props = defineProps<{ accountId: string }>()
 const emit = defineEmits<{ imported: [] }>()
@@ -72,10 +73,10 @@ function reset() {
 </script>
 
 <template>
-  <button class="btn btn-secondary" @click="open = true">
+  <Button @click="open = true">
     <Upload :size="16" />
     <span>Import CSV</span>
-  </button>
+  </Button>
 
   <BaseModal v-model:open="open" title="Import CSV" @close="reset">
     <div

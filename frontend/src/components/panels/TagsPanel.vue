@@ -6,6 +6,7 @@ import { formatMinor } from '@/lib/money'
 import { useToastsStore } from '@/stores/toasts'
 import { Sparkles } from 'lucide-vue-next'
 import DataTable from '@/components/ui/DataTable.vue'
+import Button from '@/components/ui/Button.vue'
 import type { ColumnDef } from '@tanstack/vue-table'
 
 interface Tag { tag: string; count: number; totalMinor: string }
@@ -87,15 +88,16 @@ const columns = computed<ColumnDef<Tag, unknown>[]>(() => [
     </div>
 
     <div class="flex flex-wrap items-center gap-3">
-      <button
-        type="button"
-        class="btn btn-primary"
-        :disabled="retagging || !data || data.tags.length === 0"
+      <Button
+        variant="primary"
+        :loading="retagging"
+        loading-text="Tagging…"
+        :disabled="!data || data.tags.length === 0"
         @click="retagAll"
       >
         <Sparkles :size="14" />
-        <span>{{ retagging ? 'Tagging…' : 'Auto-tag existing transactions' }}</span>
-      </button>
+        <span>Auto-tag existing transactions</span>
+      </Button>
       <p v-if="data && data.tags.length === 0" class="text-xs text-[var(--color-text-dim)]">
         Add a tag to a transaction first — the auto-tagger needs at least one tag to learn from.
       </p>

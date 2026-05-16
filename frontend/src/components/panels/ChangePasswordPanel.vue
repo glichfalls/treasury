@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useToastsStore } from '@/stores/toasts'
 import { Key } from 'lucide-vue-next'
+import Button from '@/components/ui/Button.vue'
 
 const toasts = useToastsStore()
 
@@ -102,10 +103,10 @@ async function submit() {
       </div>
 
       <div class="flex items-center gap-3 pt-1">
-        <button type="submit" class="btn btn-primary" :disabled="submitting">
+        <Button type="submit" variant="primary" :loading="submitting" loading-text="Saving…">
           <Key :size="14" />
-          <span>{{ submitting ? 'Saving…' : 'Update password' }}</span>
-        </button>
+          <span>Update password</span>
+        </Button>
         <p v-if="error" class="text-sm text-[var(--color-negative)]">{{ error }}</p>
       </div>
     </form>

@@ -5,6 +5,7 @@ import { useToastsStore } from '@/stores/toasts'
 import { useAuthStore } from '@/stores/auth'
 import { Shield, ShieldOff, Trash2 } from 'lucide-vue-next'
 import DataTable from '@/components/ui/DataTable.vue'
+import Button from '@/components/ui/Button.vue'
 import type { ColumnDef } from '@tanstack/vue-table'
 
 interface AdminUser {
@@ -109,9 +110,9 @@ async function remove(u: AdminUser) {
       </template>
       <template #cell-actions="{ row }">
         <div class="flex justify-end gap-1">
-          <button
-            type="button"
-            class="btn btn-ghost p-1.5"
+          <Button
+            variant="ghost"
+            icon-only
             :aria-label="row.isAdmin ? `Revoke admin from ${row.email}` : `Grant admin to ${row.email}`"
             :title="row.isAdmin ? 'Revoke admin' : 'Grant admin'"
             :disabled="row.id === auth.user?.id && row.isAdmin"
@@ -119,16 +120,16 @@ async function remove(u: AdminUser) {
           >
             <ShieldOff v-if="row.isAdmin" :size="14" />
             <Shield v-else :size="14" />
-          </button>
-          <button
-            type="button"
-            class="btn btn-danger p-1.5"
+          </Button>
+          <Button
+            variant="danger"
+            icon-only
             :aria-label="`Delete ${row.email}`"
             :disabled="row.id === auth.user?.id"
             @click="remove(row)"
           >
             <Trash2 :size="14" />
-          </button>
+          </Button>
         </div>
       </template>
     </DataTable>

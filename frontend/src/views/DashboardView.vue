@@ -7,6 +7,7 @@ import CashFlowChart from '@/components/charts/CashFlowChart.vue'
 import CashflowByCategoryChart from '@/components/charts/CashflowByCategoryChart.vue'
 import AllocationDonut from '@/components/charts/AllocationDonut.vue'
 import PerformanceChart from '@/components/charts/PerformanceChart.vue'
+import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 
 const accounts = useAccountsStore()
 const range = ref<'1w' | '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'all'>('ytd')
@@ -49,16 +50,14 @@ const netWorthByCurrency = computed(() => {
     </section>
 
     <section v-if="accounts.accounts.length > 0" class="space-y-4">
-      <div class="flex items-center justify-end gap-1 -mb-2">
-        <button
-          v-for="m in (['total','stacked'] as const)"
-          :key="m"
-          :class="['text-xs px-2 py-0.5 rounded transition-colors',
-            m === networthMode
-              ? 'bg-[var(--color-surface-hover)] text-[var(--color-text)]'
-              : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]']"
-          @click="networthMode = m"
-        >{{ m === 'total' ? 'Total' : 'Cash + holdings' }}</button>
+      <div class="flex items-center justify-end -mb-2">
+        <SegmentedControl
+          v-model="networthMode"
+          :options="[
+            { value: 'total', label: 'Total' },
+            { value: 'stacked', label: 'Cash + holdings' },
+          ]"
+        />
       </div>
       <NetWorthChart
         endpoint="/api/networth/timeseries"

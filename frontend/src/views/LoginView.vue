@@ -4,6 +4,7 @@ import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ArrowRight } from 'lucide-vue-next'
 import BrandMark from '@/components/ui/BrandMark.vue'
+import Button from '@/components/ui/Button.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -91,10 +92,17 @@ async function submit() {
           <span>Keep me signed in for 14 days</span>
         </label>
 
-        <button type="submit" class="btn btn-primary w-full text-base py-2.5" :disabled="loading">
-          <span>{{ loading ? 'Signing in…' : 'Sign in' }}</span>
-          <ArrowRight v-if="!loading" :size="16" />
-        </button>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          full-width
+          :loading="loading"
+          loading-text="Signing in…"
+        >
+          <span>Sign in</span>
+          <ArrowRight :size="16" />
+        </Button>
 
         <p v-if="error" class="text-sm text-[var(--color-negative)] text-center pt-1">{{ error }}</p>
       </form>

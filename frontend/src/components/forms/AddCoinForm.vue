@@ -9,6 +9,7 @@ import ModalForm from '@/components/ui/ModalForm.vue'
 import TextField from '@/components/ui/TextField.vue'
 import PriceField from '@/components/ui/PriceField.vue'
 import SelectField from '@/components/ui/SelectField.vue'
+import Button from '@/components/ui/Button.vue'
 
 const toasts = useToastsStore()
 
@@ -91,10 +92,10 @@ async function submit() {
     @close="reset"
   >
     <template #trigger="{ open: openModal }">
-      <button class="btn btn-secondary" @click="openModal">
+      <Button @click="openModal">
         <Coins :size="16" />
         <span>Add coin</span>
-      </button>
+      </Button>
     </template>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">

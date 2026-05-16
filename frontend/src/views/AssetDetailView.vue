@@ -8,6 +8,7 @@ import AssetPriceChart from '@/components/charts/AssetPriceChart.vue'
 import DateField from '@/components/ui/DateField.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import SelectField from '@/components/ui/SelectField.vue'
+import Button from '@/components/ui/Button.vue'
 import type { ColumnDef, SortingState } from '@tanstack/vue-table'
 import { ChevronLeft, Inbox, TrendingUp, TrendingDown } from 'lucide-vue-next'
 
@@ -565,7 +566,7 @@ const singleCurrencyReturn = computed<null | {
         </div>
 
         <div v-if="hasFilters" class="flex items-center justify-end">
-          <button type="button" class="btn btn-ghost text-xs" @click="clearFilters">Clear filters</button>
+          <Button variant="ghost" size="sm" @click="clearFilters">Clear filters</Button>
         </div>
 
         <DataTable

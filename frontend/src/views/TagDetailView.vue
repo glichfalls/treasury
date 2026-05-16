@@ -8,6 +8,7 @@ import { VChart, chartColors, type EChartsOption } from '@/lib/charts'
 import DateField from '@/components/ui/DateField.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import SelectField from '@/components/ui/SelectField.vue'
+import Button from '@/components/ui/Button.vue'
 import type { ColumnDef, SortingState } from '@tanstack/vue-table'
 import { ChevronLeft, Tag as TagIcon, Inbox } from 'lucide-vue-next'
 
@@ -290,12 +291,9 @@ const hasMonthly = computed(() => (data.value?.monthly?.length ?? 0) > 0)
       <section class="space-y-3">
         <div class="flex items-center justify-between gap-3">
           <h2 class="text-lg font-medium">Transactions</h2>
-          <button
-            v-if="hasFilters"
-            type="button"
-            class="btn btn-ghost text-xs"
-            @click="clearFilters"
-          >Clear filters</button>
+          <Button v-if="hasFilters" variant="ghost" size="sm" @click="clearFilters">
+            Clear filters
+          </Button>
         </div>
 
         <div

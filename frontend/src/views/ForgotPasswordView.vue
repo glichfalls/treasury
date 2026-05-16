@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ArrowRight, MailCheck } from 'lucide-vue-next'
 import BrandMark from '@/components/ui/BrandMark.vue'
+import Button from '@/components/ui/Button.vue'
 
 const email = ref('')
 const submitting = ref(false)
@@ -78,10 +79,17 @@ async function submit() {
           />
         </div>
 
-        <button type="submit" class="btn btn-primary w-full text-base py-2.5" :disabled="submitting">
-          <span>{{ submitting ? 'Sending…' : 'Send reset link' }}</span>
-          <ArrowRight v-if="!submitting" :size="16" />
-        </button>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          full-width
+          :loading="submitting"
+          loading-text="Sending…"
+        >
+          <span>Send reset link</span>
+          <ArrowRight :size="16" />
+        </Button>
 
         <p v-if="error" class="text-sm text-[var(--color-negative)] text-center pt-1">{{ error }}</p>
       </form>

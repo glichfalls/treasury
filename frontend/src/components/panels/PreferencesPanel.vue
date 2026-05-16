@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useToastsStore } from '@/stores/toasts'
 import { Save } from 'lucide-vue-next'
+import Button from '@/components/ui/Button.vue'
 
 const auth = useAuthStore()
 const toasts = useToastsStore()
@@ -68,10 +69,10 @@ async function submit() {
         </datalist>
       </div>
 
-      <button type="submit" class="btn btn-primary" :disabled="submitting">
+      <Button type="submit" variant="primary" :loading="submitting" loading-text="Saving…">
         <Save :size="14" />
-        <span>{{ submitting ? 'Saving…' : 'Save' }}</span>
-      </button>
+        <span>Save</span>
+      </Button>
     </form>
   </div>
 </template>

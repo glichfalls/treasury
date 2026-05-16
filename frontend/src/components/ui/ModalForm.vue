@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
+import Button from '@/components/ui/Button.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -65,13 +66,14 @@ const formId = `modal-form-${Math.random().toString(36).slice(2, 9)}`
     </form>
 
     <template #footer>
-      <button type="button" class="btn btn-ghost" @click="closeModal">{{ cancelLabel }}</button>
-      <button
+      <Button variant="ghost" @click="closeModal">{{ cancelLabel }}</Button>
+      <Button
         type="submit"
+        variant="primary"
         :form="formId"
-        class="btn btn-primary"
-        :disabled="submitting"
-      >{{ submitting ? submittingLabel : submitLabel }}</button>
+        :loading="submitting"
+        :loading-text="submittingLabel"
+      >{{ submitLabel }}</Button>
     </template>
   </BaseModal>
 </template>

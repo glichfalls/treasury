@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { LogOut, Wallet, Menu, X, LayoutDashboard, Settings, Target } from 'lucide-vue-next'
 import HeaderSearch from '@/components/layout/HeaderSearch.vue'
 import BrandMark from '@/components/ui/BrandMark.vue'
+import Button from '@/components/ui/Button.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -62,21 +63,22 @@ function isActive(item: (typeof navItems)[number]): boolean {
         </div>
 
         <div v-if="auth.user" class="hidden sm:flex items-center gap-3 text-sm" :class="{ 'ml-auto': true }">
-          <button class="btn btn-ghost" @click="signOut">
+          <Button variant="ghost" @click="signOut">
             <LogOut :size="16" />
             <span>Sign out</span>
-          </button>
+          </Button>
         </div>
 
-        <button
+        <Button
           v-if="auth.user"
-          type="button"
-          class="ml-auto sm:hidden p-2 rounded-md"
+          variant="ghost"
+          icon-only
+          class="ml-auto sm:hidden"
           aria-label="Open menu"
           @click="mobileOpen = true"
         >
           <Menu :size="18" />
-        </button>
+        </Button>
       </div>
     </header>
 
@@ -90,9 +92,9 @@ function isActive(item: (typeof navItems)[number]): boolean {
       >
         <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--color-border);">
           <span class="font-semibold tracking-tight">Menu</span>
-          <button type="button" class="p-1 text-[var(--color-text-muted)]" aria-label="Close menu" @click="mobileOpen = false">
+          <Button variant="ghost" size="sm" icon-only aria-label="Close menu" @click="mobileOpen = false">
             <X :size="16" />
-          </button>
+          </Button>
         </div>
         <nav class="px-3 py-3 flex-1 space-y-0.5">
           <RouterLink
@@ -111,10 +113,10 @@ function isActive(item: (typeof navItems)[number]): boolean {
         </nav>
         <div v-if="auth.user" class="px-5 py-4 border-t" style="border-color: var(--color-border);">
           <div class="text-xs text-[var(--color-text-dim)] truncate mb-2">{{ auth.user.email }}</div>
-          <button class="btn btn-ghost w-full justify-start text-sm" @click="signOut">
+          <Button variant="ghost" full-width align="start" @click="signOut">
             <LogOut :size="14" />
             <span>Sign out</span>
-          </button>
+          </Button>
         </div>
       </aside>
     </Teleport>

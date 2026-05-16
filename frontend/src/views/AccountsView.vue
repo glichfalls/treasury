@@ -7,6 +7,7 @@ import { formatMinor } from '@/lib/money'
 import NewAccountForm from '@/components/forms/NewAccountForm.vue'
 import EditAccountForm from '@/components/forms/EditAccountForm.vue'
 import DataTable from '@/components/ui/DataTable.vue'
+import Button from '@/components/ui/Button.vue'
 import type { ColumnDef } from '@tanstack/vue-table'
 import { Pencil, Trash2, Inbox } from 'lucide-vue-next'
 
@@ -130,20 +131,22 @@ const columns = computed<ColumnDef<Account, unknown>[]>(() => [
       </template>
       <template #cell-actions="{ row }">
         <div class="flex justify-end gap-1">
-          <button
-            class="btn btn-ghost p-1.5"
+          <Button
+            variant="ghost"
+            icon-only
             :aria-label="`Edit ${row.name}`"
             @click="startEdit(row, $event)"
           >
             <Pencil :size="14" />
-          </button>
-          <button
-            class="btn btn-danger p-1.5"
+          </Button>
+          <Button
+            variant="danger"
+            icon-only
             :aria-label="`Delete ${row.name}`"
             @click="remove(row, $event)"
           >
             <Trash2 :size="14" />
-          </button>
+          </Button>
         </div>
       </template>
     </DataTable>

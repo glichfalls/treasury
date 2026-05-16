@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useToastsStore } from '@/stores/toasts'
 import { Key } from 'lucide-vue-next'
 import BrandMark from '@/components/ui/BrandMark.vue'
+import Button from '@/components/ui/Button.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -71,9 +72,9 @@ async function submit() {
         <p class="text-sm text-[var(--color-text-muted)]">
           Open the link from your email, or request a new one.
         </p>
-        <RouterLink :to="{ name: 'forgot-password' }" class="btn btn-secondary mt-2">
+        <Button :to="{ name: 'forgot-password' }" class="mt-2">
           Request a new link
-        </RouterLink>
+        </Button>
       </div>
 
       <form v-else class="card p-6 space-y-4" @submit.prevent="submit">
@@ -103,10 +104,17 @@ async function submit() {
           />
         </div>
 
-        <button type="submit" class="btn btn-primary w-full text-base py-2.5" :disabled="submitting">
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          full-width
+          :loading="submitting"
+          loading-text="Saving…"
+        >
           <Key :size="16" />
-          <span>{{ submitting ? 'Saving…' : 'Set password' }}</span>
-        </button>
+          <span>Set password</span>
+        </Button>
 
         <p v-if="error" class="text-sm text-[var(--color-negative)] text-center pt-1">{{ error }}</p>
       </form>

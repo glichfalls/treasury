@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useToastsStore } from '@/stores/toasts'
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-vue-next'
+import Button from '@/components/ui/Button.vue'
 
 const toasts = useToastsStore()
 </script>
@@ -41,14 +42,16 @@ const toasts = useToastsStore()
             class="shrink-0 mt-0.5 text-[var(--color-text-muted)]"
           />
           <p class="text-sm flex-1 break-words">{{ t.message }}</p>
-          <button
-            type="button"
-            class="shrink-0 p-0.5 rounded text-[var(--color-text-dim)] hover:text-[var(--color-text)] transition-colors"
+          <Button
+            variant="ghost"
+            size="sm"
+            icon-only
+            class="shrink-0"
             aria-label="Dismiss"
             @click="toasts.dismiss(t.id)"
           >
             <X :size="14" />
-          </button>
+          </Button>
         </div>
       </TransitionGroup>
     </div>

@@ -9,6 +9,7 @@ import { useAccountsStore } from '@/stores/accounts'
 import DateField from '@/components/ui/DateField.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import SelectField from '@/components/ui/SelectField.vue'
+import Button from '@/components/ui/Button.vue'
 import type { ColumnDef, SortingState } from '@tanstack/vue-table'
 import { VChart, chartColors, type EChartsOption } from '@/lib/charts'
 import { Search, Wallet, Receipt, TrendingUp, Repeat, Tag as TagIcon, Inbox, X } from 'lucide-vue-next'
@@ -337,15 +338,10 @@ const chartOption = computed<EChartsOption>(() => {
             />
           </div>
         </div>
-        <button
-          v-if="hasFilters"
-          type="button"
-          class="inline-flex items-center gap-1 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors py-1.5"
-          @click="clearFilters"
-        >
+        <Button v-if="hasFilters" variant="ghost" size="sm" @click="clearFilters">
           <X :size="12" />
           Clear filters
-        </button>
+        </Button>
       </div>
 
       <p class="text-sm text-[var(--color-text-muted)]">

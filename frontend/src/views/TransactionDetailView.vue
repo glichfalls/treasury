@@ -8,6 +8,7 @@ import { formatMinor, formatQuantity } from '@/lib/money'
 import { categoryMeta } from '@/lib/categories'
 import { featuresFor } from '@/lib/accountFeatures'
 import EditTransactionForm from '@/components/forms/EditTransactionForm.vue'
+import Button from '@/components/ui/Button.vue'
 import { ChevronLeft, Pencil, Trash2, ArrowRight } from 'lucide-vue-next'
 
 interface DetailedTransaction extends Transaction {
@@ -115,14 +116,14 @@ async function onEditSaved() {
 
       <!-- Action bar -->
       <div class="flex items-center gap-2 pb-2 border-b" style="border-color: var(--color-border);">
-        <button class="btn btn-ghost" type="button" @click="editing = transaction">
+        <Button variant="ghost" @click="editing = transaction">
           <Pencil :size="14" />
           <span>Edit</span>
-        </button>
-        <button class="btn btn-danger" type="button" @click="deleteTransaction">
+        </Button>
+        <Button variant="danger" @click="deleteTransaction">
           <Trash2 :size="14" />
           <span>Delete</span>
-        </button>
+        </Button>
       </div>
 
       <!-- Detail fields -->
