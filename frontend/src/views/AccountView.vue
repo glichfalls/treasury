@@ -33,7 +33,7 @@ const transactions = ref<Transaction[]>([])
 const totalTransactions = ref(0)
 const holdings = ref<Holding[]>([])
 const loading = ref(false)
-const range = ref<'1w' | '1m' | '6mo' | '1y' | '2y' | '5y' | 'all'>('1y')
+const range = ref<'1w' | '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'all'>('ytd')
 
 // Filter / pagination state.
 const page = ref(1)

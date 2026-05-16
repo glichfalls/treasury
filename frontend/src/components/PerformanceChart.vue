@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { api } from '@/lib/api'
 import { VChart, chartColors, type EChartsOption } from '@/lib/charts'
 
-type Range = '1w' | '1m' | '3mo' | '6mo' | 'ytd' | '1y' | '2y' | '5y' | 'all'
+type Range = '1w' | '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'all'
 type Metric = 'vsDeposits' | 'twr'
 
 interface Point {
@@ -21,14 +21,14 @@ const props = withDefaults(
   }>(),
   {
     title: 'Performance',
-    range: '1y',
+    range: 'ytd',
   },
 )
 
 // Auto-pick granularity from range so short windows don't show only 2 points.
 function granularityFor(range: Range): 'daily' | 'weekly' | 'monthly' {
-  if (range === '1w' || range === '1m' || range === '3mo') return 'daily'
-  if (range === '6mo' || range === 'ytd' || range === '1y' || range === '2y') return 'weekly'
+  if (range === '1w' || range === '1m' || range === '3m') return 'daily'
+  if (range === '6m' || range === 'ytd' || range === '1y' || range === '2y') return 'weekly'
   return 'monthly'
 }
 
@@ -46,8 +46,8 @@ function rangeBounds(range: Range): { from: string; to: string } {
   const from = new Date()
   if (range === '1w') from.setDate(from.getDate() - 7)
   else if (range === '1m') from.setMonth(from.getMonth() - 1)
-  else if (range === '3mo') from.setMonth(from.getMonth() - 3)
-  else if (range === '6mo') from.setMonth(from.getMonth() - 6)
+  else if (range === '3m') from.setMonth(from.getMonth() - 3)
+  else if (range === '6m') from.setMonth(from.getMonth() - 6)
   else if (range === 'ytd') from.setMonth(0, 1)
   else if (range === '1y') from.setFullYear(from.getFullYear() - 1)
   else if (range === '2y') from.setFullYear(from.getFullYear() - 2)
@@ -100,7 +100,7 @@ function splitBySign(dates: string[], values: Array<number | null>): { pos: Time
     if (i > 0 && v !== null) {
       const pv = values[i - 1]
       const pd = dates[i - 1]!
-      if (pv !== null && ((pv >= 0) !== (v >= 0))) {
+      if (pv != null && ((pv >= 0) !== (v >= 0))) {
         const t = pv / (pv - v)
         const prevTs = new Date(pd).getTime()
         const currTs = new Date(d).getTime()
@@ -224,14 +224,14 @@ const option = computed<EChartsOption>(() => {
       </div>
       <div class="flex gap-1">
         <button
-          v-for="r in (['1w','1m','3mo','6mo','ytd','1y','2y','5y','all'] as const)"
+          v-for="r in (['1w','1m','3m','6m','ytd','1y','2y','5y','all'] as const)"
           :key="r"
           :class="['text-xs px-2 py-0.5 rounded transition-colors',
             r === range
               ? 'bg-[var(--color-surface-hover)] text-[var(--color-text)]'
               : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]']"
           @click="emit('update:range', r)"
-        >{{ r }}</button>
+        >{{ r.toUpperCase() }}</button>
       </div>
     </div>
     <div class="flex items-center gap-1 mb-2">

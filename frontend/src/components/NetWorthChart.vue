@@ -17,7 +17,7 @@ const props = withDefaults(
     endpoint: string
     currency?: string
     granularity?: 'daily' | 'weekly' | 'monthly'
-    range?: '1w' | '1m' | '6mo' | '1y' | '2y' | '5y' | 'all'
+    range?: '1w' | '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'all'
     title?: string
     // Single line of total value (default), stacked cash+holdings, or value plus net deposits.
     mode?: 'total' | 'stacked' | 'vs-deposits'
@@ -27,7 +27,7 @@ const props = withDefaults(
   }>(),
   {
     currency: 'CHF',
-    range: '2y',
+    range: 'ytd',
     title: 'Net worth',
     mode: 'total',
     directionColoring: true,
@@ -37,8 +37,8 @@ const props = withDefaults(
 // Auto-pick a sampling cadence based on the visible range so short windows
 // don't end up with just two data points. An explicit `granularity` prop wins.
 function granularityFor(range: string): 'daily' | 'weekly' | 'monthly' {
-  if (range === '1w' || range === '1m') return 'daily'
-  if (range === '6mo' || range === '1y' || range === '2y') return 'weekly'
+  if (range === '1w' || range === '1m' || range === '3m') return 'daily'
+  if (range === '6m' || range === 'ytd' || range === '1y' || range === '2y') return 'weekly'
   return 'monthly'
 }
 
@@ -50,7 +50,9 @@ function rangeBounds(range: string): { from: string; to: string } {
   const from = new Date()
   if (range === '1w') from.setDate(from.getDate() - 7)
   else if (range === '1m') from.setMonth(from.getMonth() - 1)
-  else if (range === '6mo') from.setMonth(from.getMonth() - 6)
+  else if (range === '3m') from.setMonth(from.getMonth() - 3)
+  else if (range === '6m') from.setMonth(from.getMonth() - 6)
+  else if (range === 'ytd') from.setMonth(0, 1)
   else if (range === '1y') from.setFullYear(from.getFullYear() - 1)
   else if (range === '2y') from.setFullYear(from.getFullYear() - 2)
   else if (range === '5y') from.setFullYear(from.getFullYear() - 5)
@@ -288,14 +290,14 @@ const option = computed<EChartsOption>(() => {
       <h3 class="text-sm font-medium">{{ title }}</h3>
       <div class="flex gap-1">
         <button
-          v-for="r in (['1w','1m','6mo','1y','2y','5y','all'] as const)"
+          v-for="r in (['1w','1m','3m','6m','ytd','1y','2y','5y','all'] as const)"
           :key="r"
           :class="['text-xs px-2 py-0.5 rounded transition-colors',
             r === range
               ? 'bg-[var(--color-surface-hover)] text-[var(--color-text)]'
               : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]']"
           @click="$emit('update:range', r)"
-        >{{ r }}</button>
+        >{{ r.toUpperCase() }}</button>
       </div>
     </div>
     <div v-if="loading" class="h-72 flex items-center justify-center text-[var(--color-text-muted)] text-sm">Loading…</div>

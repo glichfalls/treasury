@@ -9,7 +9,7 @@ import AllocationDonut from '@/components/AllocationDonut.vue'
 import PerformanceChart from '@/components/PerformanceChart.vue'
 
 const accounts = useAccountsStore()
-const range = ref<'1w' | '1m' | '6mo' | '1y' | '2y' | '5y' | 'all'>('2y')
+const range = ref<'1w' | '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'all'>('ytd')
 const networthMode = ref<'total' | 'stacked'>('total')
 
 onMounted(() => {

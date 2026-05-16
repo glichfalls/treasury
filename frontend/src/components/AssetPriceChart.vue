@@ -9,11 +9,11 @@ interface Response { isin: string; points: PricePoint[] }
 
 const props = defineProps<{ isin: string }>()
 
-type Range = '1w' | '1m' | '3mo' | '6mo' | 'ytd' | '1y' | '2y' | '5y' | 'all'
+type Range = '1w' | '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'all'
 
 const data = ref<Response | null>(null)
 const loading = ref(false)
-const range = ref<Range>('1y')
+const range = ref<Range>('ytd')
 
 async function load() {
   loading.value = true
@@ -22,8 +22,8 @@ async function load() {
     const from = new Date()
     if (range.value === '1w') from.setDate(from.getDate() - 7)
     else if (range.value === '1m') from.setMonth(from.getMonth() - 1)
-    else if (range.value === '3mo') from.setMonth(from.getMonth() - 3)
-    else if (range.value === '6mo') from.setMonth(from.getMonth() - 6)
+    else if (range.value === '3m') from.setMonth(from.getMonth() - 3)
+    else if (range.value === '6m') from.setMonth(from.getMonth() - 6)
     else if (range.value === 'ytd') from.setMonth(0, 1)
     else if (range.value === '1y') from.setFullYear(from.getFullYear() - 1)
     else if (range.value === '2y') from.setFullYear(from.getFullYear() - 2)
@@ -88,14 +88,14 @@ const option = computed<EChartsOption>(() => {
   <div>
     <div class="flex justify-end gap-1 mb-1">
       <button
-        v-for="r in (['1w','1m','3mo','6mo','ytd','1y','2y','5y','all'] as const)"
+        v-for="r in (['1w','1m','3m','6m','ytd','1y','2y','5y','all'] as const)"
         :key="r"
         :class="['text-xs px-2 py-0.5 rounded transition-colors',
           r === range
             ? 'bg-[var(--color-surface-hover)] text-[var(--color-text)]'
             : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]']"
         @click="range = r"
-      >{{ r }}</button>
+      >{{ r.toUpperCase() }}</button>
     </div>
     <div v-if="loading" class="h-40 flex items-center justify-center text-[var(--color-text-muted)] text-xs">Loading…</div>
     <div v-else-if="!data || data.points.length === 0" class="h-40 flex items-center justify-center text-[var(--color-text-muted)] text-xs">No price data.</div>
