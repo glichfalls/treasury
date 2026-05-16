@@ -54,6 +54,8 @@ export interface TransactionFilters {
   from?: string
   to?: string
   q?: string
+  /** Sort spec, e.g. "occurredAt:desc". */
+  sort?: string
 }
 
 export interface TransactionPage {
@@ -113,6 +115,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     if (filters.from) params.set('from', filters.from)
     if (filters.to) params.set('to', filters.to)
     if (filters.q) params.set('q', filters.q)
+    if (filters.sort) params.set('sort', filters.sort)
     return api.get<TransactionPage>(`/api/accounts/${accountId}/transactions?${params.toString()}`)
   }
 

@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { recurringApi, describeSchedule, type RecurringRule } from '@/lib/recurring'
 import { formatMinor } from '@/lib/money'
 import { categoryMeta } from '@/lib/categories'
 import { useToastsStore } from '@/stores/toasts'
 import RecurringForm from '@/components/forms/RecurringForm.vue'
+import DataTable from '@/components/ui/DataTable.vue'
+import type { ColumnDef } from '@tanstack/vue-table'
 import { Plus, Pencil, Trash2, Play, Pause, Inbox } from 'lucide-vue-next'
 
 const props = withDefaults(
@@ -88,6 +90,45 @@ function shortDate(iso: string | null): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('de-CH', { year: 'numeric', month: 'short', day: '2-digit' })
 }
+
+const columns = computed<ColumnDef<RecurringRule, unknown>[]>(() => [
+  { id: 'description', accessorKey: 'description', header: 'Description', enableSorting: true },
+  {
+    id: 'schedule',
+    accessorFn: (r) => describeSchedule(r),
+    header: 'Schedule',
+    enableSorting: true,
+    meta: { cellClass: 'text-[var(--color-text-muted)]' },
+  },
+  {
+    id: 'amount',
+    accessorFn: (r) => Number(r.amountMinor),
+    header: 'Amount',
+    enableSorting: true,
+    enableColumnFilter: false,
+    meta: { align: 'right', headerClass: 'w-32', cellClass: 'tabular font-medium' },
+  },
+  {
+    id: 'next',
+    accessorFn: (r) => r.nextOccurrenceAt ?? '',
+    header: 'Next',
+    enableSorting: true,
+    meta: { cellClass: 'text-xs text-[var(--color-text-muted)] tabular' },
+  },
+  {
+    id: 'status',
+    accessorFn: (r) => (r.active ? 'Active' : 'Paused'),
+    header: 'Status',
+    enableSorting: true,
+  },
+  {
+    id: 'actions',
+    header: '',
+    enableSorting: false,
+    enableColumnFilter: false,
+    meta: { align: 'right', headerClass: 'w-32' },
+  },
+])
 </script>
 
 <template>
@@ -115,71 +156,57 @@ function shortDate(iso: string | null): string {
       </p>
     </div>
 
-    <div v-else class="card overflow-hidden">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Description</th>
-            <th>Schedule</th>
-            <th class="text-right w-32">Amount</th>
-            <th>Next</th>
-            <th>Status</th>
-            <th class="w-32"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="r in rules" :key="r.id" :class="{ 'opacity-60': !r.active }">
-            <td>
-              <div class="font-medium">{{ r.description }}</div>
-              <div v-if="showCategories && categoryMeta(r.category)" class="text-xs mt-0.5 flex items-center gap-1.5">
-                <span class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: categoryMeta(r.category)!.color }"></span>
-                <span class="text-[var(--color-text-muted)]">{{ categoryMeta(r.category)!.label }}</span>
-              </div>
-            </td>
-            <td class="text-[var(--color-text-muted)]">{{ describeSchedule(r) }}</td>
-            <td
-              class="text-right tabular font-medium"
-              :class="BigInt(r.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'"
-            >
-              {{ formatMinor(r.amountMinor, r.currency) }}
-            </td>
-            <td class="text-xs text-[var(--color-text-muted)] tabular">{{ shortDate(r.nextOccurrenceAt) }}</td>
-            <td>
-              <span v-if="r.active" class="badge" style="color: var(--color-positive);">Active</span>
-              <span v-else class="badge">Paused</span>
-            </td>
-            <td>
-              <div class="flex justify-end gap-1">
-                <button
-                  type="button"
-                  class="btn btn-ghost p-1.5"
-                  :title="r.active ? 'Pause' : 'Resume'"
-                  @click="toggleActive(r)"
-                >
-                  <Pause v-if="r.active" :size="14" />
-                  <Play v-else :size="14" />
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-ghost p-1.5"
-                  title="Run now"
-                  :disabled="!r.active"
-                  @click="runNow(r)"
-                >
-                  <span class="text-xs">▶</span>
-                </button>
-                <button type="button" class="btn btn-ghost p-1.5" title="Edit" @click="openEdit(r)">
-                  <Pencil :size="14" />
-                </button>
-                <button type="button" class="btn btn-danger p-1.5" title="Delete" @click="remove(r)">
-                  <Trash2 :size="14" />
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <DataTable v-else :data="rules" :columns="columns">
+      <template #cell-description="{ row }">
+        <div :class="{ 'opacity-60': !row.active }">
+          <div class="font-medium">{{ row.description }}</div>
+          <div v-if="showCategories && categoryMeta(row.category)" class="text-xs mt-0.5 flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: categoryMeta(row.category)!.color }"></span>
+            <span class="text-[var(--color-text-muted)]">{{ categoryMeta(row.category)!.label }}</span>
+          </div>
+        </div>
+      </template>
+      <template #cell-amount="{ row }">
+        <span :class="BigInt(row.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'">
+          {{ formatMinor(row.amountMinor, row.currency) }}
+        </span>
+      </template>
+      <template #cell-next="{ row }">
+        {{ shortDate(row.nextOccurrenceAt) }}
+      </template>
+      <template #cell-status="{ row }">
+        <span v-if="row.active" class="badge" style="color: var(--color-positive);">Active</span>
+        <span v-else class="badge">Paused</span>
+      </template>
+      <template #cell-actions="{ row }">
+        <div class="flex justify-end gap-1">
+          <button
+            type="button"
+            class="btn btn-ghost p-1.5"
+            :title="row.active ? 'Pause' : 'Resume'"
+            @click="toggleActive(row)"
+          >
+            <Pause v-if="row.active" :size="14" />
+            <Play v-else :size="14" />
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost p-1.5"
+            title="Run now"
+            :disabled="!row.active"
+            @click="runNow(row)"
+          >
+            <span class="text-xs">▶</span>
+          </button>
+          <button type="button" class="btn btn-ghost p-1.5" title="Edit" @click="openEdit(row)">
+            <Pencil :size="14" />
+          </button>
+          <button type="button" class="btn btn-danger p-1.5" title="Delete" @click="remove(row)">
+            <Trash2 :size="14" />
+          </button>
+        </div>
+      </template>
+    </DataTable>
 
     <RecurringForm
       v-model:open="formOpen"

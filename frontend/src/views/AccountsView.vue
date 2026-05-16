@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, h, onMounted, ref } from 'vue'
 import { useAccountsStore, type Account } from '@/stores/accounts'
 import { useToastsStore } from '@/stores/toasts'
 import { RouterLink } from 'vue-router'
 import { formatMinor } from '@/lib/money'
 import NewAccountForm from '@/components/forms/NewAccountForm.vue'
 import EditAccountForm from '@/components/forms/EditAccountForm.vue'
-import { Pencil, Trash2, ChevronRight, Inbox } from 'lucide-vue-next'
+import DataTable from '@/components/ui/DataTable.vue'
+import type { ColumnDef } from '@tanstack/vue-table'
+import { Pencil, Trash2, Inbox } from 'lucide-vue-next'
 
 const accounts = useAccountsStore()
 const toasts = useToastsStore()
@@ -50,6 +52,43 @@ function startEdit(a: Account, ev: MouseEvent) {
   ev.stopPropagation()
   editing.value = a
 }
+
+const columns = computed<ColumnDef<Account, unknown>[]>(() => [
+  {
+    id: 'name',
+    accessorKey: 'name',
+    header: 'Name',
+    enableSorting: true,
+  },
+  {
+    id: 'institution',
+    accessorFn: (a) => a.institution ?? '',
+    header: 'Institution',
+    enableSorting: true,
+    cell: ({ getValue }) => getValue() || h('span', { class: 'text-[var(--color-text-muted)]' }, '—'),
+  },
+  {
+    id: 'type',
+    accessorFn: (a) => typeLabels[a.type] ?? a.type,
+    header: 'Type',
+    enableSorting: true,
+  },
+  {
+    id: 'balance',
+    accessorFn: (a) => Number(a.balanceMinor),
+    header: 'Balance',
+    enableSorting: true,
+    enableColumnFilter: false,
+    meta: { align: 'right', cellClass: 'tabular font-medium' },
+  },
+  {
+    id: 'actions',
+    header: '',
+    enableSorting: false,
+    enableColumnFilter: false,
+    meta: { align: 'right', headerClass: 'w-24' },
+  },
+])
 </script>
 
 <template>
@@ -77,54 +116,37 @@ function startEdit(a: Account, ev: MouseEvent) {
       </div>
     </div>
 
-    <div v-else class="card overflow-hidden">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Institution</th>
-            <th>Type</th>
-            <th class="text-right">Balance</th>
-            <th class="w-24"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="a in accounts.accounts" :key="a.id" class="cursor-pointer">
-            <td>
-              <RouterLink :to="{ name: 'account', params: { id: a.id } }" class="flex items-center gap-2 font-medium">
-                {{ a.name }}
-                <ChevronRight :size="14" class="text-[var(--color-text-dim)]" />
-              </RouterLink>
-            </td>
-            <td class="text-[var(--color-text-muted)]">{{ a.institution ?? '—' }}</td>
-            <td>
-              <span class="badge">{{ typeLabels[a.type] ?? a.type }}</span>
-            </td>
-            <td class="text-right tabular font-medium">
-              {{ formatMinor(a.balanceMinor, a.currency) }}
-            </td>
-            <td class="text-right">
-              <div class="flex justify-end gap-1">
-                <button
-                  class="btn btn-ghost p-1.5"
-                  :aria-label="`Edit ${a.name}`"
-                  @click="startEdit(a, $event)"
-                >
-                  <Pencil :size="14" />
-                </button>
-                <button
-                  class="btn btn-danger p-1.5"
-                  :aria-label="`Delete ${a.name}`"
-                  @click="remove(a, $event)"
-                >
-                  <Trash2 :size="14" />
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <DataTable v-else :data="accounts.accounts" :columns="columns" empty-text="No accounts.">
+      <template #cell-name="{ row }">
+        <RouterLink :to="{ name: 'account', params: { id: row.id } }" class="font-medium hover:text-[var(--color-accent)] transition-colors">
+          {{ row.name }}
+        </RouterLink>
+      </template>
+      <template #cell-type="{ row }">
+        <span class="badge">{{ typeLabels[row.type] ?? row.type }}</span>
+      </template>
+      <template #cell-balance="{ row }">
+        {{ formatMinor(row.balanceMinor, row.currency) }}
+      </template>
+      <template #cell-actions="{ row }">
+        <div class="flex justify-end gap-1">
+          <button
+            class="btn btn-ghost p-1.5"
+            :aria-label="`Edit ${row.name}`"
+            @click="startEdit(row, $event)"
+          >
+            <Pencil :size="14" />
+          </button>
+          <button
+            class="btn btn-danger p-1.5"
+            :aria-label="`Delete ${row.name}`"
+            @click="remove(row, $event)"
+          >
+            <Trash2 :size="14" />
+          </button>
+        </div>
+      </template>
+    </DataTable>
 
     <EditAccountForm
       v-model:account="editing"

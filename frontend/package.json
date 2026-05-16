@@ -17,6 +17,7 @@
   "dependencies": {
     "@headlessui/vue": "^1.7.23",
     "@tailwindcss/vite": "^4.3.0",
+    "@tanstack/vue-table": "^8.21.3",
     "@vuepic/vue-datepicker": "^11.0.3",
     "echarts": "^6.0.0",
     "lucide-vue-next": "^1.0.0",

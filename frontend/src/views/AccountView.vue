@@ -5,7 +5,6 @@ import { useAccountsStore, type Account, type Transaction, type Holding } from '
 import { formatMinor, formatQuantity } from '@/lib/money'
 import NewTransactionForm from '@/components/forms/NewTransactionForm.vue'
 import ImportDropzone from '@/components/ImportDropzone.vue'
-import HoldingsTable from '@/components/HoldingsTable.vue'
 import AddCoinForm from '@/components/forms/AddCoinForm.vue'
 import AllocationEditor from '@/components/AllocationEditor.vue'
 import AddContributionForm from '@/components/forms/AddContributionForm.vue'
@@ -17,6 +16,8 @@ import EditTransactionForm from '@/components/forms/EditTransactionForm.vue'
 import EditAccountForm from '@/components/forms/EditAccountForm.vue'
 import RecurringTransactionsPanel from '@/components/panels/RecurringTransactionsPanel.vue'
 import DateField from '@/components/ui/DateField.vue'
+import DataTable from '@/components/ui/DataTable.vue'
+import type { ColumnDef, SortingState } from '@tanstack/vue-table'
 import { useToastsStore } from '@/stores/toasts'
 import { CATEGORIES, categoryMeta } from '@/lib/categories'
 import { featuresFor } from '@/lib/accountFeatures'
@@ -35,7 +36,7 @@ const holdings = ref<Holding[]>([])
 const loading = ref(false)
 const range = ref<'1w' | '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'all'>('ytd')
 
-// Filter / pagination state.
+// Filter / pagination / sort state.
 const page = ref(1)
 const pageSize = ref(25)
 const filterType = ref('')
@@ -43,11 +44,22 @@ const filterCategory = ref('')
 const filterFrom = ref('')
 const filterTo = ref('')
 const filterQ = ref('')
+// Date desc is the default — newest transactions first. Empty = backend default.
+const sorting = ref<SortingState>([{ id: 'occurredAt', desc: true }])
+const sortParam = computed(() => {
+  const s = sorting.value[0]
+  return s ? `${s.id}:${s.desc ? 'desc' : 'asc'}` : undefined
+})
 
 const totalPages = computed(() => Math.max(1, Math.ceil(totalTransactions.value / pageSize.value)))
-const hasFilters = computed(() =>
-  filterType.value !== '' || filterCategory.value !== '' || filterFrom.value !== '' || filterTo.value !== '' || filterQ.value !== '',
-)
+const activeFilterColumns = computed(() => {
+  const ids: string[] = []
+  if (filterFrom.value !== '' || filterTo.value !== '') ids.push('occurredAt')
+  if (filterType.value !== '') ids.push('type')
+  if (filterQ.value !== '' || filterCategory.value !== '') ids.push('description')
+  return ids
+})
+const hasFilters = computed(() => activeFilterColumns.value.length > 0)
 
 async function load() {
   if (!accountId.value) return
@@ -62,6 +74,7 @@ async function load() {
         from: filterFrom.value || undefined,
         to: filterTo.value || undefined,
         q: filterQ.value || undefined,
+        sort: sortParam.value,
       }),
       accounts.fetchHoldings(accountId.value),
     ])
@@ -73,14 +86,15 @@ async function load() {
   }
 }
 
-// Debounced auto-reload when filters change (avoid a request on every keystroke).
+// Debounced auto-reload when filters change. Long enough that a user typing a
+// 4-5 char search doesn't trigger an in-flight request per keystroke.
 let filterTimer: ReturnType<typeof setTimeout> | null = null
 function onFilterChange() {
   if (filterTimer) clearTimeout(filterTimer)
   filterTimer = setTimeout(() => {
     page.value = 1
     void load()
-  }, 250)
+  }, 400)
 }
 
 function clearFilters() {
@@ -141,6 +155,90 @@ function shortDate(iso: string): string {
   const d = new Date(iso)
   return d.toLocaleDateString('de-CH', { year: 'numeric', month: 'short', day: '2-digit' })
 }
+
+const holdingsColumns = computed<ColumnDef<Holding, unknown>[]>(() => [
+  { id: 'ticker', accessorFn: (h) => h.ticker ?? '', header: 'Ticker', enableSorting: true },
+  { id: 'name', accessorFn: (h) => h.name ?? '', header: 'Name', enableSorting: true },
+  {
+    id: 'quantity',
+    accessorFn: (h) => Number(h.quantity),
+    header: 'Quantity',
+    enableSorting: true,
+    enableColumnFilter: false,
+    meta: { align: 'right', headerClass: 'w-24', cellClass: 'tabular' },
+  },
+  {
+    id: 'price',
+    accessorFn: (h) => (h.priceMinor ? Number(h.priceMinor) : 0),
+    header: 'Last price',
+    enableSorting: true,
+    enableColumnFilter: false,
+    meta: { align: 'right', headerClass: 'w-32', cellClass: 'tabular text-[var(--color-text-muted)]' },
+  },
+  {
+    id: 'value',
+    accessorFn: (h) => (h.valueBaseMinor ? Number(h.valueBaseMinor) : 0),
+    header: 'Value',
+    enableSorting: true,
+    enableColumnFilter: false,
+    meta: { align: 'right', headerClass: 'w-32', cellClass: 'tabular font-medium' },
+  },
+  {
+    id: 'priceAsOf',
+    accessorFn: (h) => h.priceAsOf ?? '',
+    header: 'As of',
+    enableSorting: true,
+    meta: { headerClass: 'w-24', cellClass: 'text-xs text-[var(--color-text-dim)]' },
+  },
+])
+
+// AccountView's transactions table is server-paginated, so sort here applies only
+// to the visible page — still useful for "biggest item on this page".
+const transactionColumns = computed<ColumnDef<Transaction, unknown>[]>(() => [
+  {
+    id: 'occurredAt',
+    accessorKey: 'occurredAt',
+    header: 'Date',
+    enableSorting: true,
+    meta: { headerClass: 'w-28', cellClass: 'text-[var(--color-text-muted)] tabular' },
+  },
+  {
+    id: 'type',
+    accessorFn: (t) => typeLabels[t.type ?? 'other'] ?? t.type,
+    header: 'Type',
+    enableSorting: true,
+    meta: { headerClass: 'w-28' },
+  },
+  {
+    id: 'description',
+    accessorFn: (t) => t.description ?? '',
+    header: 'Description',
+    enableSorting: true,
+  },
+  {
+    id: 'quantity',
+    accessorFn: (t) => Number(t.assetQuantity ?? 0),
+    header: 'Quantity',
+    enableSorting: true,
+    enableColumnFilter: false,
+    meta: { align: 'right', headerClass: 'w-32', cellClass: 'tabular text-[var(--color-text-muted)]' },
+  },
+  {
+    id: 'amount',
+    accessorFn: (t) => Number(t.amountMinor),
+    header: 'Amount',
+    enableSorting: true,
+    enableColumnFilter: false,
+    meta: { align: 'right', headerClass: 'w-32', cellClass: 'tabular font-medium' },
+  },
+  {
+    id: 'actions',
+    header: '',
+    enableSorting: false,
+    enableColumnFilter: false,
+    meta: { align: 'right', headerClass: 'w-10' },
+  },
+])
 
 const editingAccount = ref<Account | null>(null)
 // Holdings is the default tab — it's the primary content for investment accounts.
@@ -361,196 +459,163 @@ async function deleteTransaction(t: Transaction) {
         />
 
         <!-- Holdings tab -->
-        <div v-if="activeTab === 'holdings' && holdings.length > 0" class="card overflow-hidden">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Ticker</th>
-                <th>Name</th>
-                <th class="text-right w-24">Quantity</th>
-                <th class="text-right w-32">Last price</th>
-                <th class="text-right w-32">Value</th>
-                <th class="w-24">As of</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="h in holdings" :key="h.isin">
-                <td>
-                  <RouterLink :to="{ name: 'asset', params: { isin: h.isin } }" class="font-medium hover:text-[var(--color-accent)] transition-colors">
-                    {{ h.ticker ?? '—' }}
-                  </RouterLink>
-                  <div class="text-xs text-[var(--color-text-dim)]">{{ h.isin }}</div>
-                </td>
-                <td class="text-[var(--color-text-muted)] truncate max-w-xs">{{ h.name ?? '—' }}</td>
-                <td class="text-right tabular">{{ formatQuantity(h.quantity) }}</td>
-                <td class="text-right tabular text-[var(--color-text-muted)]">
-                  {{ h.priceMinor && h.priceCurrency ? formatMinor(h.priceMinor, h.priceCurrency) : '—' }}
-                </td>
-                <td class="text-right tabular font-medium">
-                  {{ h.valueBaseMinor ? formatMinor(h.valueBaseMinor, h.baseCurrency) : '—' }}
-                </td>
-                <td class="text-xs text-[var(--color-text-dim)]">{{ h.priceAsOf ?? '—' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          v-if="activeTab === 'holdings' && holdings.length > 0"
+          :data="holdings"
+          :columns="holdingsColumns"
+        >
+          <template #cell-ticker="{ row }">
+            <RouterLink :to="{ name: 'asset', params: { isin: row.isin } }" class="font-medium hover:text-[var(--color-accent)] transition-colors">
+              {{ row.ticker ?? '—' }}
+            </RouterLink>
+            <div class="text-xs text-[var(--color-text-dim)]">{{ row.isin }}</div>
+          </template>
+          <template #cell-name="{ row }">
+            <span class="text-[var(--color-text-muted)] truncate max-w-xs">{{ row.name ?? '—' }}</span>
+          </template>
+          <template #cell-quantity="{ row }">
+            {{ formatQuantity(row.quantity) }}
+          </template>
+          <template #cell-price="{ row }">
+            {{ row.priceMinor && row.priceCurrency ? formatMinor(row.priceMinor, row.priceCurrency) : '—' }}
+          </template>
+          <template #cell-value="{ row }">
+            {{ row.valueBaseMinor ? formatMinor(row.valueBaseMinor, row.baseCurrency) : '—' }}
+          </template>
+          <template #cell-priceAsOf="{ row }">
+            {{ row.priceAsOf ?? '—' }}
+          </template>
+        </DataTable>
 
         <!-- Transactions tab -->
         <div v-if="activeTab === 'transactions'" class="space-y-4">
-          <div class="card p-3">
-            <div class="flex flex-wrap items-end gap-3">
-              <div class="space-y-1 flex-1 min-w-[10rem]">
-                <label class="label">Search</label>
+          <div v-if="hasFilters" class="flex items-center justify-end">
+            <button type="button" class="btn btn-ghost text-xs" @click="clearFilters">Clear filters</button>
+          </div>
+
+          <div
+            v-if="!loading && transactions.length === 0 && !hasFilters"
+            class="card p-10 text-center space-y-2"
+          >
+            <div class="flex justify-center text-[var(--color-text-dim)]">
+              <Inbox :size="40" />
+            </div>
+            <p class="font-medium">No transactions yet</p>
+            <p class="text-sm text-[var(--color-text-muted)]">Import a CSV or add one manually.</p>
+          </div>
+          <DataTable
+            v-else
+            :data="transactions"
+            :columns="transactionColumns"
+            show-filters
+            manual-filtering
+            manual-sorting
+            :active-filter-columns="activeFilterColumns"
+            :sorting="sorting"
+            :loading="loading"
+            :page="page"
+            :page-size="pageSize"
+            :total="totalTransactions"
+            empty-text="No transactions match the filters."
+            @update:page="goToPage"
+            @update:page-size="(v) => { pageSize = v; page = 1; load() }"
+            @update:sorting="(s) => { sorting = s; page = 1; load() }"
+          >
+            <template #filter-occurredAt>
+              <div class="space-y-1">
+                <DateField v-model="filterFrom" clearable placeholder="From" @update:model-value="onFilterChange" />
+                <DateField v-model="filterTo" clearable placeholder="To" @update:model-value="onFilterChange" />
+              </div>
+            </template>
+            <template #filter-type>
+              <select v-model="filterType" class="input" @change="onFilterChange">
+                <option value="">All types</option>
+                <option v-for="(label, value) in typeLabels" :key="value" :value="value">{{ label }}</option>
+              </select>
+            </template>
+            <template #filter-description>
+              <div class="space-y-1">
                 <input
                   v-model="filterQ"
-                  placeholder="Description or ISIN"
-                  class="input"
+                  placeholder="Search description or ISIN…"
+                  class="input text-sm"
                   @input="onFilterChange"
                 />
-              </div>
-              <div class="space-y-1">
-                <label class="label">Type</label>
-                <select v-model="filterType" class="input" @change="onFilterChange">
-                  <option value="">All types</option>
-                  <option v-for="(label, value) in typeLabels" :key="value" :value="value">{{ label }}</option>
-                </select>
-              </div>
-              <div v-if="features.showCategories" class="space-y-1">
-                <label class="label">Category</label>
-                <select v-model="filterCategory" class="input" @change="onFilterChange">
+                <select
+                  v-if="features.showCategories"
+                  v-model="filterCategory"
+                  class="input"
+                  @change="onFilterChange"
+                >
                   <option value="">All categories</option>
                   <option v-for="c in CATEGORIES" :key="c.value" :value="c.value">{{ c.label }}</option>
                 </select>
               </div>
-              <div class="space-y-1">
-                <label class="label">From</label>
-                <DateField v-model="filterFrom" clearable placeholder="From" @update:model-value="onFilterChange" />
-              </div>
-              <div class="space-y-1">
-                <label class="label">To</label>
-                <DateField v-model="filterTo" clearable placeholder="To" @update:model-value="onFilterChange" />
-              </div>
-              <button
-                v-if="hasFilters"
-                type="button"
-                class="btn btn-ghost"
-                @click="clearFilters"
+            </template>
+            <template #cell-occurredAt="{ row }">
+              {{ shortDate(row.occurredAt) }}
+            </template>
+            <template #cell-type="{ row }">
+              <span class="badge">{{ typeLabels[row.type ?? 'other'] ?? row.type }}</span>
+            </template>
+            <template #cell-description="{ row }">
+              <RouterLink
+                :to="{ name: 'transaction', params: { accountId: row.accountId, id: row.id } }"
+                class="block truncate max-w-md hover:text-[var(--color-accent)] transition-colors"
               >
-                Clear
-              </button>
-            </div>
-          </div>
-
-          <div v-if="loading" class="card p-10 text-center text-[var(--color-text-muted)]">Loading…</div>
-          <div v-else-if="transactions.length === 0" class="card p-10 text-center space-y-2">
-            <div class="flex justify-center text-[var(--color-text-dim)]">
-              <Inbox :size="40" />
-            </div>
-            <p class="font-medium">{{ hasFilters ? 'No transactions match the filters' : 'No transactions yet' }}</p>
-            <p class="text-sm text-[var(--color-text-muted)]">
-              {{ hasFilters ? 'Try clearing some filters.' : 'Import a CSV or add one manually.' }}
-            </p>
-          </div>
-          <div v-else class="card overflow-hidden">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th class="w-28">Date</th>
-                  <th class="w-28">Type</th>
-                  <th>Description</th>
-                  <th class="text-right w-32">Quantity</th>
-                  <th class="text-right w-32">Amount</th>
-                  <th class="w-10"></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="t in transactions" :key="t.id">
-                  <td class="text-[var(--color-text-muted)] tabular">{{ shortDate(t.occurredAt) }}</td>
-                  <td>
-                    <span class="badge">{{ typeLabels[t.type ?? 'other'] ?? t.type }}</span>
-                  </td>
-                  <td>
-                    <RouterLink
-                      :to="{ name: 'transaction', params: { accountId: t.accountId, id: t.id } }"
-                      class="block truncate max-w-md hover:text-[var(--color-accent)] transition-colors"
-                    >
-                      {{ t.description ?? '—' }}
-                    </RouterLink>
-                    <div class="flex flex-wrap items-center gap-1.5 mt-0.5 text-xs">
-                      <span
-                        v-if="features.showCategories && categoryMeta(t.category)"
-                        class="inline-flex items-center gap-1.5"
-                        :title="categoryMeta(t.category)!.label"
-                      >
-                        <span class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: categoryMeta(t.category)!.color }"></span>
-                        <span class="text-[var(--color-text-muted)]">{{ categoryMeta(t.category)!.label }}</span>
-                      </span>
-                      <span v-if="t.assetIsin" class="text-[var(--color-text-dim)]">{{ t.assetIsin }}</span>
-                      <RouterLink
-                        v-for="tag in (t.tags ?? [])"
-                        :key="tag"
-                        :to="{ name: 'tag', params: { tag } }"
-                        class="text-[10px] rounded px-1.5 py-0.5 hover:opacity-80 transition-opacity"
-                        style="background-color: color-mix(in srgb, var(--color-accent) 14%, transparent); color: var(--color-accent);"
-                        @click.stop
-                      >
-                        {{ tag }}
-                      </RouterLink>
-                    </div>
-                  </td>
-                  <td class="text-right tabular text-[var(--color-text-muted)]">
-                    {{ formatQuantity(t.assetQuantity) }}
-                  </td>
-                  <td
-                    class="text-right tabular font-medium"
-                    :class="BigInt(t.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'"
-                  >
-                    {{ formatMinor(t.amountMinor, t.currency) }}
-                  </td>
-                  <td class="text-right">
-                    <div class="flex justify-end gap-0.5">
-                      <button
-                        class="p-1.5 rounded transition-colors text-[var(--color-text-dim)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]"
-                        type="button"
-                        aria-label="Edit transaction"
-                        @click="startEditTransaction(t)"
-                      >
-                        <Pencil :size="14" />
-                      </button>
-                      <button
-                        class="p-1.5 rounded transition-colors text-[var(--color-text-dim)] hover:text-[var(--color-negative)] hover:bg-[var(--color-surface-hover)]"
-                        type="button"
-                        aria-label="Delete transaction"
-                        @click="deleteTransaction(t)"
-                      >
-                        <Trash2 :size="14" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div v-if="totalTransactions > pageSize" class="flex items-center justify-between gap-3">
-            <span class="text-xs text-[var(--color-text-muted)] tabular">
-              Page {{ page }} of {{ totalPages }}
-            </span>
-            <div class="flex items-center gap-1">
-              <button
-                type="button"
-                class="btn btn-ghost text-xs"
-                :disabled="page <= 1 || loading"
-                @click="goToPage(page - 1)"
-              >Previous</button>
-              <button
-                type="button"
-                class="btn btn-ghost text-xs"
-                :disabled="page >= totalPages || loading"
-                @click="goToPage(page + 1)"
-              >Next</button>
-            </div>
-          </div>
+                {{ row.description ?? '—' }}
+              </RouterLink>
+              <div class="flex flex-wrap items-center gap-1.5 mt-0.5 text-xs">
+                <span
+                  v-if="features.showCategories && categoryMeta(row.category)"
+                  class="inline-flex items-center gap-1.5"
+                  :title="categoryMeta(row.category)!.label"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: categoryMeta(row.category)!.color }"></span>
+                  <span class="text-[var(--color-text-muted)]">{{ categoryMeta(row.category)!.label }}</span>
+                </span>
+                <span v-if="row.assetIsin" class="text-[var(--color-text-dim)]">{{ row.assetIsin }}</span>
+                <RouterLink
+                  v-for="tag in (row.tags ?? [])"
+                  :key="tag"
+                  :to="{ name: 'tag', params: { tag } }"
+                  class="text-[10px] rounded px-1.5 py-0.5 hover:opacity-80 transition-opacity"
+                  style="background-color: color-mix(in srgb, var(--color-accent) 14%, transparent); color: var(--color-accent);"
+                  @click.stop
+                >
+                  {{ tag }}
+                </RouterLink>
+              </div>
+            </template>
+            <template #cell-quantity="{ row }">
+              {{ formatQuantity(row.assetQuantity) }}
+            </template>
+            <template #cell-amount="{ row }">
+              <span :class="BigInt(row.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'">
+                {{ formatMinor(row.amountMinor, row.currency) }}
+              </span>
+            </template>
+            <template #cell-actions="{ row }">
+              <div class="flex justify-end gap-0.5">
+                <button
+                  class="p-1.5 rounded transition-colors text-[var(--color-text-dim)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]"
+                  type="button"
+                  aria-label="Edit transaction"
+                  @click="startEditTransaction(row)"
+                >
+                  <Pencil :size="14" />
+                </button>
+                <button
+                  class="p-1.5 rounded transition-colors text-[var(--color-text-dim)] hover:text-[var(--color-negative)] hover:bg-[var(--color-surface-hover)]"
+                  type="button"
+                  aria-label="Delete transaction"
+                  @click="deleteTransaction(row)"
+                >
+                  <Trash2 :size="14" />
+                </button>
+              </div>
+            </template>
+          </DataTable>
         </div>
       </section>
     </template>

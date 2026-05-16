@@ -61,6 +61,90 @@ class SearchController extends AbstractController
     }
 
     /**
+     * Paginated, sortable transaction list for the search-results view.
+     *
+     * The unified /api/search endpoint also returns transactions, but capped
+     * at `limit` for the header dropdown. This endpoint exists so the search
+     * results page can show the full set with proper pagination.
+     */
+    #[Route('/api/search/transactions', name: 'api_search_transactions', methods: ['GET'])]
+    public function transactions(Request $request, #[CurrentUser] User $user): JsonResponse
+    {
+        $q = trim((string) $request->query->get('q', ''));
+        if (mb_strlen($q) < self::MIN_QUERY_LENGTH) {
+            return new JsonResponse(['items' => [], 'total' => 0, 'page' => 1, 'pageSize' => 25]);
+        }
+
+        $like = '%' . strtolower($q) . '%';
+        $isinCandidate = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $q));
+        $ownerBin = $user->getId()->toBinary();
+        $filters = $this->parseFilters($request);
+        $filterSql = $this->txFilterSql($filters);
+
+        $params = array_merge(
+            ['owner' => $ownerBin, 'q' => $like, 'isin' => $isinCandidate],
+            $filterSql['params'],
+        );
+        $whereSql =
+            'WHERE ac.owner_id = :owner
+               AND (LOWER(t.description) LIKE :q OR t.asset_isin = :isin)' . $filterSql['sql'];
+
+        $totalRow = $this->conn->fetchAssociative(
+            'SELECT COUNT(*) AS c
+             FROM transactions t
+             INNER JOIN accounts ac ON ac.id = t.account_id
+             ' . $whereSql,
+            $params,
+        );
+        $total = (int) ($totalRow['c'] ?? 0);
+
+        // Sort column → DB column whitelist. Frontend sends e.g. "occurredAt:desc".
+        [$col, $dir] = array_pad(explode(':', (string) $request->query->get('sort', ''), 2), 2, '');
+        $sortMap = [
+            'occurredAt' => 't.occurred_at',
+            'amount' => 't.amount_minor',
+            'type' => 't.type',
+            'description' => 't.description',
+        ];
+        $sortField = $sortMap[$col] ?? 't.occurred_at';
+        $sortDir = strtolower($dir) === 'asc' ? 'ASC' : 'DESC';
+
+        $page = max(1, (int) $request->query->get('page', '1'));
+        $pageSize = max(1, min(200, (int) $request->query->get('pageSize', '25')));
+        $offset = ($page - 1) * $pageSize;
+
+        $rows = $this->conn->fetchAllAssociative(
+            'SELECT t.id, t.occurred_at, t.amount_minor, t.currency, t.description,
+                    t.type, t.category, t.asset_isin,
+                    t.account_id, ac.name AS account_name
+             FROM transactions t
+             INNER JOIN accounts ac ON ac.id = t.account_id
+             ' . $whereSql . '
+             ORDER BY ' . $sortField . ' ' . $sortDir . ', t.id DESC
+             LIMIT ' . $pageSize . ' OFFSET ' . $offset,
+            $params,
+        );
+
+        return new JsonResponse([
+            'items' => array_map(fn($r) => [
+                'id' => Uuid::fromBinary($r['id'])->toRfc4122(),
+                'accountId' => Uuid::fromBinary($r['account_id'])->toRfc4122(),
+                'accountName' => $r['account_name'],
+                'occurredAt' => $r['occurred_at'],
+                'amountMinor' => $r['amount_minor'],
+                'currency' => $r['currency'],
+                'description' => $r['description'],
+                'type' => $r['type'],
+                'category' => $r['category'],
+                'assetIsin' => $r['asset_isin'],
+            ], $rows),
+            'total' => $total,
+            'page' => $page,
+            'pageSize' => $pageSize,
+        ]);
+    }
+
+    /**
      * Spending stats for transactions matching the query and filters. Amounts
      * are converted to the user's base currency at each transaction's
      * historical FX rate so the totals are honest across mixed currencies.

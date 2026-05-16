@@ -32,7 +32,7 @@ class AssetController extends AbstractController
      * an additive change.
      */
     #[Route('/api/assets/{isin}', name: 'api_asset_detail', methods: ['GET'])]
-    public function detail(string $isin, #[CurrentUser] User $user): JsonResponse
+    public function detail(string $isin, \Symfony\Component\HttpFoundation\Request $request, #[CurrentUser] User $user): JsonResponse
     {
         $isin = strtoupper($isin);
         $asset = $this->assets->findByIsin($isin);
@@ -223,7 +223,61 @@ class AssetController extends AbstractController
 
             'accounts' => $perAccount,
             'dividends' => $dividendsFlat,
-            'transactions' => $transactions,
+            'transactions' => $this->paginateTransactions($transactions, $request),
         ]);
+    }
+
+    /**
+     * Filter + sort + paginate the in-memory transaction list for the detail
+     * response. Mirrors the same query-param contract as the other views
+     * (q / type / from / to / sort / page / pageSize).
+     *
+     * @param list<array<string, mixed>> $items
+     * @return array{items: list<array<string, mixed>>, total: int, page: int, pageSize: int}
+     */
+    private function paginateTransactions(array $items, \Symfony\Component\HttpFoundation\Request $request): array
+    {
+        $q = strtolower(trim((string) $request->query->get('q', '')));
+        $typeFilter = (string) $request->query->get('type', '');
+        $from = (string) $request->query->get('from', '');
+        $to = (string) $request->query->get('to', '');
+
+        $filtered = array_values(array_filter($items, function ($r) use ($q, $typeFilter, $from, $to) {
+            if ($typeFilter !== '' && $r['type'] !== $typeFilter) return false;
+            if ($from !== '' && $r['occurredAt'] < $from) return false;
+            if ($to !== '' && $r['occurredAt'] > $to) return false;
+            if ($q !== '') {
+                $hay = strtolower(($r['description'] ?? '') . ' ' . ($r['accountName'] ?? ''));
+                if (!str_contains($hay, $q)) return false;
+            }
+            return true;
+        }));
+
+        [$col, $dir] = array_pad(explode(':', (string) $request->query->get('sort', ''), 2), 2, '');
+        $sortable = ['occurredAt', 'amount', 'type', 'description', 'quantity'];
+        if (!in_array($col, $sortable, true)) $col = 'occurredAt';
+        $asc = strtolower($dir) === 'asc';
+
+        usort($filtered, function ($a, $b) use ($col, $asc) {
+            $cmp = match ($col) {
+                'amount' => (int) $a['amountMinor'] <=> (int) $b['amountMinor'],
+                'quantity' => bccomp((string) ($a['assetQuantity'] ?? '0'), (string) ($b['assetQuantity'] ?? '0'), 8),
+                'type' => strcmp((string) $a['type'], (string) $b['type']),
+                'description' => strcmp((string) ($a['description'] ?? ''), (string) ($b['description'] ?? '')),
+                default => strcmp((string) $a['occurredAt'], (string) $b['occurredAt']),
+            };
+            return $asc ? $cmp : -$cmp;
+        });
+
+        $page = max(1, (int) $request->query->get('page', '1'));
+        $pageSize = max(1, min(200, (int) $request->query->get('pageSize', '25')));
+        $offset = ($page - 1) * $pageSize;
+
+        return [
+            'items' => array_slice($filtered, $offset, $pageSize),
+            'total' => count($filtered),
+            'page' => $page,
+            'pageSize' => $pageSize,
+        ];
     }
 }

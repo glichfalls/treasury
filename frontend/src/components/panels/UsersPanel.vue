@@ -4,6 +4,8 @@ import { api } from '@/lib/api'
 import { useToastsStore } from '@/stores/toasts'
 import { useAuthStore } from '@/stores/auth'
 import { Shield, ShieldOff, Trash2 } from 'lucide-vue-next'
+import DataTable from '@/components/ui/DataTable.vue'
+import type { ColumnDef } from '@tanstack/vue-table'
 
 interface AdminUser {
   id: string
@@ -38,6 +40,23 @@ const sortedUsers = computed(() =>
     return a.email.localeCompare(b.email)
   }),
 )
+
+const columns = computed<ColumnDef<AdminUser, unknown>[]>(() => [
+  { id: 'email', accessorKey: 'email', header: 'Email', enableSorting: true },
+  {
+    id: 'role',
+    accessorFn: (u) => (u.isAdmin ? 'Admin' : 'User'),
+    header: 'Role',
+    enableSorting: true,
+  },
+  {
+    id: 'actions',
+    header: '',
+    enableSorting: false,
+    enableColumnFilter: false,
+    meta: { align: 'right', headerClass: 'w-32' },
+  },
+])
 
 async function toggleAdmin(u: AdminUser) {
   const action = u.isAdmin ? 'revoke admin from' : 'grant admin to'
@@ -74,56 +93,44 @@ async function remove(u: AdminUser) {
 
     <div v-if="loading" class="text-sm text-[var(--color-text-muted)]">Loading…</div>
 
-    <div v-else-if="users.length === 0" class="text-sm text-[var(--color-text-muted)]">
-      No users.
-    </div>
-
-    <div v-else class="card overflow-hidden">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Email</th>
-            <th>Role</th>
-            <th class="w-32 text-right"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="u in sortedUsers" :key="u.id">
-            <td>
-              <span class="font-medium">{{ u.email }}</span>
-              <span v-if="u.id === auth.user?.id" class="text-xs text-[var(--color-text-dim)] ml-2">(you)</span>
-            </td>
-            <td>
-              <span v-if="u.isAdmin" class="badge" style="color: var(--color-accent);">Admin</span>
-              <span v-else class="badge">User</span>
-            </td>
-            <td class="text-right">
-              <div class="flex justify-end gap-1">
-                <button
-                  type="button"
-                  class="btn btn-ghost p-1.5"
-                  :aria-label="u.isAdmin ? `Revoke admin from ${u.email}` : `Grant admin to ${u.email}`"
-                  :title="u.isAdmin ? 'Revoke admin' : 'Grant admin'"
-                  :disabled="u.id === auth.user?.id && u.isAdmin"
-                  @click="toggleAdmin(u)"
-                >
-                  <ShieldOff v-if="u.isAdmin" :size="14" />
-                  <Shield v-else :size="14" />
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-danger p-1.5"
-                  :aria-label="`Delete ${u.email}`"
-                  :disabled="u.id === auth.user?.id"
-                  @click="remove(u)"
-                >
-                  <Trash2 :size="14" />
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      v-else
+      :data="sortedUsers"
+      :columns="columns"
+      empty-text="No users."
+    >
+      <template #cell-email="{ row }">
+        <span class="font-medium">{{ row.email }}</span>
+        <span v-if="row.id === auth.user?.id" class="text-xs text-[var(--color-text-dim)] ml-2">(you)</span>
+      </template>
+      <template #cell-role="{ row }">
+        <span v-if="row.isAdmin" class="badge" style="color: var(--color-accent);">Admin</span>
+        <span v-else class="badge">User</span>
+      </template>
+      <template #cell-actions="{ row }">
+        <div class="flex justify-end gap-1">
+          <button
+            type="button"
+            class="btn btn-ghost p-1.5"
+            :aria-label="row.isAdmin ? `Revoke admin from ${row.email}` : `Grant admin to ${row.email}`"
+            :title="row.isAdmin ? 'Revoke admin' : 'Grant admin'"
+            :disabled="row.id === auth.user?.id && row.isAdmin"
+            @click="toggleAdmin(row)"
+          >
+            <ShieldOff v-if="row.isAdmin" :size="14" />
+            <Shield v-else :size="14" />
+          </button>
+          <button
+            type="button"
+            class="btn btn-danger p-1.5"
+            :aria-label="`Delete ${row.email}`"
+            :disabled="row.id === auth.user?.id"
+            @click="remove(row)"
+          >
+            <Trash2 :size="14" />
+          </button>
+        </div>
+      </template>
+    </DataTable>
   </div>
 </template>

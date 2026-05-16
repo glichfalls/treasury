@@ -7,6 +7,8 @@ import { categoryMeta } from '@/lib/categories'
 import { describeSchedule, type RecurringFrequency } from '@/lib/recurring'
 import { useAccountsStore } from '@/stores/accounts'
 import DateField from '@/components/ui/DateField.vue'
+import DataTable from '@/components/ui/DataTable.vue'
+import type { ColumnDef, SortingState } from '@tanstack/vue-table'
 import { VChart, chartColors, type EChartsOption } from '@/lib/charts'
 import { Search, Wallet, Receipt, TrendingUp, Repeat, Tag as TagIcon, Inbox, X } from 'lucide-vue-next'
 
@@ -28,6 +30,12 @@ interface SearchResponse {
   assets: AssetResult[]
   recurring: RecurringResult[]
   tags: TagResult[]
+}
+interface TransactionsPage {
+  items: TransactionResult[]
+  total: number
+  page: number
+  pageSize: number
 }
 interface MonthlyPoint { month: string; amountMinor: string }
 interface SearchStats {
@@ -52,7 +60,17 @@ const txType = ref(String(route.query.type ?? ''))
 
 const results = ref<SearchResponse>({ accounts: [], transactions: [], assets: [], recurring: [], tags: [] })
 const stats = ref<SearchStats | null>(null)
+const transactionsPage = ref<TransactionsPage>({ items: [], total: 0, page: 1, pageSize: 25 })
 const loading = ref(false)
+
+// Pagination + sort state for the transactions table.
+const txPage = ref(1)
+const txPageSize = ref(25)
+const txSorting = ref<SortingState>([{ id: 'occurredAt', desc: true }])
+const txSortParam = computed(() => {
+  const s = txSorting.value[0]
+  return s ? `${s.id}:${s.desc ? 'desc' : 'asc'}` : undefined
+})
 
 const transactionTypes = [
   { value: 'deposit', label: 'Deposit' },
@@ -82,20 +100,31 @@ async function load() {
   if (q.length < 2) {
     results.value = { accounts: [], transactions: [], assets: [], recurring: [], tags: [] }
     stats.value = null
+    transactionsPage.value = { items: [], total: 0, page: 1, pageSize: txPageSize.value }
     return
   }
   loading.value = true
   try {
-    const [r, s] = await Promise.all([
+    const txExtra: Record<string, string | number> = {
+      page: txPage.value,
+      pageSize: txPageSize.value,
+    }
+    if (txSortParam.value) txExtra.sort = txSortParam.value
+    const [r, s, t] = await Promise.all([
       api.get<SearchResponse>(`/api/search?${buildSearchParams({ limit: 100 })}`),
       api.get<SearchStats>(`/api/search/stats?${buildSearchParams()}`),
+      api.get<TransactionsPage>(`/api/search/transactions?${buildSearchParams(txExtra)}`),
     ])
     results.value = r
     stats.value = s
+    transactionsPage.value = t
   } finally {
     loading.value = false
   }
 }
+
+// Whenever a top-bar filter changes via syncRoute, the watch on route.query
+// re-runs load(). We just need to reset to page 1 there.
 
 function syncRoute() {
   const next: Record<string, string> = {}
@@ -115,12 +144,14 @@ onMounted(async () => {
 })
 
 // React to URL changes (e.g. navigating from the modal "View all" link).
+// Reset transactions pagination — a new query implies a new dataset.
 watch(() => route.query, (q) => {
   query.value = String(q.q ?? '')
   accountId.value = String(q.accountId ?? '')
   dateFrom.value = String(q.dateFrom ?? '')
   dateTo.value = String(q.dateTo ?? '')
   txType.value = String(q.type ?? '')
+  txPage.value = 1
   load()
 })
 
@@ -144,7 +175,7 @@ function shortDate(iso: string): string {
 
 const totalMatches = computed(() => {
   const r = results.value
-  return r.accounts.length + r.assets.length + r.transactions.length + r.recurring.length + r.tags.length
+  return r.accounts.length + r.assets.length + transactionsPage.value.total + r.recurring.length + r.tags.length
 })
 
 const hasFilters = computed(() => !!(accountId.value || dateFrom.value || dateTo.value || txType.value))
@@ -154,6 +185,37 @@ const typeLabels: Record<string, string> = {
   trade_buy: 'Buy', trade_sell: 'Sell',
   fee: 'Fee', interest: 'Interest', dividend: 'Dividend', fx_conversion: 'FX', other: 'Other',
 }
+
+const transactionColumns = computed<ColumnDef<TransactionResult, unknown>[]>(() => [
+  {
+    id: 'occurredAt',
+    accessorKey: 'occurredAt',
+    header: 'Date',
+    enableSorting: true,
+    meta: { headerClass: 'w-28', cellClass: 'text-[var(--color-text-muted)] tabular' },
+  },
+  {
+    id: 'type',
+    accessorFn: (t) => typeLabels[t.type] ?? t.type,
+    header: 'Type',
+    enableSorting: true,
+    meta: { headerClass: 'w-28' },
+  },
+  {
+    id: 'description',
+    accessorFn: (t) => `${t.description ?? ''} ${t.accountName}`,
+    header: 'Account / description',
+    enableSorting: true,
+  },
+  {
+    id: 'amount',
+    accessorFn: (t) => Number(t.amountMinor),
+    header: 'Amount',
+    enableSorting: true,
+    enableColumnFilter: false,
+    meta: { align: 'right', headerClass: 'w-32', cellClass: 'tabular font-medium' },
+  },
+])
 
 const hasStats = computed(() => (stats.value?.count ?? 0) > 0)
 const hasMonthly = computed(() => (stats.value?.monthly?.length ?? 0) > 0)
@@ -383,49 +445,53 @@ const chartOption = computed<EChartsOption>(() => {
     </section>
 
     <!-- Transactions -->
-    <section v-if="results.transactions.length > 0" class="space-y-3">
+    <section v-if="transactionsPage.total > 0" class="space-y-3">
       <h2 class="text-lg font-medium flex items-center gap-2">
         <Receipt :size="16" class="text-[var(--color-text-muted)]" />
-        Transactions <span class="text-sm text-[var(--color-text-dim)]">{{ results.transactions.length }}</span>
+        Transactions <span class="text-sm text-[var(--color-text-dim)]">{{ transactionsPage.total }}</span>
       </h2>
-      <div class="card overflow-hidden">
-        <table class="table">
-          <thead>
-            <tr>
-              <th class="w-28">Date</th>
-              <th class="w-28">Type</th>
-              <th>Account / description</th>
-              <th class="text-right w-32">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="t in results.transactions" :key="t.id">
-              <td class="text-[var(--color-text-muted)] tabular">{{ shortDate(t.occurredAt) }}</td>
-              <td><span class="badge">{{ typeLabels[t.type] ?? t.type }}</span></td>
-              <td>
-                <RouterLink :to="{ name: 'transaction', params: { accountId: t.accountId, id: t.id } }"
-                  class="font-medium hover:text-[var(--color-accent)] transition-colors">
-                  {{ t.description ?? '—' }}
-                </RouterLink>
-                <div class="text-xs text-[var(--color-text-dim)] mt-0.5 flex items-center gap-1.5">
-                  <RouterLink :to="{ name: 'account', params: { id: t.accountId } }"
-                    class="hover:text-[var(--color-accent)] transition-colors">
-                    {{ t.accountName }}
-                  </RouterLink>
-                  <span v-if="categoryMeta(t.category)" class="inline-flex items-center gap-1">
-                    <span class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: categoryMeta(t.category)!.color }"></span>
-                    <span>{{ categoryMeta(t.category)!.label }}</span>
-                  </span>
-                </div>
-              </td>
-              <td class="text-right tabular font-medium"
-                :class="BigInt(t.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'">
-                {{ formatMinor(t.amountMinor, t.currency) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        :data="transactionsPage.items"
+        :columns="transactionColumns"
+        manual-sorting
+        :sorting="txSorting"
+        :loading="loading"
+        :page="txPage"
+        :page-size="txPageSize"
+        :total="transactionsPage.total"
+        empty-text="No transactions match."
+        @update:page="(p) => { txPage = p; load() }"
+        @update:page-size="(v) => { txPageSize = v; txPage = 1; load() }"
+        @update:sorting="(s) => { txSorting = s; txPage = 1; load() }"
+      >
+        <template #cell-occurredAt="{ row }">
+          {{ shortDate(row.occurredAt) }}
+        </template>
+        <template #cell-type="{ row }">
+          <span class="badge">{{ typeLabels[row.type] ?? row.type }}</span>
+        </template>
+        <template #cell-description="{ row }">
+          <RouterLink :to="{ name: 'transaction', params: { accountId: row.accountId, id: row.id } }"
+            class="font-medium hover:text-[var(--color-accent)] transition-colors">
+            {{ row.description ?? '—' }}
+          </RouterLink>
+          <div class="text-xs text-[var(--color-text-dim)] mt-0.5 flex items-center gap-1.5">
+            <RouterLink :to="{ name: 'account', params: { id: row.accountId } }"
+              class="hover:text-[var(--color-accent)] transition-colors">
+              {{ row.accountName }}
+            </RouterLink>
+            <span v-if="categoryMeta(row.category)" class="inline-flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: categoryMeta(row.category)!.color }"></span>
+              <span>{{ categoryMeta(row.category)!.label }}</span>
+            </span>
+          </div>
+        </template>
+        <template #cell-amount="{ row }">
+          <span :class="BigInt(row.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'">
+            {{ formatMinor(row.amountMinor, row.currency) }}
+          </span>
+        </template>
+      </DataTable>
     </section>
 
     <!-- Recurring -->

@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { api } from '@/lib/api'
 import { formatMinor } from '@/lib/money'
 import { useToastsStore } from '@/stores/toasts'
 import { Sparkles } from 'lucide-vue-next'
+import DataTable from '@/components/ui/DataTable.vue'
+import type { ColumnDef } from '@tanstack/vue-table'
 
 interface Tag { tag: string; count: number; totalMinor: string }
 interface TagsResponse { baseCurrency: string; tags: Tag[] }
@@ -52,6 +54,26 @@ async function retagAll() {
 }
 
 onMounted(load)
+
+const columns = computed<ColumnDef<Tag, unknown>[]>(() => [
+  { id: 'tag', accessorKey: 'tag', header: 'Tag', enableSorting: true },
+  {
+    id: 'count',
+    accessorKey: 'count',
+    header: 'Count',
+    enableSorting: true,
+    enableColumnFilter: false,
+    meta: { align: 'right', headerClass: 'w-24', cellClass: 'tabular text-[var(--color-text-muted)]' },
+  },
+  {
+    id: 'total',
+    accessorFn: (t) => Number(t.totalMinor),
+    header: `Net (${data.value?.baseCurrency ?? ''})`,
+    enableSorting: true,
+    enableColumnFilter: false,
+    meta: { align: 'right', headerClass: 'w-40', cellClass: 'tabular font-medium' },
+  },
+])
 </script>
 
 <template>
@@ -81,36 +103,25 @@ onMounted(load)
 
     <div v-if="loading" class="text-sm text-[var(--color-text-muted)]">Loading…</div>
 
-    <div v-else-if="data && data.tags.length > 0" class="card overflow-hidden">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Tag</th>
-            <th class="text-right w-24">Count</th>
-            <th class="text-right w-40">Net ({{ data.baseCurrency }})</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="t in data.tags" :key="t.tag">
-            <td>
-              <RouterLink
-                :to="{ name: 'tag', params: { tag: t.tag } }"
-                class="inline-flex items-center gap-1.5 text-xs rounded px-2 py-1 hover:opacity-80 transition-opacity"
-                style="background-color: color-mix(in srgb, var(--color-accent) 14%, transparent); color: var(--color-accent);"
-              >
-                {{ t.tag }}
-              </RouterLink>
-            </td>
-            <td class="text-right tabular text-[var(--color-text-muted)]">{{ t.count }}</td>
-            <td
-              class="text-right tabular font-medium"
-              :class="BigInt(t.totalMinor) >= 0n ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
-            >
-              {{ formatMinor(t.totalMinor, data.baseCurrency) }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      v-else-if="data && data.tags.length > 0"
+      :data="data.tags"
+      :columns="columns"
+    >
+      <template #cell-tag="{ row }">
+        <RouterLink
+          :to="{ name: 'tag', params: { tag: row.tag } }"
+          class="inline-flex items-center gap-1.5 text-xs rounded px-2 py-1 hover:opacity-80 transition-opacity"
+          style="background-color: color-mix(in srgb, var(--color-accent) 14%, transparent); color: var(--color-accent);"
+        >
+          {{ row.tag }}
+        </RouterLink>
+      </template>
+      <template #cell-total="{ row }">
+        <span :class="BigInt(row.totalMinor) >= 0n ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'">
+          {{ formatMinor(row.totalMinor, data!.baseCurrency) }}
+        </span>
+      </template>
+    </DataTable>
   </div>
 </template>

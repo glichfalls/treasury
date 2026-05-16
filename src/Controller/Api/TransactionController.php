@@ -62,7 +62,14 @@ class TransactionController extends AbstractController
         $q = $request->query->get('q');
         $q = is_string($q) ? trim($q) : null;
 
-        $result = $this->transactions->findPage($account, $page, $pageSize, $type, $from, $to, $q ?: null, $category);
+        // Sort format: "column:direction" e.g. "occurredAt:desc".
+        $sortRaw = (string) $request->query->get('sort', '');
+        [$sortColumn, $sortDir] = array_pad(explode(':', $sortRaw, 2), 2, '');
+
+        $result = $this->transactions->findPage(
+            $account, $page, $pageSize, $type, $from, $to, $q ?: null, $category,
+            $sortColumn ?: null, $sortDir ?: null,
+        );
 
         return new JsonResponse([
             'items' => array_map($this->serialize(...), $result['items']),

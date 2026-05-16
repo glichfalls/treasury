@@ -41,6 +41,9 @@ class TransactionRepository extends ServiceEntityRepository
      * from contributions and clutter the list) — the count reflects that, so
      * pagination matches what the user sees.
      *
+     * Sort column comes from the frontend column id ("occurredAt", "amount", etc.)
+     * — anything not in the whitelist falls back to occurredAt desc.
+     *
      * @return array{items: Transaction[], total: int}
      */
     public function findPage(
@@ -52,15 +55,26 @@ class TransactionRepository extends ServiceEntityRepository
         ?\DateTimeImmutable $to = null,
         ?string $q = null,
         ?TransactionCategory $category = null,
+        ?string $sortColumn = null,
+        ?string $sortDirection = null,
     ): array {
         $page = max(1, $page);
         $pageSize = max(1, min(200, $pageSize));
 
         $qb = $this->createQueryBuilder('t')
             ->andWhere('t.account = :account')
-            ->setParameter('account', $account->getId(), \Symfony\Bridge\Doctrine\Types\UuidType::NAME)
-            ->orderBy('t.occurredAt', 'DESC')
-            ->addOrderBy('t.id', 'DESC');
+            ->setParameter('account', $account->getId(), \Symfony\Bridge\Doctrine\Types\UuidType::NAME);
+
+        $sortMap = [
+            'occurredAt' => 't.occurredAt',
+            'amount' => 't.amountMinor',
+            'type' => 't.type',
+            'description' => 't.description',
+            'quantity' => 't.assetQuantity',
+        ];
+        $sortField = $sortMap[$sortColumn ?? ''] ?? 't.occurredAt';
+        $dir = strtolower($sortDirection ?? '') === 'asc' ? 'ASC' : 'DESC';
+        $qb->orderBy($sortField, $dir)->addOrderBy('t.id', 'DESC');
 
         if ($account->getType() === AccountType::Pillar3a) {
             $qb->andWhere('t.type NOT IN (:hidden)')

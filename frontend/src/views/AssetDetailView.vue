@@ -5,6 +5,9 @@ import { api } from '@/lib/api'
 import { formatMinor, formatQuantity } from '@/lib/money'
 import { categoryMeta } from '@/lib/categories'
 import AssetPriceChart from '@/components/charts/AssetPriceChart.vue'
+import DateField from '@/components/ui/DateField.vue'
+import DataTable from '@/components/ui/DataTable.vue'
+import type { ColumnDef, SortingState } from '@tanstack/vue-table'
 import { ChevronLeft, Inbox, TrendingUp, TrendingDown } from 'lucide-vue-next'
 
 interface PerAccount {
@@ -58,7 +61,13 @@ interface AssetDetail {
   baseFxIncomplete: boolean
   accounts: PerAccount[]
   dividends: YearTotal[]
-  transactions: AssetTx[]
+  transactions: TransactionsPage
+}
+interface TransactionsPage {
+  items: AssetTx[]
+  total: number
+  page: number
+  pageSize: number
 }
 
 const route = useRoute()
@@ -67,13 +76,61 @@ const isin = computed(() => String(route.params.isin).toUpperCase())
 const data = ref<AssetDetail | null>(null)
 const loading = ref(false)
 
+// Filter / pagination / sort state.
+const filterQ = ref('')
+const filterType = ref('')
+const filterFrom = ref('')
+const filterTo = ref('')
+const page = ref(1)
+const pageSize = ref(25)
+const sorting = ref<SortingState>([{ id: 'occurredAt', desc: true }])
+const sortParam = computed(() => {
+  const s = sorting.value[0]
+  return s ? `${s.id}:${s.desc ? 'desc' : 'asc'}` : undefined
+})
+
+const activeFilterColumns = computed(() => {
+  const ids: string[] = []
+  if (filterFrom.value !== '' || filterTo.value !== '') ids.push('occurredAt')
+  if (filterType.value !== '') ids.push('type')
+  if (filterQ.value !== '') ids.push('description')
+  return ids
+})
+const hasFilters = computed(() => activeFilterColumns.value.length > 0)
+
+function clearFilters() {
+  filterQ.value = ''
+  filterType.value = ''
+  filterFrom.value = ''
+  filterTo.value = ''
+  page.value = 1
+  void load()
+}
+
 async function load() {
   loading.value = true
   try {
-    data.value = await api.get<AssetDetail>(`/api/assets/${isin.value}`)
+    const params = new URLSearchParams()
+    if (filterQ.value) params.set('q', filterQ.value)
+    if (filterType.value) params.set('type', filterType.value)
+    if (filterFrom.value) params.set('from', filterFrom.value)
+    if (filterTo.value) params.set('to', filterTo.value)
+    if (sortParam.value) params.set('sort', sortParam.value)
+    params.set('page', String(page.value))
+    params.set('pageSize', String(pageSize.value))
+    data.value = await api.get<AssetDetail>(`/api/assets/${isin.value}?${params.toString()}`)
   } finally {
     loading.value = false
   }
+}
+
+let filterTimer: ReturnType<typeof setTimeout> | null = null
+function onFilterChange() {
+  if (filterTimer) clearTimeout(filterTimer)
+  filterTimer = setTimeout(() => {
+    page.value = 1
+    void load()
+  }, 400)
 }
 
 onMounted(load)
@@ -95,6 +152,59 @@ const typeLabels: Record<string, string> = {
 function shortDate(iso: string): string {
   return new Date(iso).toLocaleDateString('de-CH', { year: 'numeric', month: 'short', day: '2-digit' })
 }
+
+const accountColumns = computed<ColumnDef<PerAccount, unknown>[]>(() => [
+  { id: 'accountName', accessorKey: 'accountName', header: 'Account', enableSorting: true },
+  {
+    id: 'quantity',
+    accessorFn: (a) => Number(a.quantity),
+    header: 'Quantity',
+    enableSorting: true,
+    enableColumnFilter: false,
+    meta: { align: 'right', cellClass: 'tabular' },
+  },
+])
+
+// Server already sorts descending by default — no need to reverse.
+
+const transactionColumns = computed<ColumnDef<AssetTx, unknown>[]>(() => [
+  {
+    id: 'occurredAt',
+    accessorKey: 'occurredAt',
+    header: 'Date',
+    enableSorting: true,
+    meta: { headerClass: 'w-28', cellClass: 'text-[var(--color-text-muted)] tabular' },
+  },
+  {
+    id: 'type',
+    accessorFn: (t) => typeLabels[t.type] ?? t.type,
+    header: 'Type',
+    enableSorting: true,
+    meta: { headerClass: 'w-28' },
+  },
+  {
+    id: 'description',
+    accessorFn: (t) => `${t.accountName} ${t.description ?? ''}`,
+    header: 'Account / description',
+    enableSorting: true,
+  },
+  {
+    id: 'quantity',
+    accessorFn: (t) => Number(t.assetQuantity ?? 0),
+    header: 'Quantity',
+    enableSorting: true,
+    enableColumnFilter: false,
+    meta: { align: 'right', headerClass: 'w-28', cellClass: 'tabular text-[var(--color-text-muted)]' },
+  },
+  {
+    id: 'amount',
+    accessorFn: (t) => Number(t.amountMinor),
+    header: 'Amount',
+    enableSorting: true,
+    enableColumnFilter: false,
+    meta: { align: 'right', headerClass: 'w-32', cellClass: 'tabular font-medium' },
+  },
+])
 
 // Group dividends by currency for the per-year totals section.
 const dividendsByCurrency = computed(() => {
@@ -248,12 +358,12 @@ const singleCurrencyReturn = computed<null | {
         </div>
         <div class="px-5 py-4" style="background-color: var(--color-surface);">
           <p class="label">Transactions</p>
-          <p class="text-lg font-medium tabular mt-1">{{ data.transactions.length }}</p>
+          <p class="text-lg font-medium tabular mt-1">{{ data.transactions.total }}</p>
         </div>
         <div class="px-5 py-4" style="background-color: var(--color-surface);">
           <p class="label">Dividends</p>
           <p class="text-lg font-medium tabular mt-1">
-            {{ data.transactions.filter((t) => t.type === 'dividend').length }}
+            {{ data.dividends.reduce((sum, d) => sum + d.count, 0) }}
           </p>
         </div>
       </div>
@@ -409,26 +519,16 @@ const singleCurrencyReturn = computed<null | {
       <!-- Per-account holdings -->
       <section v-if="data.accounts.length > 0" class="space-y-3">
         <h2 class="text-lg font-medium">Held in</h2>
-        <div class="card overflow-hidden">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Account</th>
-                <th class="text-right">Quantity</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="a in data.accounts" :key="a.accountId">
-                <td>
-                  <RouterLink :to="{ name: 'account', params: { id: a.accountId } }" class="font-medium">
-                    {{ a.accountName }}
-                  </RouterLink>
-                </td>
-                <td class="text-right tabular">{{ formatQuantity(a.quantity) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTable :data="data.accounts" :columns="accountColumns">
+          <template #cell-accountName="{ row }">
+            <RouterLink :to="{ name: 'account', params: { id: row.accountId } }" class="font-medium">
+              {{ row.accountName }}
+            </RouterLink>
+          </template>
+          <template #cell-quantity="{ row }">
+            {{ formatQuantity(row.quantity) }}
+          </template>
+        </DataTable>
       </section>
 
       <!-- Dividends by year -->
@@ -455,52 +555,86 @@ const singleCurrencyReturn = computed<null | {
       <section class="space-y-3">
         <h2 class="text-lg font-medium">Transactions</h2>
 
-        <div v-if="data.transactions.length === 0" class="card p-10 text-center space-y-2">
+        <div
+          v-if="!loading && data.transactions.items.length === 0 && !hasFilters"
+          class="card p-10 text-center space-y-2"
+        >
           <div class="flex justify-center text-[var(--color-text-dim)]"><Inbox :size="40" /></div>
           <p class="font-medium">No transactions for this asset.</p>
         </div>
 
-        <div v-else class="card overflow-hidden">
-          <table class="table">
-            <thead>
-              <tr>
-                <th class="w-28">Date</th>
-                <th class="w-28">Type</th>
-                <th>Account / description</th>
-                <th class="text-right w-28">Quantity</th>
-                <th class="text-right w-32">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="t in [...data.transactions].reverse()" :key="t.id">
-                <td class="text-[var(--color-text-muted)] tabular">{{ shortDate(t.occurredAt) }}</td>
-                <td><span class="badge">{{ typeLabels[t.type] ?? t.type }}</span></td>
-                <td>
-                  <RouterLink :to="{ name: 'account', params: { id: t.accountId } }" class="font-medium hover:text-[var(--color-accent)]">
-                    {{ t.accountName }}
-                  </RouterLink>
-                  <div class="text-xs text-[var(--color-text-dim)] mt-0.5 flex items-center gap-1.5">
-                    <span v-if="t.description">{{ t.description }}</span>
-                    <span
-                      v-if="categoryMeta(t.category)"
-                      class="inline-flex items-center gap-1"
-                    >
-                      <span class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: categoryMeta(t.category)!.color }"></span>
-                      <span>{{ categoryMeta(t.category)!.label }}</span>
-                    </span>
-                  </div>
-                </td>
-                <td class="text-right tabular text-[var(--color-text-muted)]">{{ formatQuantity(t.assetQuantity) }}</td>
-                <td
-                  class="text-right tabular font-medium"
-                  :class="BigInt(t.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'"
-                >
-                  {{ formatMinor(t.amountMinor, t.currency) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-if="hasFilters" class="flex items-center justify-end">
+          <button type="button" class="btn btn-ghost text-xs" @click="clearFilters">Clear filters</button>
         </div>
+
+        <DataTable
+          v-if="loading || data.transactions.items.length > 0 || hasFilters"
+          :data="data.transactions.items"
+          :columns="transactionColumns"
+          show-filters
+          manual-filtering
+          manual-sorting
+          :active-filter-columns="activeFilterColumns"
+          :sorting="sorting"
+          :loading="loading"
+          :page="page"
+          :page-size="pageSize"
+          :total="data.transactions.total"
+          empty-text="No transactions match the filters."
+          @update:page="(p) => { page = p; load() }"
+          @update:page-size="(v) => { pageSize = v; page = 1; load() }"
+          @update:sorting="(s) => { sorting = s; page = 1; load() }"
+        >
+          <template #filter-occurredAt>
+            <div class="space-y-1">
+              <DateField v-model="filterFrom" clearable placeholder="From" @update:model-value="onFilterChange" />
+              <DateField v-model="filterTo" clearable placeholder="To" @update:model-value="onFilterChange" />
+            </div>
+          </template>
+          <template #filter-type>
+            <select v-model="filterType" class="input" @change="onFilterChange">
+              <option value="">All types</option>
+              <option v-for="(label, value) in typeLabels" :key="value" :value="value">{{ label }}</option>
+            </select>
+          </template>
+          <template #filter-description>
+            <input
+              v-model="filterQ"
+              placeholder="Search description or account…"
+              class="input text-sm"
+              @input="onFilterChange"
+            />
+          </template>
+          <template #cell-occurredAt="{ row }">
+            {{ shortDate(row.occurredAt) }}
+          </template>
+          <template #cell-type="{ row }">
+            <span class="badge">{{ typeLabels[row.type] ?? row.type }}</span>
+          </template>
+          <template #cell-description="{ row }">
+            <RouterLink :to="{ name: 'account', params: { id: row.accountId } }" class="font-medium hover:text-[var(--color-accent)]">
+              {{ row.accountName }}
+            </RouterLink>
+            <div class="text-xs text-[var(--color-text-dim)] mt-0.5 flex items-center gap-1.5">
+              <span v-if="row.description">{{ row.description }}</span>
+              <span
+                v-if="categoryMeta(row.category)"
+                class="inline-flex items-center gap-1"
+              >
+                <span class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: categoryMeta(row.category)!.color }"></span>
+                <span>{{ categoryMeta(row.category)!.label }}</span>
+              </span>
+            </div>
+          </template>
+          <template #cell-quantity="{ row }">
+            {{ formatQuantity(row.assetQuantity) }}
+          </template>
+          <template #cell-amount="{ row }">
+            <span :class="BigInt(row.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'">
+              {{ formatMinor(row.amountMinor, row.currency) }}
+            </span>
+          </template>
+        </DataTable>
       </section>
     </template>
 

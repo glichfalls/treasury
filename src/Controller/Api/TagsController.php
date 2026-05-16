@@ -80,12 +80,15 @@ class TagsController extends AbstractController
     }
 
     /**
-     * Detail view for a single tag: total + count, monthly time series, full
-     * transaction list. Totals are in the user's base currency using historical
-     * FX; raw native amounts are returned alongside.
+     * Detail view for a single tag. Stats (count, monthly chart, totals) cover
+     * the entire dataset; the `transactions` block is server-side filtered,
+     * sorted, and paginated so the table can scale.
+     *
+     * Stats walk all matching rows; pagination/filter/sort are applied to a
+     * copy of the same array — keeps it one DB hit per request.
      */
     #[Route('/api/tags/{tag}', name: 'api_tags_detail', methods: ['GET'], requirements: ['tag' => '[^/]+'])]
-    public function detail(string $tag, #[CurrentUser] User $user): JsonResponse
+    public function detail(string $tag, \Symfony\Component\HttpFoundation\Request $request, #[CurrentUser] User $user): JsonResponse
     {
         $tag = strtolower(trim($tag));
         if ($tag === '') {
@@ -110,7 +113,7 @@ class TagsController extends AbstractController
         $totalSpent = 0;
         $totalIncome = 0;
         $byMonth = [];
-        $transactions = [];
+        $allTransactions = [];
 
         foreach ($rows as $r) {
             $base = $this->convertToBase(
@@ -126,7 +129,7 @@ class TagsController extends AbstractController
             $month = substr($r['occurred_at'], 0, 7);
             $byMonth[$month] = ($byMonth[$month] ?? 0) + $base;
 
-            $transactions[] = [
+            $allTransactions[] = [
                 'id' => Uuid::fromBinary($r['id'])->toRfc4122(),
                 'accountId' => Uuid::fromBinary($r['account_id'])->toRfc4122(),
                 'accountName' => $r['account_name'],
@@ -147,16 +150,74 @@ class TagsController extends AbstractController
             $monthly[] = ['month' => $m, 'amountMinor' => (string) $sum];
         }
 
+        $tx = $this->paginateAndSort($allTransactions, $request);
+
         return new JsonResponse([
             'tag' => $tag,
             'baseCurrency' => $baseCurrency,
-            'count' => count($transactions),
+            'count' => count($allTransactions),
             'totalSignedMinor' => (string) $totalSigned,
             'totalSpentMinor' => (string) $totalSpent,
             'totalIncomeMinor' => (string) $totalIncome,
             'monthly' => $monthly,
-            'transactions' => $transactions,
+            'transactions' => $tx,
         ]);
+    }
+
+    /**
+     * Filter + sort + paginate an in-memory transaction list using standard
+     * query params (q, type, from, to, sort, page, pageSize).
+     *
+     * @param list<array<string, mixed>> $items
+     * @return array{items: list<array<string, mixed>>, total: int, page: int, pageSize: int}
+     */
+    private function paginateAndSort(array $items, \Symfony\Component\HttpFoundation\Request $request): array
+    {
+        $q = strtolower(trim((string) $request->query->get('q', '')));
+        $typeFilter = (string) $request->query->get('type', '');
+        $from = (string) $request->query->get('from', '');
+        $to = (string) $request->query->get('to', '');
+
+        $filtered = array_values(array_filter($items, function ($r) use ($q, $typeFilter, $from, $to) {
+            if ($typeFilter !== '' && $r['type'] !== $typeFilter) return false;
+            if ($from !== '' && $r['occurredAt'] < $from) return false;
+            // Inclusive upper bound: occurredAt is YYYY-MM-DD, "<= $to" works lexically.
+            if ($to !== '' && $r['occurredAt'] > $to) return false;
+            if ($q !== '') {
+                $hay = strtolower(($r['description'] ?? '') . ' ' . ($r['accountName'] ?? ''));
+                if (!str_contains($hay, $q)) return false;
+            }
+            return true;
+        }));
+
+        // Sort spec "column:direction" — default occurredAt desc. Whitelist
+        // keys we can safely sort on (anything outside falls back to date).
+        [$col, $dir] = array_pad(explode(':', (string) $request->query->get('sort', ''), 2), 2, '');
+        $sortable = ['occurredAt', 'amount', 'amountBase', 'type', 'description'];
+        if (!in_array($col, $sortable, true)) $col = 'occurredAt';
+        $asc = strtolower($dir) === 'asc';
+
+        usort($filtered, function ($a, $b) use ($col, $asc) {
+            $cmp = match ($col) {
+                'amount' => (int) $a['amountMinor'] <=> (int) $b['amountMinor'],
+                'amountBase' => (int) $a['amountBaseMinor'] <=> (int) $b['amountBaseMinor'],
+                'type' => strcmp((string) $a['type'], (string) $b['type']),
+                'description' => strcmp((string) ($a['description'] ?? ''), (string) ($b['description'] ?? '')),
+                default => strcmp((string) $a['occurredAt'], (string) $b['occurredAt']),
+            };
+            return $asc ? $cmp : -$cmp;
+        });
+
+        $page = max(1, (int) $request->query->get('page', '1'));
+        $pageSize = max(1, min(200, (int) $request->query->get('pageSize', '25')));
+        $offset = ($page - 1) * $pageSize;
+
+        return [
+            'items' => array_slice($filtered, $offset, $pageSize),
+            'total' => count($filtered),
+            'page' => $page,
+            'pageSize' => $pageSize,
+        ];
     }
 
     /**

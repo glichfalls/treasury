@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { api } from '@/lib/api'
 import { useToastsStore } from '@/stores/toasts'
 import { Plus, Trash2, Copy, Check } from 'lucide-vue-next'
+import DataTable from '@/components/ui/DataTable.vue'
+import type { ColumnDef } from '@tanstack/vue-table'
 
 interface RegistrationCode {
   id: string
@@ -73,6 +75,37 @@ async function copyCode(c: RegistrationCode) {
 function shortDate(iso: string): string {
   return new Date(iso).toLocaleDateString('de-CH', { year: 'numeric', month: 'short', day: '2-digit' })
 }
+
+const columns = computed<ColumnDef<RegistrationCode, unknown>[]>(() => [
+  { id: 'code', accessorKey: 'code', header: 'Code', enableSorting: true },
+  {
+    id: 'label',
+    accessorFn: (c) => c.label ?? '',
+    header: 'Label',
+    enableSorting: true,
+    meta: { cellClass: 'text-[var(--color-text-muted)]' },
+  },
+  {
+    id: 'status',
+    accessorFn: (c) => (c.usedAt ? `used:${c.usedByEmail}` : 'unused'),
+    header: 'Status',
+    enableSorting: true,
+  },
+  {
+    id: 'createdAt',
+    accessorKey: 'createdAt',
+    header: 'Created',
+    enableSorting: true,
+    meta: { cellClass: 'text-xs text-[var(--color-text-muted)]' },
+  },
+  {
+    id: 'actions',
+    header: '',
+    enableSorting: false,
+    enableColumnFilter: false,
+    meta: { align: 'right', headerClass: 'w-10' },
+  },
+])
 </script>
 
 <template>
@@ -97,57 +130,47 @@ function shortDate(iso: string): string {
 
     <div v-if="loading" class="text-sm text-[var(--color-text-muted)]">Loading…</div>
 
-    <div v-else-if="codes.length === 0" class="text-sm text-[var(--color-text-muted)]">
-      No codes yet. Create one to invite a user.
-    </div>
-
-    <div v-else class="card overflow-hidden">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Code</th>
-            <th>Label</th>
-            <th>Status</th>
-            <th>Created</th>
-            <th class="w-10"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="c in codes" :key="c.id">
-            <td>
-              <button
-                type="button"
-                class="font-mono text-sm flex items-center gap-1.5 hover:text-[var(--color-accent)] transition-colors"
-                :title="copiedId === c.id ? 'Copied' : 'Click to copy'"
-                @click="copyCode(c)"
-              >
-                <span class="tracking-wider">{{ c.code }}</span>
-                <Check v-if="copiedId === c.id" :size="12" class="text-[var(--color-positive)]" />
-                <Copy v-else :size="12" class="text-[var(--color-text-dim)]" />
-              </button>
-            </td>
-            <td class="text-[var(--color-text-muted)]">{{ c.label ?? '—' }}</td>
-            <td>
-              <span v-if="c.usedAt" class="badge" style="color: var(--color-positive);">
-                Used by {{ c.usedByEmail }}
-              </span>
-              <span v-else class="badge">Unused</span>
-            </td>
-            <td class="text-xs text-[var(--color-text-muted)]">{{ shortDate(c.createdAt) }}</td>
-            <td class="text-right">
-              <button
-                v-if="!c.usedAt"
-                type="button"
-                class="btn btn-danger p-1.5"
-                aria-label="Revoke code"
-                @click="revoke(c)"
-              >
-                <Trash2 :size="14" />
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      v-else
+      :data="codes"
+      :columns="columns"
+      empty-text="No codes yet. Create one to invite a user."
+    >
+      <template #cell-code="{ row }">
+        <button
+          type="button"
+          class="font-mono text-sm flex items-center gap-1.5 hover:text-[var(--color-accent)] transition-colors"
+          :title="copiedId === row.id ? 'Copied' : 'Click to copy'"
+          @click="copyCode(row)"
+        >
+          <span class="tracking-wider">{{ row.code }}</span>
+          <Check v-if="copiedId === row.id" :size="12" class="text-[var(--color-positive)]" />
+          <Copy v-else :size="12" class="text-[var(--color-text-dim)]" />
+        </button>
+      </template>
+      <template #cell-label="{ row }">
+        {{ row.label ?? '—' }}
+      </template>
+      <template #cell-status="{ row }">
+        <span v-if="row.usedAt" class="badge" style="color: var(--color-positive);">
+          Used by {{ row.usedByEmail }}
+        </span>
+        <span v-else class="badge">Unused</span>
+      </template>
+      <template #cell-createdAt="{ row }">
+        {{ shortDate(row.createdAt) }}
+      </template>
+      <template #cell-actions="{ row }">
+        <button
+          v-if="!row.usedAt"
+          type="button"
+          class="btn btn-danger p-1.5"
+          aria-label="Revoke code"
+          @click="revoke(row)"
+        >
+          <Trash2 :size="14" />
+        </button>
+      </template>
+    </DataTable>
   </div>
 </template>
