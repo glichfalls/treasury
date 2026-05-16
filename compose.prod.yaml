@@ -10,6 +10,9 @@ services:
     # Reach Plesk's MySQL on the host
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     expose:
       - "9000"
     volumes:
@@ -18,6 +21,42 @@ services:
       # like before shadowed the freshly-warmed cache with stale content from a previous
       # build and broke DI when constructor signatures changed.
       - php_sessions:/app/var/sessions
+
+  # Long-lived worker that ticks the Symfony Scheduler and consumes the async
+  # queue (RabbitMQ). The scheduler ticks `scheduler_default` and dispatches
+  # RefreshPricesMessage / MaterializeRecurringMessage onto `async`; this same
+  # process picks them up from RabbitMQ and runs the handlers. --time-limit
+  # recycles the worker hourly to keep memory clean; restart: unless-stopped
+  # brings it right back up.
+  worker:
+    image: ghcr.io/${GHCR_OWNER}/treasury-php:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env.prod.local
+    environment:
+      APP_ENV: prod
+      APP_DEBUG: "0"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    entrypoint: []
+    command: ["php", "bin/console", "messenger:consume", "scheduler_default", "async", "-vv", "--time-limit=3600"]
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    restart: unless-stopped
+    env_file:
+      - .env.prod.local
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
 
   web:
     image: ghcr.io/${GHCR_OWNER}/treasury-web:${IMAGE_TAG:-latest}
@@ -30,3 +69,4 @@ services:
 
 volumes:
   php_sessions:
+  rabbitmq_data:

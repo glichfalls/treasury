@@ -19,3 +19,13 @@ services:
     ports:
       - "127.0.0.1:33306:3306"
 ###< doctrine/doctrine-bundle ###
+
+  rabbitmq:
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+
+  worker:
+    volumes:
+      - .:/app
+      - php_vendor:/app/vendor

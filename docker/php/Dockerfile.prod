@@ -2,9 +2,11 @@ FROM composer:2 AS composer-bin
 
 FROM php:8.4-fpm-alpine AS prod
 
-RUN apk add --no-cache git unzip icu-libs icu-data-full \
-    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS icu-dev linux-headers \
+RUN apk add --no-cache git unzip icu-libs icu-data-full rabbitmq-c \
+    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS icu-dev linux-headers rabbitmq-c-dev \
     && docker-php-ext-install -j$(nproc) pdo_mysql intl opcache bcmath \
+    && pecl install amqp \
+    && docker-php-ext-enable amqp \
     && apk del .build-deps
 
 COPY --from=composer-bin /usr/bin/composer /usr/bin/composer

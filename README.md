@@ -98,7 +98,18 @@ docker compose logs -f php
 
 The `APP_ENV=test` override on phpunit is needed because compose sets `APP_ENV=dev` on the php service.
 
-A daily scheduler runs `app:prices:refresh` at 22:30 (see `src/Schedule.php`); no cron setup needed.
+Scheduled jobs (`src/Schedule.php`) run through Symfony Scheduler + Messenger over RabbitMQ:
+
+- `app:prices:refresh` daily at 22:30 (via `RefreshPricesMessage`)
+- recurring-transaction materialization daily at 00:05 (via `MaterializeRecurringMessage`)
+
+The `worker` container in `compose.prod.yaml` runs `messenger:consume scheduler_default async`: it ticks the scheduler on the configured cron and consumes the dispatched messages from the `rabbitmq` service. Locally, run the same consumer when you want jobs to fire:
+
+```
+docker compose exec php php bin/console messenger:consume scheduler_default async -vv
+```
+
+The RabbitMQ management UI is at http://localhost:15672 in dev (guest/guest).
 
 ## Importing details
 
@@ -136,7 +147,8 @@ src/
   Backup/           JSON export/import service
   Entity/PasswordResetToken.php   Time-limited reset tokens (SHA-256 hashed)
   Command/          Console commands (user mgmt, prices, seeding)
-  Schedule.php      Symfony Scheduler config (daily price refresh)
+  Schedule.php      Symfony Scheduler config (daily price refresh + recurring tx materialization)
+  Schedule/         Scheduler messages and their handlers (dispatched via RabbitMQ)
 frontend/
   src/components/   Charts, forms, modals, dropzone
   src/views/        Landing, login, register, dashboard, accounts, account, settings

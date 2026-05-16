@@ -4,11 +4,49 @@ services:
     build: ./docker/php
     environment:
       DATABASE_URL: "mysql://${MYSQL_USER:-app}:${MYSQL_PASSWORD:-apppass}@database:3306/${MYSQL_DATABASE:-app}?serverVersion=8.4&charset=utf8mb4"
+      MESSENGER_TRANSPORT_DSN: "amqp://guest:guest@rabbitmq:5672/%2f/messages"
       APP_ENV: dev
     depends_on:
       database:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     working_dir: /app
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  # Ticks the Symfony Scheduler (cron-style) and consumes the async (RabbitMQ)
+  # queue. Waits for the shared php_vendor volume to be populated by the `php`
+  # service before starting. --time-limit recycles the process hourly so code
+  # edits to handlers get picked up on the next cycle without manual restart.
+  worker:
+    build: ./docker/php
+    environment:
+      DATABASE_URL: "mysql://${MYSQL_USER:-app}:${MYSQL_PASSWORD:-apppass}@database:3306/${MYSQL_DATABASE:-app}?serverVersion=8.4&charset=utf8mb4"
+      MESSENGER_TRANSPORT_DSN: "amqp://guest:guest@rabbitmq:5672/%2f/messages"
+      APP_ENV: dev
+    depends_on:
+      database:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    working_dir: /app
+    entrypoint: ["sh", "-c"]
+    command:
+      - 'until [ -f /app/vendor/autoload.php ]; do echo "[worker] waiting for vendor..."; sleep 2; done; exec php bin/console messenger:consume scheduler_default async -vv --time-limit=3600'
+    restart: unless-stopped
 
   frontend:
     build: ./docker/frontend
@@ -40,3 +78,4 @@ volumes:
 ###< doctrine/doctrine-bundle ###
   php_vendor:
   frontend_node_modules:
+  rabbitmq_data:

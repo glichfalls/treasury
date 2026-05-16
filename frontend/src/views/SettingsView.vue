@@ -2,6 +2,7 @@
 import BackupPanel from '@/components/BackupPanel.vue'
 import ChangePasswordPanel from '@/components/ChangePasswordPanel.vue'
 import PreferencesPanel from '@/components/PreferencesPanel.vue'
+import PricesAdminPanel from '@/components/PricesAdminPanel.vue'
 import RegistrationCodesPanel from '@/components/RegistrationCodesPanel.vue'
 import TagsPanel from '@/components/TagsPanel.vue'
 import UsersPanel from '@/components/UsersPanel.vue'
@@ -28,6 +29,7 @@ const auth = useAuthStore()
     <template v-if="auth.isAdmin">
       <UsersPanel />
       <RegistrationCodesPanel />
+      <PricesAdminPanel />
     </template>
   </div>
 </template>

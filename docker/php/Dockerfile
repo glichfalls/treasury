@@ -1,8 +1,10 @@
 FROM php:8.4-cli-alpine
 
-RUN apk add --no-cache git unzip icu-libs icu-data-full \
-    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS icu-dev oniguruma-dev linux-headers \
+RUN apk add --no-cache git unzip icu-libs icu-data-full rabbitmq-c \
+    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS icu-dev oniguruma-dev linux-headers rabbitmq-c-dev \
     && docker-php-ext-install -j$(nproc) pdo_mysql intl opcache bcmath \
+    && pecl install amqp \
+    && docker-php-ext-enable amqp \
     && apk del .build-deps
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
