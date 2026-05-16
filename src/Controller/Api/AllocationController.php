@@ -232,7 +232,8 @@ class AllocationController extends AbstractController
         }
 
         $description = is_string($body['description'] ?? null) ? $body['description'] : null;
-        $result = $this->contributions->record($account, $date, (int) $amountMinor, $description);
+        $isOpeningBalance = (bool) ($body['isOpeningBalance'] ?? false);
+        $result = $this->contributions->record($account, $date, (int) $amountMinor, $description, $isOpeningBalance);
 
         return new JsonResponse([
             'depositId' => $result['deposit']->getId()->toRfc4122(),

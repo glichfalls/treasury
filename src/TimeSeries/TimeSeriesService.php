@@ -54,7 +54,7 @@ final class TimeSeriesService
              INNER JOIN accounts a ON a.id = t.account_id
              WHERE a.owner_id = :owner
                AND t.occurred_at BETWEEN :from AND :to
-               AND t.type NOT IN ('trade_buy', 'trade_sell', 'fx_conversion')
+               AND t.type NOT IN ('trade_buy', 'trade_sell', 'fx_conversion', 'opening_balance')
              ORDER BY t.occurred_at ASC",
             [
                 'owner' => $user->getId()->toBinary(),
@@ -105,7 +105,7 @@ final class TimeSeriesService
              INNER JOIN accounts a ON a.id = t.account_id
              WHERE a.owner_id = :owner
                AND t.occurred_at BETWEEN :from AND :to
-               AND t.type NOT IN ('trade_buy', 'trade_sell', 'fx_conversion')
+               AND t.type NOT IN ('trade_buy', 'trade_sell', 'fx_conversion', 'opening_balance')
              ORDER BY t.occurred_at ASC",
             [
                 'owner' => $user->getId()->toBinary(),
@@ -345,8 +345,10 @@ final class TimeSeriesService
         // "deposits" makes vsDeposits and TWR systematically wrong — TWR in
         // particular strips period flows out of the return calculation, so
         // tagging a $50 dividend as a flow makes that $50 of real return
-        // invisible. `other` is ambiguous, kept out for safety.
-        $depositLikeTypes = ['deposit', 'withdrawal'];
+        // invisible. `other` is ambiguous, kept out for safety. Opening
+        // balance counts as a deposit so TWR/vsDeposits start from a real
+        // basis (otherwise V/0 blows up on day one).
+        $depositLikeTypes = ['deposit', 'withdrawal', 'opening_balance'];
 
         // Collect ISINs we'll need to look up prices for.
         $isins = [];

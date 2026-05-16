@@ -44,6 +44,33 @@ class AccountRepository extends ServiceEntityRepository
     }
 
     /**
+     * Which of the supplied accounts already have an opening-balance row?
+     * Used to hide the "Set starting balance" button after it's been used —
+     * the flow is one-shot per account.
+     *
+     * @param \Symfony\Component\Uid\Uuid[] $accountIds
+     * @return array<string, bool>  account_id (rfc4122) => has opening balance
+     */
+    public function hasOpeningBalanceMap(array $accountIds): array
+    {
+        if ($accountIds === []) {
+            return [];
+        }
+        $binIds = array_map(fn(\Symfony\Component\Uid\Uuid $u) => $u->toBinary(), $accountIds);
+        $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(
+            "SELECT DISTINCT account_id FROM transactions
+             WHERE account_id IN (?) AND type = 'opening_balance'",
+            [$binIds],
+            [\Doctrine\DBAL\ArrayParameterType::BINARY],
+        );
+        $out = [];
+        foreach ($rows as $r) {
+            $out[\Symfony\Component\Uid\Uuid::fromBinary($r['account_id'])->toRfc4122()] = true;
+        }
+        return $out;
+    }
+
+    /**
      * @param \Symfony\Component\Uid\Uuid[] $accountIds
      * @return array<string, string>  account_id (rfc4122) => sum of amount_minor as string
      */

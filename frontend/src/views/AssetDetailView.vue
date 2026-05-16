@@ -81,6 +81,7 @@ watch(isin, load)
 
 const typeLabels: Record<string, string> = {
   deposit: 'Deposit',
+  opening_balance: 'Opening balance',
   withdrawal: 'Withdrawal',
   trade_buy: 'Buy',
   trade_sell: 'Sell',

@@ -5,6 +5,7 @@ namespace App\Entity;
 enum TransactionType: string
 {
     case Deposit = 'deposit';
+    case OpeningBalance = 'opening_balance';
     case Withdrawal = 'withdrawal';
     case TradeBuy = 'trade_buy';
     case TradeSell = 'trade_sell';

@@ -126,6 +126,7 @@ watch(accountId, () => {
 
 const typeLabels: Record<string, string> = {
   deposit: 'Deposit',
+  opening_balance: 'Opening balance',
   withdrawal: 'Withdrawal',
   trade_buy: 'Buy',
   trade_sell: 'Sell',
@@ -168,7 +169,8 @@ async function onTransactionSaved() {
 }
 
 async function deleteTransaction(t: Transaction) {
-  const isPillar3aDeposit = account.value?.type === 'pillar_3a' && t.type === 'deposit'
+  const isPillar3aDeposit = account.value?.type === 'pillar_3a'
+    && (t.type === 'deposit' || t.type === 'opening_balance')
   const msg = isPillar3aDeposit
     ? 'Delete this contribution? Auto-generated trade rows from the same day will also be removed.'
     : `Delete this transaction (${t.description ?? t.type})?`
@@ -228,6 +230,7 @@ async function deleteTransaction(t: Transaction) {
               @created="reloadAfterImport"
             />
             <OpeningBalanceForm
+              v-if="!account.hasOpeningBalance"
               :account-id="account.id"
               :currency="account.currency"
               @created="reloadAfterImport"

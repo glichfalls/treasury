@@ -199,11 +199,38 @@ class TransactionController extends AbstractController
 
         $body = json_decode($request->getContent(), true, flags: JSON_THROW_ON_ERROR);
 
+        // Remember the date BEFORE we mutate it — the trade-cascade below needs
+        // to find sibling trades by their old date.
+        $previousOccurredAt = $tx->getOccurredAt();
+        $cascadedTradeDates = 0;
         if (array_key_exists('occurredAt', $body)) {
             try {
-                $tx->setOccurredAt(new \DateTimeImmutable((string) $body['occurredAt']));
+                $newDate = new \DateTimeImmutable((string) $body['occurredAt']);
             } catch (\Exception) {
                 return new JsonResponse(['error' => 'Invalid occurredAt'], 422);
+            }
+            $tx->setOccurredAt($newDate);
+
+            // For Pillar 3a contributions/opening balances, the trade rows on the
+            // SAME old date are auto-generated siblings of this deposit — keep
+            // their date in lockstep so reports and the delete cascade stay
+            // coherent. Without this, editing a deposit's date orphans the
+            // trades on the original date (and they then show up as today's
+            // performance instead of the user's chosen date).
+            $isContribution = $account->getType() === AccountType::Pillar3a
+                && in_array($tx->getType(), [TransactionType::Deposit, TransactionType::OpeningBalance], true);
+            if ($isContribution && $newDate->format('Y-m-d') !== $previousOccurredAt->format('Y-m-d')) {
+                $cascadedTradeDates = (int) $this->em->getConnection()->executeStatement(
+                    "UPDATE transactions
+                     SET occurred_at = :new
+                     WHERE account_id = :a AND occurred_at = :old
+                       AND type IN ('trade_buy', 'trade_sell')",
+                    [
+                        'a' => $account->getId()->toBinary(),
+                        'old' => $previousOccurredAt->format('Y-m-d'),
+                        'new' => $newDate->format('Y-m-d'),
+                    ],
+                );
             }
         }
         if (array_key_exists('amountMinor', $body)) {
@@ -251,7 +278,10 @@ class TransactionController extends AbstractController
 
         $this->em->flush();
 
-        return new JsonResponse($this->serialize($tx));
+        return new JsonResponse([
+            ...$this->serialize($tx),
+            'cascadedTradeDates' => $cascadedTradeDates,
+        ]);
     }
 
     #[Route('/{transactionId}', name: 'api_transactions_get', methods: ['GET'], requirements: ['transactionId' => '[0-9a-f-]+'])]
@@ -300,7 +330,9 @@ class TransactionController extends AbstractController
         }
 
         $cascaded = 0;
-        if ($account->getType() === AccountType::Pillar3a && $tx->getType() === TransactionType::Deposit) {
+        if ($account->getType() === AccountType::Pillar3a
+            && in_array($tx->getType(), [TransactionType::Deposit, TransactionType::OpeningBalance], true)
+        ) {
             $cascaded = (int) $this->em->getConnection()->executeStatement(
                 "DELETE FROM transactions
                  WHERE account_id = :a AND occurred_at = :d AND type IN ('trade_buy', 'trade_sell')",

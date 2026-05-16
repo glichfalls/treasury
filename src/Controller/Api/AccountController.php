@@ -28,15 +28,23 @@ class AccountController extends AbstractController
     public function list(#[CurrentUser] User $user): JsonResponse
     {
         $accounts = $this->accounts->findByOwner($user);
-        $balances = $this->accounts->sumBalancesMinor(array_map(fn($a) => $a->getId(), $accounts));
+        $ids = array_map(fn($a) => $a->getId(), $accounts);
+        $balances = $this->accounts->sumBalancesMinor($ids);
+        $hasOpening = $this->accounts->hasOpeningBalanceMap($ids);
 
         return new JsonResponse(array_map(
-            function (Account $a) use ($balances) {
+            function (Account $a) use ($balances, $hasOpening) {
                 $cash = $balances[$a->getId()->toRfc4122()] ?? '0';
                 $holdings = $this->holdings->forAccount($a);
                 $holdingsValue = $this->holdings->totalValueMinor($a, $holdings);
                 $total = bcadd($cash, $holdingsValue, 0);
-                return $this->serializeAccount($a, $cash, $holdingsValue, $total);
+                return $this->serializeAccount(
+                    $a,
+                    $cash,
+                    $holdingsValue,
+                    $total,
+                    $hasOpening[$a->getId()->toRfc4122()] ?? false,
+                );
             },
             $accounts,
         ));
@@ -174,8 +182,9 @@ class AccountController extends AbstractController
         $holdings = $this->holdings->forAccount($account);
         $holdingsValue = $this->holdings->totalValueMinor($account, $holdings);
         $total = bcadd($cash, $holdingsValue, 0);
+        $hasOpening = $this->accounts->hasOpeningBalanceMap([$account->getId()])[$account->getId()->toRfc4122()] ?? false;
 
-        return new JsonResponse($this->serializeAccount($account, $cash, $holdingsValue, $total));
+        return new JsonResponse($this->serializeAccount($account, $cash, $holdingsValue, $total, $hasOpening));
     }
 
     private function serializeAccount(
@@ -183,6 +192,7 @@ class AccountController extends AbstractController
         string $cashMinor,
         string $holdingsMinor = '0',
         ?string $totalMinor = null,
+        bool $hasOpeningBalance = false,
     ): array {
         return [
             'id' => $a->getId()->toRfc4122(),
@@ -194,6 +204,7 @@ class AccountController extends AbstractController
             'cashMinor' => $cashMinor,
             'holdingsMinor' => $holdingsMinor,
             'balanceMinor' => $totalMinor ?? $cashMinor,
+            'hasOpeningBalance' => $hasOpeningBalance,
         ];
     }
 }

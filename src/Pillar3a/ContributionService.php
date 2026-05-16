@@ -27,8 +27,13 @@ final class ContributionService
     /**
      * @return array{deposit: Transaction, trades: list<Transaction>, missingPrices: list<string>}
      */
-    public function record(Account $account, \DateTimeImmutable $date, int $amountMinor, ?string $description = null): array
-    {
+    public function record(
+        Account $account,
+        \DateTimeImmutable $date,
+        int $amountMinor,
+        ?string $description = null,
+        bool $isOpeningBalance = false,
+    ): array {
         // Use the strategy effective on the contribution date — not today's — so back-
         // dated contributions reflect what the user actually held at that time.
         $allocations = $this->allocations->findEffective($account, $date);
@@ -37,14 +42,16 @@ final class ContributionService
             throw new \InvalidArgumentException(sprintf('Allocation exceeds 100 %% (sum: %.2f %%).', $totalBp / 100));
         }
 
-        // The cash deposit always lands first.
+        // The cash deposit always lands first. Opening-balance rows are tagged with
+        // their own type so cash-flow charts can skip them (the money was earned
+        // over years before the app existed, not income at the entry date).
         $deposit = new Transaction();
         $deposit->setAccount($account);
         $deposit->setOccurredAt($date);
         $deposit->setAmountMinor((string) $amountMinor);
         $deposit->setCurrency($account->getCurrency());
         $deposit->setDescription($description ?? 'Pillar 3a contribution');
-        $deposit->setType(TransactionType::Deposit);
+        $deposit->setType($isOpeningBalance ? TransactionType::OpeningBalance : TransactionType::Deposit);
         $deposit->setSource(TransactionSource::Manual);
         $this->em->persist($deposit);
 

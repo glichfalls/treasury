@@ -139,6 +139,28 @@ final class ContributionServiceTest extends KernelTestCase
         );
     }
 
+    public function testOpeningBalanceUsesItsOwnType(): void
+    {
+        $this->setAllocation([['US9229083632', 10000]]);
+        $this->addPrice($this->voo, '2024-06-01', '50000', 'USD');
+        $this->addFx('USD', 'CHF', '0.90', '2024-06-01');
+
+        $result = $this->service->record(
+            $this->account,
+            new \DateTimeImmutable('2024-06-01'),
+            100000,
+            'Opening balance',
+            isOpeningBalance: true,
+        );
+
+        // The deposit row carries the new type so cash-flow charts know to skip
+        // it (the money is accumulated savings, not income on the entry date).
+        // The buy legs stay as ordinary trade_buy so holdings math is unchanged.
+        $this->assertSame(TransactionType::OpeningBalance, $result['deposit']->getType());
+        $this->assertCount(1, $result['trades']);
+        $this->assertSame(TransactionType::TradeBuy, $result['trades'][0]->getType());
+    }
+
     public function testBackdatedContributionUsesStrategyEffectiveAtThatDate(): void
     {
         // Two strategies:

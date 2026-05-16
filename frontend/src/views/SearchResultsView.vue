@@ -150,7 +150,8 @@ const totalMatches = computed(() => {
 const hasFilters = computed(() => !!(accountId.value || dateFrom.value || dateTo.value || txType.value))
 
 const typeLabels: Record<string, string> = {
-  deposit: 'Deposit', withdrawal: 'Withdrawal', trade_buy: 'Buy', trade_sell: 'Sell',
+  deposit: 'Deposit', opening_balance: 'Opening balance', withdrawal: 'Withdrawal',
+  trade_buy: 'Buy', trade_sell: 'Sell',
   fee: 'Fee', interest: 'Interest', dividend: 'Dividend', fx_conversion: 'FX', other: 'Other',
 }
 

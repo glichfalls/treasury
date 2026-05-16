@@ -35,7 +35,7 @@ async function submit() {
     const amountMinor = parseMajor(amount.value, props.currency)
     const res = await api.post<{ tradeCount: number; missingPrices: string[] }>(
       `/api/accounts/${props.accountId}/contributions`,
-      { occurredAt: occurredAt.value, amountMinor, description: 'Opening balance' },
+      { occurredAt: occurredAt.value, amountMinor, description: 'Opening balance', isOpeningBalance: true },
     )
     missing.value = res.missingPrices
     toasts.success('Starting balance saved')

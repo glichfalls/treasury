@@ -66,9 +66,11 @@ final class TimeSeriesServiceTest extends KernelTestCase
         $this->addTx($this->checking, '2025-03-05', 500000, TransactionType::Deposit);
         $this->addTx($this->checking, '2025-03-10', -250000, TransactionType::Withdrawal);
         $this->addTx($this->checking, '2025-03-15', -3000, TransactionType::Fee);
-        // Trade legs and FX should be EXCLUDED from cash flow.
+        // Trade legs, FX, and opening balances should be EXCLUDED from cash
+        // flow (the opening balance is accumulated savings, not real income).
         $this->addTx($this->brokerage, '2025-03-20', -100000, TransactionType::TradeBuy);
         $this->addTx($this->brokerage, '2025-03-21', -500, TransactionType::FxConversion);
+        $this->addTx($this->brokerage, '2025-03-22', 999999, TransactionType::OpeningBalance);
 
         $series = $this->service->cashFlowMonthly(
             $this->user,

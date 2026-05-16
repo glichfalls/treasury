@@ -33,6 +33,7 @@ const features = computed(() => {
 
 const transactionTypes = [
   { value: 'deposit', label: 'Deposit' },
+  { value: 'opening_balance', label: 'Opening balance' },
   { value: 'withdrawal', label: 'Withdrawal' },
   { value: 'trade_buy', label: 'Buy' },
   { value: 'trade_sell', label: 'Sell' },

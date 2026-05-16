@@ -12,6 +12,7 @@ export interface Account {
   cashMinor: string
   holdingsMinor: string
   balanceMinor: string
+  hasOpeningBalance: boolean
 }
 
 export interface NewAccount {
