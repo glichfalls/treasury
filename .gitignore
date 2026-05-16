@@ -14,4 +14,5 @@
 ###< phpunit/phpunit ###
 samples/
 .claude/
+CLAUDE.md
 docs/node_modules
