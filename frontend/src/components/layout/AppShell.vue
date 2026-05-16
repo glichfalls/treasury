@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { LogOut, Wallet, Menu, X, LayoutDashboard, Settings, Target } from 'lucide-vue-next'
+import { LogOut, Wallet, Menu, X, LayoutDashboard, Settings, Target, BarChart3 } from 'lucide-vue-next'
 import HeaderSearch from '@/components/layout/HeaderSearch.vue'
 import BrandMark from '@/components/ui/BrandMark.vue'
 import Button from '@/components/ui/Button.vue'
@@ -18,6 +18,7 @@ const activeName = computed(() => String(route.name ?? ''))
 const navItems = [
   { to: { name: 'dashboard' }, label: 'Dashboard', icon: LayoutDashboard, match: (n: string) => n === 'dashboard' },
   { to: { name: 'accounts' }, label: 'Accounts', icon: Wallet, match: (n: string) => n === 'accounts' || n === 'account' || n === 'asset' },
+  { to: { name: 'insights' }, label: 'Insights', icon: BarChart3, match: (n: string) => n === 'insights' },
   { to: { name: 'plan' }, label: 'Plan', icon: Target, match: (n: string) => n === 'plan' },
   { to: { name: 'settings' }, label: 'Settings', icon: Settings, match: (n: string) => n === 'settings' },
 ]

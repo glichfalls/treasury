@@ -15,6 +15,10 @@ final class Holding
         public readonly ?string $priceAsOf,
         public readonly ?string $valueBaseMinor,
         public readonly string $baseCurrency,
+        /** Price the day before $priceAsOf, in $priceCurrency. Null if no prior price exists. */
+        public readonly ?string $previousPriceMinor = null,
+        /** (latest − previous) / previous × 100. Null if either side is missing. */
+        public readonly ?float $dayChangePct = null,
     ) {}
 
     public function toArray(): array
@@ -29,6 +33,8 @@ final class Holding
             'priceAsOf' => $this->priceAsOf,
             'valueBaseMinor' => $this->valueBaseMinor,
             'baseCurrency' => $this->baseCurrency,
+            'previousPriceMinor' => $this->previousPriceMinor,
+            'dayChangePct' => $this->dayChangePct,
         ];
     }
 }

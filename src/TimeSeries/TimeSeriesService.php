@@ -262,6 +262,130 @@ final class TimeSeriesService
     }
 
     /**
+     * Per-asset profit-over-time series, in the user's base currency.
+     *
+     * For each sample date returns:
+     *  - costBasisMinor:    cumulative cash invested in the position (buys − sells, in base)
+     *  - marketValueMinor:  qty held × price × FX, in base
+     *  - dividendsCumMinor: cumulative dividends received, in base (historical FX per tx)
+     *  - unrealizedPnlMinor: marketValue − costBasis
+     *  - totalReturnMinor:  marketValue − costBasis + dividendsCum
+     *
+     * All FX conversions use the rate effective on the relevant date (tx date for
+     * cash flows, sample date for market value), matching the netWorth series so
+     * the numbers reconcile.
+     *
+     * @return list<array{date:string, costBasisMinor:string, marketValueMinor:string, dividendsCumMinor:string, unrealizedPnlMinor:string, totalReturnMinor:string}>
+     */
+    public function assetProfitSeries(
+        \App\Entity\User $user,
+        string $isin,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        string $granularity = 'daily',
+        string $displayCurrency = 'CHF',
+    ): array {
+        $isin = strtoupper($isin);
+
+        $tx = $this->conn->fetchAllAssociative(
+            "SELECT t.occurred_at, t.amount_minor, t.currency, t.type, t.asset_quantity
+             FROM transactions t
+             INNER JOIN accounts a ON a.id = t.account_id
+             WHERE a.owner_id = :owner AND t.asset_isin = :isin
+             ORDER BY t.occurred_at ASC, t.id ASC",
+            [
+                'owner' => $user->getId()->toBinary(),
+                'isin' => $isin,
+            ],
+        );
+
+        if ($tx === []) {
+            return [];
+        }
+
+        $firstTxDate = new \DateTimeImmutable($tx[0]['occurred_at']);
+        if ($from < $firstTxDate) {
+            $from = $firstTxDate;
+        }
+
+        $pricesByIsin = $this->loadPrices([$isin]);
+        $pricesByIsin = $this->applyCommodityDerivedPrices($pricesByIsin, [$isin]);
+        $fxByPair = $this->loadFxRates($displayCurrency, $pricesByIsin);
+
+        $dates = $this->sampleDates($from, $to, $granularity);
+        $points = [];
+
+        $costCum = 0;        // base-currency minor units, signed
+        $divCum = 0;         // base-currency minor units
+        $qty = '0';          // decimal string
+        $txIdx = 0;
+        $txCount = count($tx);
+
+        foreach ($dates as $date) {
+            $dateStr = $date->format('Y-m-d');
+
+            while ($txIdx < $txCount && $tx[$txIdx]['occurred_at'] <= $dateStr) {
+                $row = $tx[$txIdx];
+                $amount = (int) $row['amount_minor'];
+                $rowCcy = $row['currency'];
+                $converted = $this->fx->convertMinor(
+                    $amount,
+                    $rowCcy,
+                    $displayCurrency,
+                    new \DateTimeImmutable($row['occurred_at']),
+                );
+                $converted ??= $amount;
+
+                if (in_array($row['type'], ['trade_buy', 'trade_sell'], true)) {
+                    // Buy: amount is negative (money out), so subtracting it INCREASES cost.
+                    // Sell: amount is positive (money in), subtracting DECREASES cost.
+                    $costCum -= $converted;
+                    if ($row['asset_quantity'] !== null) {
+                        $qty = bcadd($qty, (string) $row['asset_quantity'], 8);
+                    }
+                } elseif ($row['type'] === 'dividend') {
+                    $divCum += $converted;
+                }
+                $txIdx++;
+            }
+
+            // Market value at sample date in base currency.
+            $mv = 0.0;
+            if (bccomp($qty, '0', 8) !== 0) {
+                $priceEntry = $this->findOnOrBefore($pricesByIsin[$isin] ?? [], $dateStr);
+                if ($priceEntry !== null) {
+                    $priceMajor = $priceEntry['price_minor'] / 100;
+                    $native = (float) $qty * $priceMajor;
+                    $assetCcy = $priceEntry['currency'];
+                    if ($assetCcy === $displayCurrency) {
+                        $mv = $native;
+                    } else {
+                        $fxEntry = $this->findOnOrBefore($fxByPair[$assetCcy] ?? [], $dateStr);
+                        if ($fxEntry !== null) {
+                            $mv = $native * $fxEntry['rate'];
+                        }
+                    }
+                }
+            }
+
+            $mvMinor = (int) round($mv * 100);
+            $unrealized = $mvMinor - $costCum;
+            $total = $unrealized + $divCum;
+
+            $points[] = [
+                'date' => $dateStr,
+                'costBasisMinor' => (string) $costCum,
+                'marketValueMinor' => (string) $mvMinor,
+                'dividendsCumMinor' => (string) $divCum,
+                'unrealizedPnlMinor' => (string) $unrealized,
+                'totalReturnMinor' => (string) $total,
+            ];
+        }
+
+        return $points;
+    }
+
+    /**
      * Net-worth time series for all accounts owned by $user.
      *
      * @return TimeSeriesPoint[]

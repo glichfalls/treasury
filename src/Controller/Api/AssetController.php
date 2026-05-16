@@ -6,6 +6,7 @@ use App\Entity\Asset;
 use App\Entity\User;
 use App\Fx\FxConverter;
 use App\Repository\AssetRepository;
+use App\TimeSeries\TimeSeriesService;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -20,7 +21,45 @@ class AssetController extends AbstractController
         private readonly AssetRepository $assets,
         private readonly Connection $conn,
         private readonly FxConverter $fx,
+        private readonly TimeSeriesService $timeSeries,
     ) {}
+
+    /**
+     * Profit-over-time series for a single asset, in the user's base currency.
+     * Used by the asset detail view's P&L chart.
+     */
+    #[Route('/api/assets/{isin}/profit-series', name: 'api_asset_profit_series', methods: ['GET'])]
+    public function profitSeries(string $isin, \Symfony\Component\HttpFoundation\Request $request, #[CurrentUser] User $user): JsonResponse
+    {
+        $isin = strtoupper($isin);
+        if ($this->assets->findByIsin($isin) === null) {
+            throw new NotFoundHttpException();
+        }
+
+        $toStr = $request->query->get('to');
+        $fromStr = $request->query->get('from');
+        $granularity = $request->query->get('granularity', 'daily');
+        if (!in_array($granularity, ['daily', 'weekly', 'monthly'], true)) {
+            $granularity = 'daily';
+        }
+        $to = $toStr !== null ? new \DateTimeImmutable($toStr) : new \DateTimeImmutable('today');
+        $from = $fromStr !== null ? new \DateTimeImmutable($fromStr) : $to->modify('-1 year');
+
+        $points = $this->timeSeries->assetProfitSeries(
+            $user,
+            $isin,
+            $from,
+            $to,
+            $granularity,
+            $user->getBaseCurrency(),
+        );
+
+        return new JsonResponse([
+            'isin' => $isin,
+            'baseCurrency' => $user->getBaseCurrency(),
+            'points' => $points,
+        ]);
+    }
 
     /**
      * Aggregate view of a single asset across all the user's accounts:
@@ -145,15 +184,25 @@ class AssetController extends AbstractController
             fn($a) => bccomp($a['quantity'], '0', 8) !== 0,
         ));
 
-        // Latest price for the asset (raw, in asset's native currency).
-        $latestPrice = $this->conn->fetchAssociative(
+        // Latest TWO prices for the asset (latest + previous) so we can show a
+        // day-over-day % change next to the latest price.
+        $lastTwoPrices = $this->conn->fetchAllAssociative(
             'SELECT price_minor, currency, occurred_at
              FROM prices
              WHERE asset_id = :id
              ORDER BY occurred_at DESC
-             LIMIT 1',
+             LIMIT 2',
             ['id' => $asset->getId()->toBinary()],
         );
+        $latestPrice = $lastTwoPrices[0] ?? false;
+        $previousPrice = $lastTwoPrices[1] ?? null;
+        $dayChangePct = null;
+        if ($latestPrice !== false && $previousPrice !== null) {
+            $prevMinor = (float) $previousPrice['price_minor'];
+            if ($prevMinor !== 0.0) {
+                $dayChangePct = ((float) $latestPrice['price_minor'] - $prevMinor) / $prevMinor * 100;
+            }
+        }
 
         $currentValueMinor = null;
         $currentValueCurrency = null;
@@ -200,6 +249,9 @@ class AssetController extends AbstractController
             'currentPriceMinor' => $latestPrice !== false ? $latestPrice['price_minor'] ?? null : null,
             'currentPriceCurrency' => $latestPrice !== false ? $latestPrice['currency'] ?? null : null,
             'currentPriceAsOf' => $latestPrice !== false ? $latestPrice['occurred_at'] ?? null : null,
+            'previousPriceMinor' => $previousPrice['price_minor'] ?? null,
+            'previousPriceAsOf' => $previousPrice['occurred_at'] ?? null,
+            'dayChangePct' => $dayChangePct,
             'currentValueMinor' => $currentValueMinor,
             'currentValueCurrency' => $currentValueCurrency,
 

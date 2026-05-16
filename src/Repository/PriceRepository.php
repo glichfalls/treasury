@@ -29,6 +29,54 @@ class PriceRepository extends ServiceEntityRepository
     }
 
     /**
+     * Latest two prices per asset (most recent + the one before it). Used to
+     * compute day-over-day % change. Returns at most two entries per asset,
+     * ordered most-recent first.
+     *
+     * @param \Symfony\Component\Uid\Uuid[] $assetIds
+     * @return array<string, list<array{occurredAt: string, priceMinor: string, currency: string}>>
+     *         keyed by asset_id (rfc4122)
+     */
+    public function findLatestTwoByAssetIds(array $assetIds): array
+    {
+        if ($assetIds === []) {
+            return [];
+        }
+        $binIds = array_map(fn(\Symfony\Component\Uid\Uuid $u) => $u->toBinary(), $assetIds);
+
+        // Window function: rank prices per asset by date desc, take the top 2.
+        // Supported by MySQL 8+ and MariaDB 10.2+ (we target 10.6 in prod).
+        $sql = <<<'SQL'
+            SELECT asset_id, occurred_at, price_minor, currency
+            FROM (
+                SELECT asset_id, occurred_at, price_minor, currency,
+                       ROW_NUMBER() OVER (PARTITION BY asset_id ORDER BY occurred_at DESC) AS rn
+                FROM prices
+                WHERE asset_id IN (?)
+            ) ranked
+            WHERE rn <= 2
+            ORDER BY asset_id, occurred_at DESC
+        SQL;
+
+        $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(
+            $sql,
+            [$binIds],
+            [\Doctrine\DBAL\ArrayParameterType::BINARY],
+        );
+
+        $out = [];
+        foreach ($rows as $r) {
+            $key = \Symfony\Component\Uid\Uuid::fromBinary($r['asset_id'])->toRfc4122();
+            $out[$key][] = [
+                'occurredAt' => $r['occurred_at'],
+                'priceMinor' => (string) $r['price_minor'],
+                'currency' => $r['currency'],
+            ];
+        }
+        return $out;
+    }
+
+    /**
      * @param \Symfony\Component\Uid\Uuid[] $assetIds
      * @return array<string, Price>  asset_id (rfc4122) => latest Price
      */

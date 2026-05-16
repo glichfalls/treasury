@@ -47,10 +47,17 @@ final class HoldingsService
 
         $assetIds = array_map(fn($a) => $a->getId(), $assetsByIsin);
         $latestPrices = $this->prices->findLatestByAssetIds($assetIds);
+        $lastTwoByAssetId = $this->prices->findLatestTwoByAssetIds($assetIds);
 
         // Spot price is needed if any of our held assets are commodity-backed.
         $spotAsset = $this->assets->findByIsin(self::SPOT_GOLD_ISIN);
         $spotPrice = $spotAsset !== null ? $this->prices->findLatest($spotAsset) : null;
+        // Commodity coins derive their price from the gold spot — so their day
+        // change is just the spot's day change (the grams × premium factor is a
+        // positive constant that cancels out).
+        $spotDayChange = $spotAsset !== null
+            ? $this->dayChangePctFor($lastTwoByAssetId[$spotAsset->getId()->toRfc4122()] ?? [])
+            : null;
 
         $base = $account->getCurrency();
         $holdings = [];
@@ -58,14 +65,23 @@ final class HoldingsService
             $asset = $assetsByIsin[$r['asset_isin']] ?? null;
             $qty = (string) $r['qty'];
 
+            $previousPriceMinor = null;
+            $dayChangePct = null;
+
             if ($asset !== null && $asset->getUnitWeightGrams() !== null) {
                 // Commodity-backed asset (e.g. gold coin): value = qty × grams ×
                 // spotPerGram × (1 + premium) × FX.
                 [$priceCurrency, $priceMinor, $priceAsOf, $valueBaseMinor] =
                     $this->valuateCommodity($asset, $qty, $spotPrice, $base);
+                $dayChangePct = $spotDayChange;
             } else {
                 [$priceCurrency, $priceMinor, $priceAsOf, $valueBaseMinor] =
                     $this->valuateMarketAsset($asset, $qty, $latestPrices, $base);
+                if ($asset !== null) {
+                    $two = $lastTwoByAssetId[$asset->getId()->toRfc4122()] ?? [];
+                    $dayChangePct = $this->dayChangePctFor($two);
+                    $previousPriceMinor = $two[1]['priceMinor'] ?? null;
+                }
             }
 
             $holdings[] = new Holding(
@@ -78,6 +94,8 @@ final class HoldingsService
                 priceAsOf: $priceAsOf,
                 valueBaseMinor: $valueBaseMinor,
                 baseCurrency: $base,
+                previousPriceMinor: $previousPriceMinor,
+                dayChangePct: $dayChangePct,
             );
         }
 
@@ -147,6 +165,24 @@ final class HoldingsService
             $spotPrice->getOccurredAt()->format('Y-m-d'),
             $valueBaseMinor,
         ];
+    }
+
+    /**
+     * Compute day-over-day % change from a list of "latest two" price rows.
+     *
+     * @param list<array{priceMinor: string, currency: string, occurredAt: string}> $lastTwo
+     */
+    private function dayChangePctFor(array $lastTwo): ?float
+    {
+        if (count($lastTwo) < 2) {
+            return null;
+        }
+        $latest = (float) $lastTwo[0]['priceMinor'];
+        $prev = (float) $lastTwo[1]['priceMinor'];
+        if ($prev === 0.0) {
+            return null;
+        }
+        return ($latest - $prev) / $prev * 100;
     }
 
     /** Sum of holding values in the account's base currency. Returns null if any holding lacks a price. */

@@ -5,10 +5,12 @@ import { api } from '@/lib/api'
 import { formatMinor, formatQuantity } from '@/lib/money'
 import { categoryMeta } from '@/lib/categories'
 import AssetPriceChart from '@/components/charts/AssetPriceChart.vue'
+import AssetProfitChart from '@/components/charts/AssetProfitChart.vue'
 import DateField from '@/components/ui/DateField.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import SelectField from '@/components/ui/SelectField.vue'
 import Button from '@/components/ui/Button.vue'
+import DayChangeBadge from '@/components/ui/DayChangeBadge.vue'
 import type { ColumnDef, SortingState } from '@tanstack/vue-table'
 import { ChevronLeft, Inbox, TrendingUp, TrendingDown } from 'lucide-vue-next'
 
@@ -53,6 +55,9 @@ interface AssetDetail {
   currentPriceMinor: string | null
   currentPriceCurrency: string | null
   currentPriceAsOf: string | null
+  previousPriceMinor: string | null
+  previousPriceAsOf: string | null
+  dayChangePct: number | null
   currentValueMinor: string | null
   currentValueCurrency: string | null
   totalsByCurrency: CurrencyTotal[]
@@ -347,11 +352,14 @@ const singleCurrencyReturn = computed<null | {
            style="background-color: var(--color-border);">
         <div class="px-5 py-4" style="background-color: var(--color-surface);">
           <p class="label">Latest price</p>
-          <p class="text-lg font-medium tabular mt-1">
-            {{ data.currentPriceMinor && data.currentPriceCurrency
-              ? formatMinor(data.currentPriceMinor, data.currentPriceCurrency)
-              : '—' }}
-          </p>
+          <div class="flex items-baseline gap-2 mt-1">
+            <p class="text-lg font-medium tabular">
+              {{ data.currentPriceMinor && data.currentPriceCurrency
+                ? formatMinor(data.currentPriceMinor, data.currentPriceCurrency)
+                : '—' }}
+            </p>
+            <DayChangeBadge :pct="data.dayChangePct" size="sm" />
+          </div>
           <p v-if="data.currentPriceAsOf" class="text-xs text-[var(--color-text-dim)] mt-0.5">{{ data.currentPriceAsOf }}</p>
         </div>
         <div class="px-5 py-4" style="background-color: var(--color-surface);">
@@ -516,6 +524,12 @@ const singleCurrencyReturn = computed<null | {
       <section class="space-y-3">
         <h2 class="text-lg font-medium">Price history</h2>
         <AssetPriceChart :isin="data.isin" />
+      </section>
+
+      <!-- Profit chart -->
+      <section class="space-y-3">
+        <h2 class="text-lg font-medium">Profit history</h2>
+        <AssetProfitChart :isin="data.isin" />
       </section>
 
       <!-- Per-account holdings -->

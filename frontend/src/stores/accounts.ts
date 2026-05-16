@@ -75,6 +75,9 @@ export interface Holding {
   priceAsOf: string | null
   valueBaseMinor: string | null
   baseCurrency: string
+  previousPriceMinor: string | null
+  /** Day-over-day price change in %, or null when there's no prior price. */
+  dayChangePct: number | null
 }
 
 export const useAccountsStore = defineStore('accounts', () => {

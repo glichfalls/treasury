@@ -20,6 +20,7 @@ import DataTable from '@/components/ui/DataTable.vue'
 import SelectField from '@/components/ui/SelectField.vue'
 import Button from '@/components/ui/Button.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
+import DayChangeBadge from '@/components/ui/DayChangeBadge.vue'
 import type { ColumnDef, SortingState } from '@tanstack/vue-table'
 import { useToastsStore } from '@/stores/toasts'
 import { CATEGORIES, categoryMeta } from '@/lib/categories'
@@ -176,7 +177,15 @@ const holdingsColumns = computed<ColumnDef<Holding, unknown>[]>(() => [
     header: 'Last price',
     enableSorting: true,
     enableColumnFilter: false,
-    meta: { align: 'right', headerClass: 'w-32', cellClass: 'tabular text-[var(--color-text-muted)]' },
+    meta: { align: 'right', headerClass: 'w-40', cellClass: 'tabular text-[var(--color-text-muted)]' },
+  },
+  {
+    id: 'dayChange',
+    accessorFn: (h) => h.dayChangePct ?? 0,
+    header: 'Day',
+    enableSorting: true,
+    enableColumnFilter: false,
+    meta: { align: 'right', headerClass: 'w-20' },
   },
   {
     id: 'value',
@@ -465,6 +474,9 @@ async function deleteTransaction(t: Transaction) {
           </template>
           <template #cell-price="{ row }">
             {{ row.priceMinor && row.priceCurrency ? formatMinor(row.priceMinor, row.priceCurrency) : '—' }}
+          </template>
+          <template #cell-dayChange="{ row }">
+            <DayChangeBadge :pct="row.dayChangePct" size="sm" :show-icon="false" />
           </template>
           <template #cell-value="{ row }">
             {{ row.valueBaseMinor ? formatMinor(row.valueBaseMinor, row.baseCurrency) : '—' }}

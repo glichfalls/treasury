@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { LayoutDashboard, Wallet, Settings, Menu, X } from 'lucide-vue-next'
+import { LayoutDashboard, Wallet, BarChart3, Settings, Menu, X } from 'lucide-vue-next'
 import BrandMark from '@/components/ui/BrandMark.vue'
 import Button from '@/components/ui/Button.vue'
 
@@ -10,6 +10,7 @@ const route = useRoute()
 const items = [
   { to: { name: 'dashboard' }, label: 'Dashboard', icon: LayoutDashboard, match: (n: string) => n === 'dashboard' },
   { to: { name: 'accounts' }, label: 'Accounts', icon: Wallet, match: (n: string) => n === 'accounts' || n === 'account' },
+  { to: { name: 'insights' }, label: 'Insights', icon: BarChart3, match: (n: string) => n === 'insights' },
   { to: { name: 'settings' }, label: 'Settings', icon: Settings, match: (n: string) => n === 'settings' },
 ]
 
