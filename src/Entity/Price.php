@@ -30,6 +30,14 @@ class Price
     #[ORM\Column(length: 3)]
     private string $currency;
 
+    /**
+     * True once this row reflects the official daily close for the exchange.
+     * False means the value is still intraday and may be upgraded by a later
+     * refresh once the market has closed.
+     */
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $isClose = false;
+
     public function __construct()
     {
         $this->id = Uuid::v7();
@@ -44,4 +52,6 @@ class Price
     public function setPriceMinor(string|int $priceMinor): self { $this->priceMinor = (string) $priceMinor; return $this; }
     public function getCurrency(): string { return $this->currency; }
     public function setCurrency(string $currency): self { $this->currency = strtoupper($currency); return $this; }
+    public function isClose(): bool { return $this->isClose; }
+    public function setIsClose(bool $isClose): self { $this->isClose = $isClose; return $this; }
 }

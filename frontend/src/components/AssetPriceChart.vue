@@ -9,17 +9,24 @@ interface Response { isin: string; points: PricePoint[] }
 
 const props = defineProps<{ isin: string }>()
 
+type Range = '1w' | '1m' | '3mo' | '6mo' | 'ytd' | '1y' | '2y' | '5y' | 'all'
+
 const data = ref<Response | null>(null)
 const loading = ref(false)
-const range = ref<'6mo' | '1y' | '5y' | 'all'>('1y')
+const range = ref<Range>('1y')
 
 async function load() {
   loading.value = true
   try {
     const to = new Date()
     const from = new Date()
-    if (range.value === '6mo') from.setMonth(from.getMonth() - 6)
+    if (range.value === '1w') from.setDate(from.getDate() - 7)
+    else if (range.value === '1m') from.setMonth(from.getMonth() - 1)
+    else if (range.value === '3mo') from.setMonth(from.getMonth() - 3)
+    else if (range.value === '6mo') from.setMonth(from.getMonth() - 6)
+    else if (range.value === 'ytd') from.setMonth(0, 1)
     else if (range.value === '1y') from.setFullYear(from.getFullYear() - 1)
+    else if (range.value === '2y') from.setFullYear(from.getFullYear() - 2)
     else if (range.value === '5y') from.setFullYear(from.getFullYear() - 5)
     else from.setFullYear(from.getFullYear() - 20)
     data.value = await api.get<Response>(
@@ -81,7 +88,7 @@ const option = computed<EChartsOption>(() => {
   <div>
     <div class="flex justify-end gap-1 mb-1">
       <button
-        v-for="r in (['6mo','1y','5y','all'] as const)"
+        v-for="r in (['1w','1m','3mo','6mo','ytd','1y','2y','5y','all'] as const)"
         :key="r"
         :class="['text-xs px-2 py-0.5 rounded transition-colors',
           r === range

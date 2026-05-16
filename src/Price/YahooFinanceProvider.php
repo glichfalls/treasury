@@ -65,16 +65,28 @@ final class YahooFinanceProvider implements PriceProvider
             return null;
         }
 
-        $ts = $meta['regularMarketTime'] ?? time();
+        $ts = (int) ($meta['regularMarketTime'] ?? time());
         [$normPrice, $normCcy] = $this->normalizeUnits((float) $price, (string) ($meta['currency'] ?? 'USD'));
 
         return new PriceQuote(
             price: $normPrice,
             currency: $normCcy,
-            asOf: (new \DateTimeImmutable())->setTimestamp((int) $ts)->setTime(0, 0),
+            asOf: (new \DateTimeImmutable())->setTimestamp($ts)->setTime(0, 0),
             resolvedTicker: (string) ($meta['symbol'] ?? $ticker),
             name: $this->pickName($meta),
+            isClose: $this->isCloseTimestamp($ts),
         );
+    }
+
+    /**
+     * Yahoo's chart endpoint doesn't reliably surface `marketState`, so we lean
+     * on the trade timestamp. During a regular session `regularMarketTime`
+     * updates within seconds for any liquid name; once the session ends it
+     * sticks. A 15-minute staleness window is the cutoff: stale → close locked.
+     */
+    private function isCloseTimestamp(int $regularMarketTime): bool
+    {
+        return (time() - $regularMarketTime) > 900;
     }
 
     /** Yahoo gives us shortName / longName depending on the asset; prefer the shorter one. */
@@ -113,14 +125,20 @@ final class YahooFinanceProvider implements PriceProvider
         $rawCurrency = (string) ($data['meta']['currency'] ?? 'USD');
         $resolved = (string) ($data['meta']['symbol'] ?? $ticker);
         $name = $this->pickName(is_array($data['meta'] ?? null) ? $data['meta'] : []);
-        return $this->parseHistory($data, function (float $price, \DateTimeImmutable $date) use ($rawCurrency, $resolved, $name) {
+        $todayIsClose = $this->isCloseTimestamp((int) ($data['meta']['regularMarketTime'] ?? time()));
+        $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
+        return $this->parseHistory($data, function (float $price, \DateTimeImmutable $date) use ($rawCurrency, $resolved, $name, $todayIsClose, $today) {
             [$normPrice, $normCcy] = $this->normalizeUnits($price, $rawCurrency);
+            // Past days are locked closes. Today's bar is only a close once
+            // the exchange's regular session has ended.
+            $isClose = $date->format('Y-m-d') === $today ? $todayIsClose : true;
             return new PriceQuote(
                 price: $normPrice,
                 currency: $normCcy,
                 asOf: $date,
                 resolvedTicker: $resolved,
                 name: $name,
+                isClose: $isClose,
             );
         });
     }

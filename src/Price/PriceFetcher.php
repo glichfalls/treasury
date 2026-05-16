@@ -136,26 +136,43 @@ final class PriceFetcher
                     $asset->setName($history[0]->name);
                 }
 
-                $existing = $this->existingPriceDatesFor($asset);
+                $existing = $this->existingPricesFor($asset);
                 $assetBin = $asset->getId()->toBinary();
                 $values = [];
                 $params = [];
                 foreach ($history as $quote) {
                     $key = $quote->asOf->format('Y-m-d');
                     if (isset($existing[$key])) {
+                        // Upgrade an intraday row to the official close when
+                        // Yahoo can now give us one. Never downgrade a close
+                        // back to an intraday print.
+                        if (!$existing[$key] && $quote->isClose) {
+                            $conn->executeStatement(
+                                'UPDATE prices SET price_minor = ?, currency = ?, is_close = 1 '
+                                . 'WHERE asset_id = ? AND occurred_at = ?',
+                                [
+                                    (string) (int) round($quote->price * 100),
+                                    $quote->currency,
+                                    $assetBin,
+                                    $key,
+                                ],
+                            );
+                            $existing[$key] = true;
+                        }
                         continue;
                     }
-                    $values[] = '(?, ?, ?, ?, ?)';
+                    $values[] = '(?, ?, ?, ?, ?, ?)';
                     $params[] = \Symfony\Component\Uid\Uuid::v7()->toBinary();
                     $params[] = $assetBin;
                     $params[] = $key;
                     $params[] = (string) (int) round($quote->price * 100);
                     $params[] = $quote->currency;
-                    $existing[$key] = true;
+                    $params[] = $quote->isClose ? 1 : 0;
+                    $existing[$key] = $quote->isClose;
                 }
                 if ($values !== []) {
                     $conn->executeStatement(
-                        'INSERT INTO prices (id, asset_id, occurred_at, price_minor, currency) VALUES '
+                        'INSERT INTO prices (id, asset_id, occurred_at, price_minor, currency, is_close) VALUES '
                         . implode(', ', $values),
                         $params,
                     );
@@ -204,11 +221,24 @@ final class PriceFetcher
                 continue;
             }
             $existing = $this->existingFxDatesFor($from, $to);
+            $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
             $values = [];
             $params = [];
             foreach ($history as $row) {
                 $key = $row['date']->format('Y-m-d');
+                $rateStr = number_format($row['rate'], 8, '.', '');
                 if (isset($existing[$key])) {
+                    // Past-date rates are finalized once the trading day is
+                    // done; overwrite any stale or glitched value we may have
+                    // captured intraday. Leave today's row to refreshFxFor so
+                    // we don't ping-pong between two writes in the same run.
+                    if ($key !== $today) {
+                        $conn->executeStatement(
+                            'UPDATE fx_rates SET rate = ? '
+                            . 'WHERE from_currency = ? AND to_currency = ? AND occurred_at = ?',
+                            [$rateStr, $from, $to, $key],
+                        );
+                    }
                     continue;
                 }
                 $values[] = '(?, ?, ?, ?, ?)';
@@ -216,7 +246,7 @@ final class PriceFetcher
                 $params[] = $key;
                 $params[] = $from;
                 $params[] = $to;
-                $params[] = number_format($row['rate'], 8, '.', '');
+                $params[] = $rateStr;
                 $existing[$key] = true;
             }
             if ($values !== []) {
@@ -230,15 +260,20 @@ final class PriceFetcher
     }
 
     /** @return array<string, true> Map of YYYY-MM-DD => true for the asset's stored prices. */
-    private function existingPriceDatesFor(Asset $asset): array
+    /**
+     * Map of YYYY-MM-DD => isClose for each price row of an asset.
+     *
+     * @return array<string, bool>
+     */
+    private function existingPricesFor(Asset $asset): array
     {
         $rows = $this->em->getConnection()->fetchAllAssociative(
-            'SELECT occurred_at FROM prices WHERE asset_id = :id',
+            'SELECT occurred_at, is_close FROM prices WHERE asset_id = :id',
             ['id' => $asset->getId()->toBinary()],
         );
         $out = [];
         foreach ($rows as $r) {
-            $out[$r['occurred_at']] = true;
+            $out[$r['occurred_at']] = (bool) $r['is_close'];
         }
         return $out;
     }
@@ -312,14 +347,23 @@ final class PriceFetcher
             'occurredAt' => $quote->asOf,
         ]);
         if ($existing !== null) {
+            // Don't downgrade a locked-in close back to an intraday print: once
+            // we have the final close for a day, the next intraday refresh
+            // (e.g. an admin clicking "Reload prices" the next morning before
+            // the new session opens) must not stomp on it.
+            if ($existing->isClose() && !$quote->isClose) {
+                return;
+            }
             $existing->setPriceMinor($priceMinor);
             $existing->setCurrency($quote->currency);
+            $existing->setIsClose($quote->isClose);
         } else {
             $price = new Price();
             $price->setAsset($asset);
             $price->setOccurredAt($quote->asOf);
             $price->setCurrency($quote->currency);
             $price->setPriceMinor($priceMinor);
+            $price->setIsClose($quote->isClose);
             $this->em->persist($price);
         }
         $this->em->flush();

@@ -8,6 +8,8 @@ import {
   TitleComponent,
   LegendComponent,
   DataZoomComponent,
+  VisualMapComponent,
+  MarkLineComponent,
 } from 'echarts/components'
 import VChart, { THEME_KEY } from 'vue-echarts'
 import type { EChartsOption } from 'echarts/types/dist/shared'
@@ -22,6 +24,8 @@ use([
   TitleComponent,
   LegendComponent,
   DataZoomComponent,
+  VisualMapComponent,
+  MarkLineComponent,
 ])
 
 export { VChart, THEME_KEY }

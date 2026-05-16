@@ -8,20 +8,21 @@ use App\Entity\User;
 /**
  * Derives return-over-time metrics on top of a TimeSeriesPoint series.
  *
- * Both metrics are rebased to 0% at the first point of the requested window, so
- * the chart always shows performance *during* the window (a 1-week chart shows
- * that week's return, not lifetime return).
+ *  - returnVsDepositsPct: lifetime (value − netDeposits) / netDeposits × 100.
+ *    Cumulative "how much is my money up vs what I put in" number — does NOT
+ *    represent return inside the chart window. Distorted by withdrawals.
  *
- *  - returnVsDepositsPct: lifetime (value − netDeposits) / netDeposits × 100,
- *    minus the same ratio at the window's start. Intuitive "how much is my money
- *    up over this period" number. Distorted by deposits/withdrawals during the
- *    window (denominator shifts) — prefer TWR when external flows occur.
- *
- *  - twrPct: Time-weighted return, compounded across periods, with external
- *    cash flows stripped out per period. Comparable across portfolios regardless
- *    of contribution timing.
+ *  - twrPct: Time-weighted return, compounded across periods inside the chart
+ *    window with external cash flows stripped out per period. Comparable
+ *    across portfolios regardless of contribution timing and is the right
+ *    metric for "performance during this period".
  *      r_i = (V_i − C_i) / V_{i-1}      where C_i = netDeposits_i − netDeposits_{i-1}
  *      cumTWR = Π(1 + r_i) − 1
+ *
+ * Earlier this service rebased vsDeposits to 0% at the window start so short
+ * windows would look "alive". That was wrong: vsDeposits is a ratio against
+ * deposits, so its delta over a window inflates the true period return by
+ * (V/D) — the carry of unrealized gains. TWR is the correct period metric.
  */
 final class PerformanceService
 {
@@ -55,25 +56,15 @@ final class PerformanceService
     {
         $cumTwr = 1.0;
         $prev = null;
-        $vsDepositsBaseline = null;
         $out = [];
 
         foreach ($series as $p) {
             $total = (float) $p->totalMinor;
             $deposits = (float) $p->netDepositsMinor;
 
-            $vsDepositsLifetime = $deposits > 0
+            $vsDeposits = $deposits > 0
                 ? (($total - $deposits) / $deposits) * 100
                 : null;
-
-            if ($vsDepositsLifetime !== null) {
-                if ($vsDepositsBaseline === null) {
-                    $vsDepositsBaseline = $vsDepositsLifetime;
-                }
-                $vsDeposits = $vsDepositsLifetime - $vsDepositsBaseline;
-            } else {
-                $vsDeposits = null;
-            }
 
             if ($prev !== null) {
                 $prevTotal = (float) $prev->totalMinor;
