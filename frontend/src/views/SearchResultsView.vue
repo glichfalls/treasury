@@ -8,6 +8,7 @@ import { describeSchedule, type RecurringFrequency } from '@/lib/recurring'
 import { useAccountsStore } from '@/stores/accounts'
 import DateField from '@/components/ui/DateField.vue'
 import DataTable from '@/components/ui/DataTable.vue'
+import SelectField from '@/components/ui/SelectField.vue'
 import type { ColumnDef, SortingState } from '@tanstack/vue-table'
 import { VChart, chartColors, type EChartsOption } from '@/lib/charts'
 import { Search, Wallet, Receipt, TrendingUp, Repeat, Tag as TagIcon, Inbox, X } from 'lucide-vue-next'
@@ -53,10 +54,10 @@ const router = useRouter()
 const accountsStore = useAccountsStore()
 
 const query = ref(String(route.query.q ?? ''))
-const accountId = ref(String(route.query.accountId ?? ''))
+const accountId = ref<string | null>(route.query.accountId ? String(route.query.accountId) : null)
 const dateFrom = ref(String(route.query.dateFrom ?? ''))
 const dateTo = ref(String(route.query.dateTo ?? ''))
-const txType = ref(String(route.query.type ?? ''))
+const txType = ref<string | null>(route.query.type ? String(route.query.type) : null)
 
 const results = ref<SearchResponse>({ accounts: [], transactions: [], assets: [], recurring: [], tags: [] })
 const stats = ref<SearchStats | null>(null)
@@ -147,10 +148,10 @@ onMounted(async () => {
 // Reset transactions pagination — a new query implies a new dataset.
 watch(() => route.query, (q) => {
   query.value = String(q.q ?? '')
-  accountId.value = String(q.accountId ?? '')
+  accountId.value = q.accountId ? String(q.accountId) : null
   dateFrom.value = String(q.dateFrom ?? '')
   dateTo.value = String(q.dateTo ?? '')
-  txType.value = String(q.type ?? '')
+  txType.value = q.type ? String(q.type) : null
   txPage.value = 1
   load()
 })
@@ -162,10 +163,10 @@ function onFilterChange() {
   syncRoute()
 }
 function clearFilters() {
-  accountId.value = ''
+  accountId.value = null
   dateFrom.value = ''
   dateTo.value = ''
-  txType.value = ''
+  txType.value = null
   syncRoute()
 }
 
@@ -299,13 +300,21 @@ const chartOption = computed<EChartsOption>(() => {
 
       <!-- Filter bar -->
       <div class="flex flex-wrap items-end gap-3 pt-1">
-        <label class="flex flex-col gap-1 text-xs text-[var(--color-text-dim)]">
+        <div class="flex flex-col gap-1 text-xs text-[var(--color-text-dim)]">
           <span>Account</span>
-          <select v-model="accountId" class="input py-1.5 text-sm min-w-[12rem]" @change="onFilterChange">
-            <option value="">All accounts</option>
-            <option v-for="a in accountsStore.accounts" :key="a.id" :value="a.id">{{ a.name }}</option>
-          </select>
-        </label>
+          <div class="min-w-[12rem]">
+            <SelectField
+              v-model="accountId"
+              :options="accountsStore.accounts.map((a) => ({ value: a.id, label: a.name }))"
+              allow-empty
+              empty-label="All accounts"
+              clearable
+              searchable
+              size="sm"
+              @update:model-value="onFilterChange"
+            />
+          </div>
+        </div>
         <div class="flex flex-col gap-1 text-xs text-[var(--color-text-dim)]">
           <span>From</span>
           <DateField v-model="dateFrom" placeholder="Any" clearable :max="dateTo || undefined" @update:model-value="onFilterChange" />
@@ -314,13 +323,20 @@ const chartOption = computed<EChartsOption>(() => {
           <span>To</span>
           <DateField v-model="dateTo" placeholder="Any" clearable :min="dateFrom || undefined" @update:model-value="onFilterChange" />
         </div>
-        <label class="flex flex-col gap-1 text-xs text-[var(--color-text-dim)]">
+        <div class="flex flex-col gap-1 text-xs text-[var(--color-text-dim)]">
           <span>Type</span>
-          <select v-model="txType" class="input py-1.5 text-sm min-w-[10rem]" @change="onFilterChange">
-            <option value="">All types</option>
-            <option v-for="t in transactionTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
-          </select>
-        </label>
+          <div class="min-w-[10rem]">
+            <SelectField
+              v-model="txType"
+              :options="transactionTypes"
+              allow-empty
+              empty-label="All types"
+              clearable
+              size="sm"
+              @update:model-value="onFilterChange"
+            />
+          </div>
+        </div>
         <button
           v-if="hasFilters"
           type="button"

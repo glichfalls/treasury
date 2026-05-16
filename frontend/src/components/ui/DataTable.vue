@@ -12,6 +12,7 @@ import {
 } from '@tanstack/vue-table'
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/vue'
 import { ArrowUp, ArrowDown, ChevronsUpDown, ChevronLeft, ChevronRight, Filter } from 'lucide-vue-next'
+import SelectField from '@/components/ui/SelectField.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -274,16 +275,16 @@ function isFilterActive(columnId: string): boolean {
         <template v-else>{{ rangeStart }}–{{ rangeEnd }} of {{ total }}</template>
       </span>
       <div class="flex items-center gap-3">
-        <label class="flex items-center gap-2 text-[var(--color-text-muted)]">
+        <div class="flex items-center gap-2 text-[var(--color-text-muted)]">
           <span>Rows</span>
-          <select
-            :value="pageSize"
-            class="input !py-1 !px-2 text-xs"
-            @change="emit('update:pageSize', Number(($event.target as HTMLSelectElement).value))"
-          >
-            <option v-for="opt in pageSizeOptions" :key="opt" :value="opt">{{ opt }}</option>
-          </select>
-        </label>
+          <SelectField
+            :model-value="pageSize ?? null"
+            :options="pageSizeOptions.map((o) => ({ value: o, label: String(o) }))"
+            size="sm"
+            :full-width="false"
+            @update:model-value="(v) => emit('update:pageSize', Number(v))"
+          />
+        </div>
         <div class="flex items-center gap-1">
           <button
             type="button"

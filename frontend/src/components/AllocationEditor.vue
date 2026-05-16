@@ -5,6 +5,7 @@ import { Pencil, Plus, Save, Trash2, History, X, Check, Copy } from 'lucide-vue-
 import { chartColors } from '@/lib/charts'
 import { useAccountsStore } from '@/stores/accounts'
 import DateField from '@/components/ui/DateField.vue'
+import SelectField from '@/components/ui/SelectField.vue'
 
 interface Rule {
   assetIsin: string
@@ -35,7 +36,7 @@ const draftRules = ref<Rule[]>([])
 const draftEffectiveFrom = ref('')
 const saving = ref(false)
 const error = ref<string | null>(null)
-const copySourceId = ref('')
+const copySourceId = ref<string | null>(null)
 
 const otherPillar3aAccounts = computed(() =>
   accountsStore.accounts.filter((a) => a.type === 'pillar_3a' && a.id !== props.accountId),
@@ -188,7 +189,7 @@ async function copyFrom(sourceId: string) {
   if (!sourceId) return
   if (draftRules.value.some((r) => r.assetIsin.trim() !== '' || r.percent > 0)) {
     if (!confirm('Replace the current draft with the copied strategy?')) {
-      copySourceId.value = ''
+      copySourceId.value = null
       return
     }
   }
@@ -200,7 +201,7 @@ async function copyFrom(sourceId: string) {
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
-    copySourceId.value = ''
+    copySourceId.value = null
   }
 }
 </script>
@@ -276,16 +277,14 @@ async function copyFrom(sourceId: string) {
       >
         <Copy :size="14" class="text-[var(--color-text-dim)]" />
         <span class="text-[var(--color-text-muted)]">Copy strategy from</span>
-        <select
+        <SelectField
           v-model="copySourceId"
-          class="input text-xs py-1 w-auto"
-          @change="copyFrom(copySourceId)"
-        >
-          <option value="">Pick an account…</option>
-          <option v-for="a in otherPillar3aAccounts" :key="a.id" :value="a.id">
-            {{ a.name }}
-          </option>
-        </select>
+          :options="otherPillar3aAccounts.map((a) => ({ value: a.id, label: a.name }))"
+          placeholder="Pick an account…"
+          size="sm"
+          :full-width="false"
+          @update:model-value="(v) => v && copyFrom(v)"
+        />
       </div>
 
       <ul class="space-y-2.5">

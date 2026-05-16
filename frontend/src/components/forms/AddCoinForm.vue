@@ -99,7 +99,7 @@ async function submit() {
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div class="sm:col-span-2">
-        <SelectField v-model="isin" label="Coin" :options="catalogOptions" />
+        <SelectField v-model="isin" label="Coin" :options="catalogOptions" searchable />
       </div>
       <div class="space-y-1.5">
         <label class="label">Date</label>

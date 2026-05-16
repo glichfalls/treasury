@@ -17,6 +17,7 @@ import EditAccountForm from '@/components/forms/EditAccountForm.vue'
 import RecurringTransactionsPanel from '@/components/panels/RecurringTransactionsPanel.vue'
 import DateField from '@/components/ui/DateField.vue'
 import DataTable from '@/components/ui/DataTable.vue'
+import SelectField from '@/components/ui/SelectField.vue'
 import type { ColumnDef, SortingState } from '@tanstack/vue-table'
 import { useToastsStore } from '@/stores/toasts'
 import { CATEGORIES, categoryMeta } from '@/lib/categories'
@@ -39,8 +40,8 @@ const range = ref<'1w' | '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'all'
 // Filter / pagination / sort state.
 const page = ref(1)
 const pageSize = ref(25)
-const filterType = ref('')
-const filterCategory = ref('')
+const filterType = ref<string | null>(null)
+const filterCategory = ref<string | null>(null)
 const filterFrom = ref('')
 const filterTo = ref('')
 const filterQ = ref('')
@@ -55,8 +56,8 @@ const totalPages = computed(() => Math.max(1, Math.ceil(totalTransactions.value 
 const activeFilterColumns = computed(() => {
   const ids: string[] = []
   if (filterFrom.value !== '' || filterTo.value !== '') ids.push('occurredAt')
-  if (filterType.value !== '') ids.push('type')
-  if (filterQ.value !== '' || filterCategory.value !== '') ids.push('description')
+  if (filterType.value) ids.push('type')
+  if (filterQ.value !== '' || filterCategory.value) ids.push('description')
   return ids
 })
 const hasFilters = computed(() => activeFilterColumns.value.length > 0)
@@ -98,8 +99,8 @@ function onFilterChange() {
 }
 
 function clearFilters() {
-  filterType.value = ''
-  filterCategory.value = ''
+  filterType.value = null
+  filterCategory.value = null
   filterFrom.value = ''
   filterTo.value = ''
   filterQ.value = ''
@@ -129,8 +130,8 @@ watch(accountId, () => {
   // doesn't carry over filters that may not make sense (e.g. an asset ISIN
   // search on an account that doesn't hold that asset).
   page.value = 1
-  filterType.value = ''
-  filterCategory.value = ''
+  filterType.value = null
+  filterCategory.value = null
   filterFrom.value = ''
   filterTo.value = ''
   filterQ.value = ''
@@ -528,10 +529,15 @@ async function deleteTransaction(t: Transaction) {
               </div>
             </template>
             <template #filter-type>
-              <select v-model="filterType" class="input" @change="onFilterChange">
-                <option value="">All types</option>
-                <option v-for="(label, value) in typeLabels" :key="value" :value="value">{{ label }}</option>
-              </select>
+              <SelectField
+                v-model="filterType"
+                :options="Object.entries(typeLabels).map(([value, label]) => ({ value, label }))"
+                allow-empty
+                empty-label="All types"
+                clearable
+                size="sm"
+                @update:model-value="onFilterChange"
+              />
             </template>
             <template #filter-description>
               <div class="space-y-1">
@@ -541,15 +547,16 @@ async function deleteTransaction(t: Transaction) {
                   class="input text-sm"
                   @input="onFilterChange"
                 />
-                <select
+                <SelectField
                   v-if="features.showCategories"
                   v-model="filterCategory"
-                  class="input"
-                  @change="onFilterChange"
-                >
-                  <option value="">All categories</option>
-                  <option v-for="c in CATEGORIES" :key="c.value" :value="c.value">{{ c.label }}</option>
-                </select>
+                  :options="CATEGORIES.map((c) => ({ value: c.value, label: c.label }))"
+                  allow-empty
+                  empty-label="All categories"
+                  clearable
+                  size="sm"
+                  @update:model-value="onFilterChange"
+                />
               </div>
             </template>
             <template #cell-occurredAt="{ row }">

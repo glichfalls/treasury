@@ -7,6 +7,7 @@ import { categoryMeta } from '@/lib/categories'
 import AssetPriceChart from '@/components/charts/AssetPriceChart.vue'
 import DateField from '@/components/ui/DateField.vue'
 import DataTable from '@/components/ui/DataTable.vue'
+import SelectField from '@/components/ui/SelectField.vue'
 import type { ColumnDef, SortingState } from '@tanstack/vue-table'
 import { ChevronLeft, Inbox, TrendingUp, TrendingDown } from 'lucide-vue-next'
 
@@ -78,7 +79,7 @@ const loading = ref(false)
 
 // Filter / pagination / sort state.
 const filterQ = ref('')
-const filterType = ref('')
+const filterType = ref<string | null>(null)
 const filterFrom = ref('')
 const filterTo = ref('')
 const page = ref(1)
@@ -92,7 +93,7 @@ const sortParam = computed(() => {
 const activeFilterColumns = computed(() => {
   const ids: string[] = []
   if (filterFrom.value !== '' || filterTo.value !== '') ids.push('occurredAt')
-  if (filterType.value !== '') ids.push('type')
+  if (filterType.value) ids.push('type')
   if (filterQ.value !== '') ids.push('description')
   return ids
 })
@@ -100,7 +101,7 @@ const hasFilters = computed(() => activeFilterColumns.value.length > 0)
 
 function clearFilters() {
   filterQ.value = ''
-  filterType.value = ''
+  filterType.value = null
   filterFrom.value = ''
   filterTo.value = ''
   page.value = 1
@@ -592,10 +593,15 @@ const singleCurrencyReturn = computed<null | {
             </div>
           </template>
           <template #filter-type>
-            <select v-model="filterType" class="input" @change="onFilterChange">
-              <option value="">All types</option>
-              <option v-for="(label, value) in typeLabels" :key="value" :value="value">{{ label }}</option>
-            </select>
+            <SelectField
+              v-model="filterType"
+              :options="Object.entries(typeLabels).map(([value, label]) => ({ value, label }))"
+              allow-empty
+              empty-label="All types"
+              clearable
+              size="sm"
+              @update:model-value="onFilterChange"
+            />
           </template>
           <template #filter-description>
             <input
