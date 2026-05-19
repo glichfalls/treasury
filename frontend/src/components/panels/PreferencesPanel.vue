@@ -1,35 +1,50 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useToastsStore } from '@/stores/toasts'
 import { Save } from 'lucide-vue-next'
 import Button from '@/components/ui/Button.vue'
+import SelectField from '@/components/ui/SelectField.vue'
+import type { SelectOption } from '@/components/ui/SelectField.vue'
 
 const auth = useAuthStore()
 const toasts = useToastsStore()
 
-// Curated list — covers ~95% of accounts a Swiss user is likely to touch. Anyone
-// who needs something exotic can still type it in the input.
-const COMMON_CURRENCIES = [
-  'CHF', 'EUR', 'USD', 'GBP', 'JPY', 'CAD', 'AUD', 'SEK', 'NOK', 'DKK',
+const COMMON_CURRENCIES = ['CHF', 'EUR', 'USD', 'GBP', 'JPY', 'CAD', 'AUD', 'SEK', 'NOK', 'DKK']
+const CUSTOM_KEY = '__custom__'
+
+const CURRENCY_OPTIONS: SelectOption<string>[] = [
+  ...COMMON_CURRENCIES.map((c) => ({ value: c, label: c })),
+  { value: CUSTOM_KEY, label: 'Other…' },
 ]
 
-const baseCurrency = ref(auth.user?.baseCurrency ?? 'CHF')
+function init(v: string | undefined | null): { sel: string | null; custom: string } {
+  if (!v) return { sel: null, custom: '' }
+  return COMMON_CURRENCIES.includes(v) ? { sel: v, custom: '' } : { sel: CUSTOM_KEY, custom: v }
+}
+
+const { sel: initSel, custom: initCustom } = init(auth.user?.baseCurrency)
+const selectedKey = ref<string | null>(initSel)
+const customCode = ref(initCustom)
 const submitting = ref(false)
 
 watch(
   () => auth.user?.baseCurrency,
   (v) => {
-    if (v) baseCurrency.value = v
+    const { sel, custom } = init(v)
+    selectedKey.value = sel
+    customCode.value = custom
   },
 )
+
+const isCustom = computed(() => selectedKey.value === CUSTOM_KEY)
 
 async function submit() {
   submitting.value = true
   try {
-    const ccy = baseCurrency.value.trim().toUpperCase()
+    const ccy = isCustom.value ? customCode.value.trim().toUpperCase() : (selectedKey.value ?? '')
     if (!/^[A-Z]{3}$/.test(ccy)) {
-      throw new Error('Currency must be a 3-letter code')
+      throw new Error('Currency must be a 3-letter code (e.g. EUR, USD)')
     }
     await auth.updatePreferences({ baseCurrency: ccy })
     toasts.success(`Base currency set to ${ccy}`)
@@ -53,20 +68,26 @@ async function submit() {
     </div>
 
     <form class="space-y-4 max-w-sm" @submit.prevent="submit">
-      <div class="space-y-1.5">
-        <label class="label" for="pref-base-ccy">Base currency</label>
+      <SelectField
+        label="Base currency"
+        :model-value="selectedKey"
+        :options="CURRENCY_OPTIONS"
+        placeholder="Select currency…"
+        @update:model-value="selectedKey = $event"
+      />
+
+      <div v-if="isCustom" class="space-y-1.5">
+        <label class="label" for="pref-custom-ccy">Currency code</label>
         <input
-          id="pref-base-ccy"
-          v-model="baseCurrency"
-          list="common-currencies"
-          required
+          id="pref-custom-ccy"
+          v-model="customCode"
+          placeholder="e.g. SGD"
           maxlength="3"
           pattern="[A-Za-z]{3}"
-          class="input uppercase tabular tracking-widest"
+          class="input uppercase"
+          required
         />
-        <datalist id="common-currencies">
-          <option v-for="c in COMMON_CURRENCIES" :key="c" :value="c" />
-        </datalist>
+        <p class="text-xs text-[var(--color-text-dim)]">3-letter ISO 4217 code.</p>
       </div>
 
       <Button type="submit" variant="primary" :loading="submitting" loading-text="Saving…">
