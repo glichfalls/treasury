@@ -9,6 +9,7 @@ import DataTable from '@/components/ui/DataTable.vue'
 import Button from '@/components/ui/Button.vue'
 import type { ColumnDef } from '@tanstack/vue-table'
 import { Plus, Pencil, Trash2, Play, Pause, Inbox } from 'lucide-vue-next'
+import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 
 const props = withDefaults(
   defineProps<{ accountId: string; currency: string; showCategories?: boolean }>(),
@@ -168,9 +169,7 @@ const columns = computed<ColumnDef<RecurringRule, unknown>[]>(() => [
         </div>
       </template>
       <template #cell-amount="{ row }">
-        <span :class="BigInt(row.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'">
-          {{ formatMinor(row.amountMinor, row.currency) }}
-        </span>
+        <MoneyDisplay :minor="row.amountMinor" :currency="row.currency" sensitive :class="BigInt(row.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'" />
       </template>
       <template #cell-next="{ row }">
         {{ shortDate(row.nextOccurrenceAt) }}

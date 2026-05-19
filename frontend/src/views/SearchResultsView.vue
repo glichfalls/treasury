@@ -13,6 +13,7 @@ import Button from '@/components/ui/Button.vue'
 import type { ColumnDef, SortingState } from '@tanstack/vue-table'
 import { VChart, chartColors, type EChartsOption } from '@/lib/charts'
 import { Search, Wallet, Receipt, TrendingUp, Repeat, Tag as TagIcon, Inbox, X } from 'lucide-vue-next'
+import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 
 interface AccountResult { id: string; name: string; institution: string | null; type: string; currency: string }
 interface TransactionResult {
@@ -364,19 +365,19 @@ const chartOption = computed<EChartsOption>(() => {
           class="text-2xl font-semibold tracking-tight tabular mt-1"
           :class="BigInt(stats.totalSignedMinor) >= 0n ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
         >
-          {{ formatMinor(stats.totalSignedMinor, stats.baseCurrency) }}
+          <MoneyDisplay :minor="stats.totalSignedMinor" :currency="stats.baseCurrency" sensitive />
         </p>
       </div>
       <div class="px-5 py-4" style="background-color: var(--color-surface);">
         <p class="label">Spent</p>
         <p class="text-2xl font-semibold tracking-tight tabular mt-1 text-[var(--color-negative)]">
-          {{ formatMinor(stats.totalSpentMinor, stats.baseCurrency) }}
+          <MoneyDisplay :minor="stats.totalSpentMinor" :currency="stats.baseCurrency" sensitive />
         </p>
       </div>
       <div class="px-5 py-4" style="background-color: var(--color-surface);">
         <p class="label">Received</p>
         <p class="text-2xl font-semibold tracking-tight tabular mt-1 text-[var(--color-positive)]">
-          {{ formatMinor(stats.totalIncomeMinor, stats.baseCurrency) }}
+          <MoneyDisplay :minor="stats.totalIncomeMinor" :currency="stats.baseCurrency" sensitive />
         </p>
       </div>
     </section>
@@ -499,9 +500,7 @@ const chartOption = computed<EChartsOption>(() => {
           </div>
         </template>
         <template #cell-amount="{ row }">
-          <span :class="BigInt(row.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'">
-            {{ formatMinor(row.amountMinor, row.currency) }}
-          </span>
+          <MoneyDisplay :minor="row.amountMinor" :currency="row.currency" sensitive :class="BigInt(row.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'" />
         </template>
       </DataTable>
     </section>
@@ -522,10 +521,7 @@ const chartOption = computed<EChartsOption>(() => {
                 <div class="font-medium">{{ r.description }}</div>
                 <div class="text-xs text-[var(--color-text-dim)]">{{ r.accountName }} · {{ describeSchedule(r as never) }}</div>
               </div>
-              <span class="tabular text-sm"
-                :class="BigInt(r.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'">
-                {{ formatMinor(r.amountMinor, r.currency) }}
-              </span>
+              <MoneyDisplay :minor="r.amountMinor" :currency="r.currency" sensitive class="tabular text-sm" :class="BigInt(r.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'" />
             </RouterLink>
           </li>
         </ul>

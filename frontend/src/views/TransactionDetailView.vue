@@ -10,6 +10,7 @@ import { featuresFor } from '@/lib/accountFeatures'
 import EditTransactionForm from '@/components/forms/EditTransactionForm.vue'
 import Button from '@/components/ui/Button.vue'
 import { ChevronLeft, Pencil, Trash2, ArrowRight } from 'lucide-vue-next'
+import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 
 interface DetailedTransaction extends Transaction {
   accountName: string
@@ -110,7 +111,7 @@ async function onEditSaved() {
           class="text-4xl font-semibold tracking-tight tabular"
           :class="BigInt(transaction.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'"
         >
-          {{ formatMinor(transaction.amountMinor, transaction.currency) }}
+          <MoneyDisplay :minor="transaction.amountMinor" :currency="transaction.currency" sensitive />
         </p>
       </header>
 

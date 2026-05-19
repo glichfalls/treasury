@@ -8,6 +8,7 @@ import {
 import { formatMinor } from '@/lib/money'
 import ChartCard from '@/components/ui/ChartCard.vue'
 import RangeSelector from '@/components/ui/RangeSelector.vue'
+import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 
 interface Point {
   date: string
@@ -162,20 +163,16 @@ const empty = computed(() => !data.value || data.value.points.length === 0)
     </template>
     <template #subactions>
       <div v-if="summary" class="flex items-baseline gap-4 text-xs tabular">
-        <span
-          :class="summary.unrealized >= 0n ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
-        >
-          Price P&L {{ formatMinor(summary.unrealized.toString(), currency) }}
+        <span :class="summary.unrealized >= 0n ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'">
+          Price P&L <MoneyDisplay :minor="summary.unrealized.toString()" :currency="currency" sensitive />
         </span>
         <span v-if="summary.dividends !== 0n" class="text-[var(--color-text-muted)]">
-          + Dividends {{ formatMinor(summary.dividends.toString(), currency) }}
+          + Dividends <MoneyDisplay :minor="summary.dividends.toString()" :currency="currency" sensitive />
         </span>
         <span
           :class="summary.total >= 0n ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
           class="font-medium"
-        >
-          Total {{ formatMinor(summary.total.toString(), currency) }}
-        </span>
+        >Total <MoneyDisplay :minor="summary.total.toString()" :currency="currency" sensitive /></span>
       </div>
     </template>
     <VChart :option="option" class="w-full" style="height: 18rem" autoresize />

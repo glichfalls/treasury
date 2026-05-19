@@ -9,6 +9,7 @@ import {
   Search, Wallet, Receipt, TrendingUp, Repeat, Tag as TagIcon, ArrowRight, X,
 } from 'lucide-vue-next'
 import Button from '@/components/ui/Button.vue'
+import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 
 interface AccountResult { id: string; name: string; institution: string | null; type: string; currency: string }
 interface TransactionResult {
@@ -344,10 +345,7 @@ const showAllParams = computed(() => ({ name: 'search', query: { q: query.value.
                       </span>
                     </div>
                   </div>
-                  <span class="text-xs tabular shrink-0"
-                    :class="BigInt(t.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'">
-                    {{ formatMinor(t.amountMinor, t.currency) }}
-                  </span>
+                  <MoneyDisplay :minor="t.amountMinor" :currency="t.currency" sensitive class="text-xs tabular shrink-0" :class="BigInt(t.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'" />
                 </button>
               </section>
 
@@ -381,10 +379,7 @@ const showAllParams = computed(() => ({ name: 'search', query: { q: query.value.
                       {{ r.accountName }} · {{ describeSchedule(r as never) }}
                     </div>
                   </div>
-                  <span class="text-xs tabular shrink-0"
-                    :class="BigInt(r.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'">
-                    {{ formatMinor(r.amountMinor, r.currency) }}
-                  </span>
+                  <MoneyDisplay :minor="r.amountMinor" :currency="r.currency" sensitive class="text-xs tabular shrink-0" :class="BigInt(r.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'" />
                 </button>
               </section>
             </template>

@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { VChart, chartColors, rangeBounds, type EChartsOption, type Range } from '@/lib/charts'
 import { formatMinor } from '@/lib/money'
 import ChartCard from '@/components/ui/ChartCard.vue'
+import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 
 interface MonthlyPoint { month: string; amountBaseMinor: string }
 interface ByAccountRow {
@@ -105,19 +106,19 @@ const chartOption = computed<EChartsOption>(() => {
       <div class="px-5 py-4" style="background-color: var(--color-surface);">
         <p class="label">Range total</p>
         <p class="text-lg font-medium tabular mt-1 text-[var(--color-negative)]">
-          {{ formatMinor(data.totalBaseMinor, currency) }}
+          <MoneyDisplay :minor="data.totalBaseMinor" :currency="currency" sensitive />
         </p>
       </div>
       <div class="px-5 py-4" style="background-color: var(--color-surface);">
         <p class="label">YTD</p>
         <p class="text-lg font-medium tabular mt-1 text-[var(--color-negative)]">
-          {{ formatMinor(data.ytdBaseMinor, currency) }}
+          <MoneyDisplay :minor="data.ytdBaseMinor" :currency="currency" sensitive />
         </p>
       </div>
       <div class="px-5 py-4" style="background-color: var(--color-surface);">
         <p class="label">Lifetime</p>
         <p class="text-lg font-medium tabular mt-1 text-[var(--color-negative)]">
-          {{ formatMinor(data.lifetimeBaseMinor, currency) }}
+          <MoneyDisplay :minor="data.lifetimeBaseMinor" :currency="currency" sensitive />
         </p>
       </div>
     </div>
@@ -145,9 +146,7 @@ const chartOption = computed<EChartsOption>(() => {
             {{ row.accountName }}
           </RouterLink>
           <span class="w-16 text-right tabular text-[var(--color-text-muted)]">{{ row.count }}</span>
-          <span class="w-28 text-right tabular text-[var(--color-negative)] font-medium">
-            {{ formatMinor(row.amountBaseMinor, currency) }}
-          </span>
+          <MoneyDisplay :minor="row.amountBaseMinor" :currency="currency" sensitive class="w-28 text-right tabular text-[var(--color-negative)] font-medium" />
         </div>
       </div>
     </ChartCard>

@@ -11,6 +11,7 @@ import SelectField from '@/components/ui/SelectField.vue'
 import Button from '@/components/ui/Button.vue'
 import type { ColumnDef, SortingState } from '@tanstack/vue-table'
 import { ChevronLeft, Tag as TagIcon, Inbox } from 'lucide-vue-next'
+import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 
 interface TagTransaction {
   id: string
@@ -264,19 +265,19 @@ const hasMonthly = computed(() => (data.value?.monthly?.length ?? 0) > 0)
             class="text-2xl font-semibold tracking-tight tabular mt-1"
             :class="BigInt(data.totalSignedMinor) >= 0n ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
           >
-            {{ formatMinor(data.totalSignedMinor, data.baseCurrency) }}
+            <MoneyDisplay :minor="data.totalSignedMinor" :currency="data.baseCurrency" sensitive />
           </p>
         </div>
         <div class="px-5 py-4" style="background-color: var(--color-surface);">
           <p class="label">Spent</p>
           <p class="text-2xl font-semibold tracking-tight tabular mt-1 text-[var(--color-negative)]">
-            {{ formatMinor(data.totalSpentMinor, data.baseCurrency) }}
+            <MoneyDisplay :minor="data.totalSpentMinor" :currency="data.baseCurrency" sensitive />
           </p>
         </div>
         <div class="px-5 py-4" style="background-color: var(--color-surface);">
           <p class="label">Received</p>
           <p class="text-2xl font-semibold tracking-tight tabular mt-1 text-[var(--color-positive)]">
-            {{ formatMinor(data.totalIncomeMinor, data.baseCurrency) }}
+            <MoneyDisplay :minor="data.totalIncomeMinor" :currency="data.baseCurrency" sensitive />
           </p>
         </div>
       </section>
@@ -377,14 +378,10 @@ const hasMonthly = computed(() => (data.value?.monthly?.length ?? 0) > 0)
             </div>
           </template>
           <template #cell-amount="{ row }">
-            <span :class="BigInt(row.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'">
-              {{ formatMinor(row.amountMinor, row.currency) }}
-            </span>
+            <MoneyDisplay :minor="row.amountMinor" :currency="row.currency" sensitive :class="BigInt(row.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'" />
           </template>
           <template #cell-amountBase="{ row }">
-            <span :class="BigInt(row.amountBaseMinor) < 0n ? 'text-[var(--color-negative)]' : ''">
-              {{ formatMinor(row.amountBaseMinor, data!.baseCurrency) }}
-            </span>
+            <MoneyDisplay :minor="row.amountBaseMinor" :currency="data!.baseCurrency" sensitive :class="BigInt(row.amountBaseMinor) < 0n ? 'text-[var(--color-negative)]' : ''" />
           </template>
         </DataTable>
       </section>

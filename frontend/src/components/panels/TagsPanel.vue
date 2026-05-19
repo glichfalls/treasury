@@ -8,6 +8,7 @@ import { Sparkles } from 'lucide-vue-next'
 import DataTable from '@/components/ui/DataTable.vue'
 import Button from '@/components/ui/Button.vue'
 import type { ColumnDef } from '@tanstack/vue-table'
+import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 
 interface Tag { tag: string; count: number; totalMinor: string }
 interface TagsResponse { baseCurrency: string; tags: Tag[] }
@@ -120,9 +121,7 @@ const columns = computed<ColumnDef<Tag, unknown>[]>(() => [
         </RouterLink>
       </template>
       <template #cell-total="{ row }">
-        <span :class="BigInt(row.totalMinor) >= 0n ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'">
-          {{ formatMinor(row.totalMinor, data!.baseCurrency) }}
-        </span>
+        <MoneyDisplay :minor="row.totalMinor" :currency="data!.baseCurrency" sensitive :class="BigInt(row.totalMinor) >= 0n ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'" />
       </template>
     </DataTable>
   </div>

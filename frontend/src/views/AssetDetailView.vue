@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { api } from '@/lib/api'
 import { formatMinor, formatQuantity } from '@/lib/money'
+import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 import { categoryMeta } from '@/lib/categories'
 import AssetPriceChart from '@/components/charts/AssetPriceChart.vue'
 import AssetProfitChart from '@/components/charts/AssetProfitChart.vue'
@@ -342,7 +343,7 @@ const singleCurrencyReturn = computed<null | {
           <p class="label">Holdings</p>
           <p class="text-3xl font-semibold tracking-tight tabular mt-1">{{ formatQuantity(data.totalQuantity) }}</p>
           <p v-if="data.currentValueMinor && data.currentValueCurrency" class="text-xs text-[var(--color-text-dim)] tabular mt-1">
-            {{ formatMinor(data.currentValueMinor, data.currentValueCurrency) }} current value
+            <MoneyDisplay :minor="data.currentValueMinor" :currency="data.currentValueCurrency" sensitive /> current value
           </p>
         </div>
       </header>
@@ -399,22 +400,25 @@ const singleCurrencyReturn = computed<null | {
             <div class="space-y-1.5 text-sm">
               <div class="flex justify-between">
                 <span class="text-[var(--color-text-muted)]">Net invested</span>
-                <span class="tabular">{{ formatMinor(baseReturn.investedMinor, baseReturn.currency) }}</span>
+                <MoneyDisplay :minor="baseReturn.investedMinor" :currency="baseReturn.currency" sensitive class="tabular" />
               </div>
               <div v-if="BigInt(baseReturn.dividendsMinor) !== 0n" class="flex justify-between">
                 <span class="text-[var(--color-text-muted)]">+ Dividends</span>
-                <span class="tabular text-[var(--color-positive)]">{{ formatMinor(baseReturn.dividendsMinor, baseReturn.currency) }}</span>
+                <MoneyDisplay :minor="baseReturn.dividendsMinor" :currency="baseReturn.currency" sensitive class="tabular text-[var(--color-positive)]" />
               </div>
               <div v-if="BigInt(baseReturn.valueMinor) !== 0n" class="flex justify-between">
                 <span class="text-[var(--color-text-muted)]">Current value</span>
-                <span class="tabular">{{ formatMinor(baseReturn.valueMinor, baseReturn.currency) }}</span>
+                <MoneyDisplay :minor="baseReturn.valueMinor" :currency="baseReturn.currency" sensitive class="tabular" />
               </div>
               <div class="flex justify-between border-t pt-1.5 mt-1.5" style="border-color: var(--color-border);">
                 <span class="text-[var(--color-text)] font-medium">Total return</span>
-                <span
+                <MoneyDisplay
+                  :minor="baseReturn.returnMinor.toString()"
+                  :currency="baseReturn.currency"
+                  sensitive
                   class="tabular font-medium"
                   :class="baseReturn.returnMinor >= 0n ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
-                >{{ formatMinor(baseReturn.returnMinor.toString(), baseReturn.currency) }}</span>
+                />
               </div>
             </div>
             <p class="text-xs text-[var(--color-text-dim)]">
@@ -440,22 +444,25 @@ const singleCurrencyReturn = computed<null | {
             <div class="space-y-1.5 text-sm">
               <div class="flex justify-between">
                 <span class="text-[var(--color-text-muted)]">Net invested</span>
-                <span class="tabular">{{ formatMinor(singleCurrencyReturn.investedMinor, singleCurrencyReturn.currency) }}</span>
+                <MoneyDisplay :minor="singleCurrencyReturn.investedMinor" :currency="singleCurrencyReturn.currency" sensitive class="tabular" />
               </div>
               <div v-if="BigInt(singleCurrencyReturn.dividendsMinor) !== 0n" class="flex justify-between">
                 <span class="text-[var(--color-text-muted)]">+ Dividends</span>
-                <span class="tabular text-[var(--color-positive)]">{{ formatMinor(singleCurrencyReturn.dividendsMinor, singleCurrencyReturn.currency) }}</span>
+                <MoneyDisplay :minor="singleCurrencyReturn.dividendsMinor" :currency="singleCurrencyReturn.currency" sensitive class="tabular text-[var(--color-positive)]" />
               </div>
               <div v-if="BigInt(singleCurrencyReturn.valueMinor) !== 0n" class="flex justify-between">
                 <span class="text-[var(--color-text-muted)]">Current value</span>
-                <span class="tabular">{{ formatMinor(singleCurrencyReturn.valueMinor, singleCurrencyReturn.currency) }}</span>
+                <MoneyDisplay :minor="singleCurrencyReturn.valueMinor" :currency="singleCurrencyReturn.currency" sensitive class="tabular" />
               </div>
               <div class="flex justify-between border-t pt-1.5 mt-1.5" style="border-color: var(--color-border);">
                 <span class="text-[var(--color-text)] font-medium">Total return</span>
-                <span
+                <MoneyDisplay
+                  :minor="singleCurrencyReturn.returnMinor.toString()"
+                  :currency="singleCurrencyReturn.currency"
+                  sensitive
                   class="tabular font-medium"
                   :class="singleCurrencyReturn.returnMinor >= 0n ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
-                >{{ formatMinor(singleCurrencyReturn.returnMinor.toString(), singleCurrencyReturn.currency) }}</span>
+                />
               </div>
             </div>
             <p class="text-xs text-[var(--color-text-dim)]">
@@ -509,7 +516,7 @@ const singleCurrencyReturn = computed<null | {
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
           <div v-for="c in costBasis" :key="c.currency" class="card p-5 space-y-1">
             <p class="label">Spent in {{ c.currency }}</p>
-            <p class="text-xl font-medium tabular mt-1">{{ formatMinor(c.investedMinor, c.currency) }}</p>
+            <p class="text-xl font-medium tabular mt-1"><MoneyDisplay :minor="c.investedMinor" :currency="c.currency" sensitive /></p>
           </div>
         </div>
         <p class="text-xs text-[var(--color-text-dim)]">
@@ -556,11 +563,11 @@ const singleCurrencyReturn = computed<null | {
               <span class="label">{{ d.currency }}</span>
               <span class="text-xs text-[var(--color-text-muted)]">{{ d.count }} payments</span>
             </div>
-            <p class="text-2xl font-medium tabular text-[var(--color-positive)]">{{ formatMinor(d.total, d.currency) }}</p>
+            <p class="text-2xl font-medium tabular text-[var(--color-positive)]"><MoneyDisplay :minor="d.total" :currency="d.currency" sensitive /></p>
             <ul class="space-y-1 text-sm">
               <li v-for="y in d.years" :key="y.year" class="flex items-center justify-between">
                 <span class="text-[var(--color-text-muted)]">{{ y.year }}</span>
-                <span class="tabular">{{ formatMinor(y.amountMinor, y.currency) }}</span>
+                <MoneyDisplay :minor="y.amountMinor" :currency="y.currency" sensitive class="tabular" />
               </li>
             </ul>
           </div>
@@ -651,9 +658,12 @@ const singleCurrencyReturn = computed<null | {
             {{ formatQuantity(row.assetQuantity) }}
           </template>
           <template #cell-amount="{ row }">
-            <span :class="BigInt(row.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'">
-              {{ formatMinor(row.amountMinor, row.currency) }}
-            </span>
+            <MoneyDisplay
+              :minor="row.amountMinor"
+              :currency="row.currency"
+              sensitive
+              :class="BigInt(row.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'"
+            />
           </template>
         </DataTable>
       </section>

@@ -598,9 +598,7 @@ async function deleteTransaction(t: Transaction) {
               {{ formatQuantity(row.assetQuantity) }}
             </template>
             <template #cell-amount="{ row }">
-              <span :class="BigInt(row.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'">
-                {{ formatMinor(row.amountMinor, row.currency) }}
-              </span>
+              <MoneyDisplay :minor="row.amountMinor" :currency="row.currency" sensitive :class="BigInt(row.amountMinor) < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-positive)]'" />
             </template>
             <template #cell-actions="{ row }">
               <div class="flex justify-end gap-0.5">
