@@ -4,6 +4,7 @@ import { api } from '@/lib/api'
 import { VChart, chartColors, granularityFor, rangeBounds, type EChartsOption, type Range } from '@/lib/charts'
 import { formatMinor } from '@/lib/money'
 import ChartCard from '@/components/ui/ChartCard.vue'
+import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 
 interface Snapshot { currency: string; valueNativeMinor: string; valueBaseMinor: string }
 interface FxGain {
@@ -174,9 +175,7 @@ function pctOf(minor: string): number {
   <div v-else class="space-y-4">
     <ChartCard title="Currency exposure">
       <template #actions>
-        <span class="text-xs text-[var(--color-text-muted)] tabular">
-          {{ formatMinor(totalBaseMinor.toString(), currency) }}
-        </span>
+        <MoneyDisplay :minor="totalBaseMinor.toString()" :currency="currency" sensitive class="text-xs text-[var(--color-text-muted)] tabular" />
       </template>
       <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 items-center">
         <VChart :option="pieOption" style="height: 18rem" autoresize />
@@ -188,9 +187,9 @@ function pctOf(minor: string): number {
             />
             <span class="w-12 font-medium shrink-0">{{ s.currency }}</span>
             <div class="flex-1 min-w-0 text-right">
-              <div class="tabular">{{ formatMinor(s.valueNativeMinor, s.currency) }}</div>
+              <div class="tabular"><MoneyDisplay :minor="s.valueNativeMinor" :currency="s.currency" sensitive /></div>
               <div class="tabular text-xs text-[var(--color-text-dim)]">
-                {{ formatMinor(s.valueBaseMinor, currency) }}
+                <MoneyDisplay :minor="s.valueBaseMinor" :currency="currency" sensitive />
               </div>
             </div>
             <span class="tabular text-[var(--color-text-muted)] w-14 text-right shrink-0">
@@ -223,10 +222,10 @@ function pctOf(minor: string): number {
             >
               <td class="py-2 font-medium">{{ row.currency }}</td>
               <td class="py-2 text-right tabular text-[var(--color-text-muted)]">
-                {{ formatMinor(row.exposureNativeMinor, row.currency) }}
+                <MoneyDisplay :minor="row.exposureNativeMinor" :currency="row.currency" sensitive />
               </td>
               <td class="py-2 text-right tabular">
-                {{ formatMinor(row.exposureBaseMinor, currency) }}
+                <MoneyDisplay :minor="row.exposureBaseMinor" :currency="currency" sensitive />
               </td>
               <td
                 v-if="row.currency === currency || row.avgFxRate === null"
@@ -251,7 +250,7 @@ function pctOf(minor: string): number {
                 class="py-2 text-right tabular font-medium"
                 :class="BigInt(row.fxPnlBaseMinor) >= 0n ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
               >
-                {{ formatMinor(row.fxPnlBaseMinor, currency) }}
+                <MoneyDisplay :minor="row.fxPnlBaseMinor" :currency="currency" sensitive />
               </td>
             </tr>
           </tbody>

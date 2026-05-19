@@ -2,6 +2,7 @@
 import { onMounted, computed, ref } from 'vue'
 import { useAccountsStore } from '@/stores/accounts'
 import { formatMinor } from '@/lib/money'
+import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 import NetWorthChart from '@/components/charts/NetWorthChart.vue'
 import CashFlowChart from '@/components/charts/CashFlowChart.vue'
 import CashflowByCategoryChart from '@/components/charts/CashflowByCategoryChart.vue'
@@ -42,8 +43,8 @@ const netWorthByCurrency = computed(() => {
       </div>
       <div v-else class="flex flex-wrap gap-x-10 gap-y-3">
         <div v-for="t in netWorthByCurrency" :key="t.currency">
-          <div class="text-3xl font-semibold tracking-tight tabular private-value">
-            {{ formatMinor(t.minor, t.currency) }}
+          <div class="text-3xl font-semibold tracking-tight tabular">
+            <MoneyDisplay :minor="t.minor" :currency="t.currency" sensitive />
           </div>
         </div>
       </div>

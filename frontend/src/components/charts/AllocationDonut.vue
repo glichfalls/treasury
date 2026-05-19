@@ -5,6 +5,7 @@ import { VChart, chartColors, type EChartsOption } from '@/lib/charts'
 import { formatMinor } from '@/lib/money'
 import ChartCard from '@/components/ui/ChartCard.vue'
 import Button from '@/components/ui/Button.vue'
+import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 
 interface Slice {
   label: string
@@ -149,11 +150,6 @@ const option = computed<EChartsOption>(() => {
   }
 })
 
-const totalFormatted = computed(() => {
-  const { total, currency } = grouped.value
-  if (total === 0n) return ''
-  return formatMinor(total.toString(), currency)
-})
 
 const showOtherDetails = ref(false)
 </script>
@@ -166,7 +162,13 @@ const showOtherDetails = ref(false)
     empty-text="No holdings."
   >
     <template #actions>
-      <span class="text-xs text-[var(--color-text-muted)] tabular">{{ totalFormatted }}</span>
+      <MoneyDisplay
+        v-if="grouped.total !== 0n"
+        :minor="grouped.total.toString()"
+        :currency="grouped.currency"
+        sensitive
+        class="text-xs text-[var(--color-text-muted)] tabular"
+      />
     </template>
     <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 items-center">
       <VChart :option="option" style="height: 18rem" autoresize />

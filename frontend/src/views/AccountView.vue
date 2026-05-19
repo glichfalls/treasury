@@ -21,6 +21,7 @@ import SelectField from '@/components/ui/SelectField.vue'
 import Button from '@/components/ui/Button.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import DayChangeBadge from '@/components/ui/DayChangeBadge.vue'
+import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 import type { ColumnDef, SortingState } from '@tanstack/vue-table'
 import { useToastsStore } from '@/stores/toasts'
 import { CATEGORIES, categoryMeta } from '@/lib/categories'
@@ -332,14 +333,14 @@ async function deleteTransaction(t: Transaction) {
           <div class="text-right">
             <p class="label">Total</p>
             <p class="text-3xl font-semibold tracking-tight tabular mt-1">
-              {{ formatMinor(account.balanceMinor, account.currency) }}
+              <MoneyDisplay :minor="account.balanceMinor" :currency="account.currency" sensitive />
             </p>
             <p
               v-if="BigInt(account.holdingsMinor) !== 0n"
               class="text-xs text-[var(--color-text-dim)] tabular mt-1"
             >
-              {{ formatMinor(account.cashMinor, account.currency) }} cash &middot;
-              {{ formatMinor(account.holdingsMinor, account.currency) }} holdings
+              <MoneyDisplay :minor="account.cashMinor" :currency="account.currency" sensitive /> cash &middot;
+              <MoneyDisplay :minor="account.holdingsMinor" :currency="account.currency" sensitive /> holdings
             </p>
           </div>
         </div>
@@ -479,7 +480,8 @@ async function deleteTransaction(t: Transaction) {
             <DayChangeBadge :pct="row.dayChangePct" size="sm" :show-icon="false" />
           </template>
           <template #cell-value="{ row }">
-            {{ row.valueBaseMinor ? formatMinor(row.valueBaseMinor, row.baseCurrency) : '—' }}
+            <MoneyDisplay v-if="row.valueBaseMinor" :minor="row.valueBaseMinor" :currency="row.baseCurrency" sensitive />
+            <span v-else>—</span>
           </template>
           <template #cell-priceAsOf="{ row }">
             {{ row.priceAsOf ?? '—' }}

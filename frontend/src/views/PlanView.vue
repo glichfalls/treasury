@@ -4,7 +4,7 @@ import { api } from '@/lib/api'
 import { formatMinor, formatMinorCompact } from '@/lib/money'
 import { VChart, chartColors, type EChartsOption } from '@/lib/charts'
 import { TrendingUp, RotateCcw, Pencil, AlertTriangle, Plus, Trash2 } from 'lucide-vue-next'
-import { usePrivacyMode } from '@/composables/usePrivacyMode'
+import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 import Button from '@/components/ui/Button.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -321,7 +321,6 @@ async function deleteActive() {
 }
 
 const baseCurrency = computed(() => planData.value?.baseCurrency || 'CHF')
-const { hideBalances } = usePrivacyMode()
 
 const WINDOW_OPTIONS: { value: PlanWindow; label: string }[] = [
   { value: '1y', label: '1 year' },
@@ -439,7 +438,7 @@ const option = computed<EChartsOption>(() => {
       borderColor: chartColors.border,
       textStyle: { color: chartColors.text },
       valueFormatter: (v: unknown) =>
-        hideBalances.value ? '•••••' : formatMinor(toMinor(Number(v)), baseCurrency.value),
+        formatMinor(toMinor(Number(v)), baseCurrency.value),
     },
     legend: {
       top: 4,
@@ -461,15 +460,13 @@ const option = computed<EChartsOption>(() => {
       axisLabel: {
         color: chartColors.textMuted,
         fontSize: 11,
-        formatter: hideBalances.value
-          ? () => '•'
-          : (v: number) => {
-              const abs = Math.abs(v)
-              if (abs >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)}B`
-              if (abs >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
-              if (abs >= 1_000) return `${(v / 1_000).toFixed(0)}k`
-              return v.toFixed(0)
-            },
+        formatter: (v: number) => {
+          const abs = Math.abs(v)
+          if (abs >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)}B`
+          if (abs >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
+          if (abs >= 1_000) return `${(v / 1_000).toFixed(0)}k`
+          return v.toFixed(0)
+        },
       },
     },
     series: [
@@ -739,22 +736,23 @@ const accountTypeLabels: Record<string, string> = {
               </div>
 
               <!-- Three tabular columns, right-aligned, fixed widths so they align across rows. -->
-              <div
-                class="tabular text-right w-16 text-sm whitespace-nowrap private-value"
-                :title="hideBalances ? undefined : formatMinor(a.startingMinorBase, baseCurrency)"
-              >
-                {{ formatMinorCompact(a.startingMinorBase, baseCurrency) }}
+              <div class="tabular text-right w-16 text-sm whitespace-nowrap">
+                <MoneyDisplay :minor="a.startingMinorBase" :currency="baseCurrency" compact sensitive />
               </div>
               <div
-                class="tabular text-right w-16 text-sm whitespace-nowrap private-value"
+                class="tabular text-right w-16 text-sm whitespace-nowrap"
                 :class="effectiveFor(a).contributionMajor > 0
                   ? 'text-[var(--color-text)]'
                   : 'text-[var(--color-text-dim)]'"
-                :title="hideBalances ? undefined : formatMinor(toMinor(effectiveFor(a).contributionMajor), baseCurrency)"
               >
-                {{ effectiveFor(a).contributionMajor > 0
-                    ? formatMinorCompact(toMinor(effectiveFor(a).contributionMajor), baseCurrency)
-                    : '—' }}
+                <MoneyDisplay
+                  v-if="effectiveFor(a).contributionMajor > 0"
+                  :minor="toMinor(effectiveFor(a).contributionMajor)"
+                  :currency="baseCurrency"
+                  compact
+                  sensitive
+                />
+                <span v-else>—</span>
               </div>
               <div class="tabular text-right w-12 text-sm whitespace-nowrap">
                 {{ effectiveFor(a).returnPct.toFixed(1) }}%
@@ -786,8 +784,8 @@ const accountTypeLabels: Record<string, string> = {
       <div class="px-5 py-4" style="background-color: var(--color-surface);">
         <p class="label">Final value</p>
         <p
-          class="text-2xl font-semibold tracking-tight tabular mt-1 text-[var(--color-accent)] private-value"
-          :title="hideBalances ? undefined : formatMinor(toMinor(final.expected), baseCurrency)"
+          class="text-2xl font-semibold tracking-tight tabular mt-1 text-[var(--color-accent)]"
+          :title="formatMinor(toMinor(final.expected), baseCurrency)"
         >
           {{ formatMinorCompact(toMinor(final.expected), baseCurrency) }}
         </p>
@@ -795,8 +793,8 @@ const accountTypeLabels: Record<string, string> = {
       <div class="px-5 py-4" style="background-color: var(--color-surface);">
         <p class="label">In today's money</p>
         <p
-          class="text-2xl font-semibold tracking-tight tabular mt-1 text-[var(--color-text-muted)] private-value"
-          :title="hideBalances ? undefined : (realFinal !== null ? formatMinor(toMinor(realFinal), baseCurrency) : '—')"
+          class="text-2xl font-semibold tracking-tight tabular mt-1 text-[var(--color-text-muted)]"
+          :title="realFinal !== null ? formatMinor(toMinor(realFinal), baseCurrency) : '—'"
         >
           {{ realFinal !== null ? formatMinorCompact(toMinor(realFinal), baseCurrency) : '—' }}
         </p>
@@ -804,8 +802,8 @@ const accountTypeLabels: Record<string, string> = {
       <div class="px-5 py-4" style="background-color: var(--color-surface);">
         <p class="label">Total contributed</p>
         <p
-          class="text-2xl font-semibold tracking-tight tabular mt-1 private-value"
-          :title="hideBalances ? undefined : formatMinor(toMinor(final.contributed), baseCurrency)"
+          class="text-2xl font-semibold tracking-tight tabular mt-1"
+          :title="formatMinor(toMinor(final.contributed), baseCurrency)"
         >
           {{ formatMinorCompact(toMinor(final.contributed), baseCurrency) }}
         </p>
@@ -813,9 +811,9 @@ const accountTypeLabels: Record<string, string> = {
       <div class="px-5 py-4" style="background-color: var(--color-surface);">
         <p class="label">Growth</p>
         <p
-          class="text-2xl font-semibold tracking-tight tabular mt-1 private-value"
+          class="text-2xl font-semibold tracking-tight tabular mt-1"
           :class="growth >= 0 ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
-          :title="hideBalances ? undefined : formatMinor(toMinor(growth), baseCurrency)"
+          :title="formatMinor(toMinor(growth), baseCurrency)"
         >
           <TrendingUp v-if="growth >= 0" :size="20" class="inline -mt-1" />
           {{ formatMinorCompact(toMinor(growth), baseCurrency) }}

@@ -4,6 +4,7 @@ import { useAccountsStore, type Account } from '@/stores/accounts'
 import { useToastsStore } from '@/stores/toasts'
 import { RouterLink } from 'vue-router'
 import { formatMinor } from '@/lib/money'
+import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 import NewAccountForm from '@/components/forms/NewAccountForm.vue'
 import EditAccountForm from '@/components/forms/EditAccountForm.vue'
 import DataTable from '@/components/ui/DataTable.vue'
@@ -127,7 +128,7 @@ const columns = computed<ColumnDef<Account, unknown>[]>(() => [
         <span class="badge">{{ typeLabels[row.type] ?? row.type }}</span>
       </template>
       <template #cell-balance="{ row }">
-        <span class="private-value">{{ formatMinor(row.balanceMinor, row.currency) }}</span>
+        <MoneyDisplay :minor="row.balanceMinor" :currency="row.currency" sensitive />
       </template>
       <template #cell-actions="{ row }">
         <div class="flex justify-end gap-1">

@@ -4,6 +4,7 @@ import { api } from '@/lib/api'
 import { VChart, chartColors, type EChartsOption } from '@/lib/charts'
 import { formatMinor } from '@/lib/money'
 import ChartCard from '@/components/ui/ChartCard.vue'
+import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 
 interface Point { month: string; incomeMinor: string; expenseMinor: string }
 
@@ -111,14 +112,12 @@ const option = computed<EChartsOption>(() => ({
   <ChartCard title="Cash flow" :loading="loading" :empty="points.length === 0">
     <template #actions>
       <div class="flex items-baseline gap-4 text-xs tabular">
-        <span class="text-[var(--color-positive)]">+{{ formatMinor(summary.income.toString(), currency) }}</span>
-        <span class="text-[var(--color-negative)]">{{ formatMinor(summary.expense.toString(), currency) }}</span>
+        <span class="text-[var(--color-positive)]">+<MoneyDisplay :minor="summary.income.toString()" :currency="currency" sensitive /></span>
+        <MoneyDisplay :minor="summary.expense.toString()" :currency="currency" sensitive class="text-[var(--color-negative)]" />
         <span
           :class="summary.net < 0n ? 'text-[var(--color-negative)]' : 'text-[var(--color-text)]'"
           class="font-medium"
-        >
-          Net {{ formatMinor(summary.net.toString(), currency) }}
-        </span>
+        >Net <MoneyDisplay :minor="summary.net.toString()" :currency="currency" sensitive /></span>
       </div>
     </template>
     <VChart :option="option" class="w-full" style="height: 18rem" autoresize />
