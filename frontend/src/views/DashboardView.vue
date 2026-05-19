@@ -42,7 +42,7 @@ const netWorthByCurrency = computed(() => {
       </div>
       <div v-else class="flex flex-wrap gap-x-10 gap-y-3">
         <div v-for="t in netWorthByCurrency" :key="t.currency">
-          <div class="text-3xl font-semibold tracking-tight tabular">
+          <div class="text-3xl font-semibold tracking-tight tabular private-value">
             {{ formatMinor(t.minor, t.currency) }}
           </div>
         </div>

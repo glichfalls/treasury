@@ -104,4 +104,13 @@
     color: var(--color-text-muted);
     border: 1px solid var(--color-border);
   }
+
+  /* Privacy mode — blur any element marked .private-value when body.privacy-mode is set */
+  .private-value {
+    transition: filter 0.15s ease;
+  }
+  .privacy-mode .private-value {
+    filter: blur(7px);
+    user-select: none;
+  }
 }

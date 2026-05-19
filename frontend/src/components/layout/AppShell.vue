@@ -2,14 +2,16 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { LogOut, Wallet, Menu, X, LayoutDashboard, Settings, Target, BarChart3 } from 'lucide-vue-next'
+import { LogOut, Wallet, Menu, X, LayoutDashboard, Settings, Target, BarChart3, Eye, EyeOff } from 'lucide-vue-next'
 import HeaderSearch from '@/components/layout/HeaderSearch.vue'
 import BrandMark from '@/components/ui/BrandMark.vue'
 import Button from '@/components/ui/Button.vue'
+import { usePrivacyMode } from '@/composables/usePrivacyMode'
 
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
+const { hideBalances, toggle: togglePrivacy } = usePrivacyMode()
 
 const showShell = computed(() => !route.meta.hideShell)
 const wideLayout = computed(() => Boolean(route.meta.wide))
@@ -65,6 +67,15 @@ function isActive(item: (typeof navItems)[number]): boolean {
         </div>
 
         <div v-if="auth.user" class="hidden sm:flex items-center gap-3 text-sm" :class="{ 'ml-auto': true }">
+          <Button
+            variant="ghost"
+            icon-only
+            :title="hideBalances ? 'Show balances' : 'Hide balances'"
+            @click="togglePrivacy"
+          >
+            <EyeOff v-if="hideBalances" :size="16" />
+            <Eye v-else :size="16" />
+          </Button>
           <Button variant="ghost" @click="signOut">
             <LogOut :size="16" />
             <span>Sign out</span>

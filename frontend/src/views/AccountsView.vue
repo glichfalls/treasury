@@ -127,7 +127,7 @@ const columns = computed<ColumnDef<Account, unknown>[]>(() => [
         <span class="badge">{{ typeLabels[row.type] ?? row.type }}</span>
       </template>
       <template #cell-balance="{ row }">
-        {{ formatMinor(row.balanceMinor, row.currency) }}
+        <span class="private-value">{{ formatMinor(row.balanceMinor, row.currency) }}</span>
       </template>
       <template #cell-actions="{ row }">
         <div class="flex justify-end gap-1">
