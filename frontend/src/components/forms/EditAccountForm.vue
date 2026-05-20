@@ -121,7 +121,7 @@ async function submit() {
                   :label="field.label"
                   :placeholder="field.placeholder"
                   :type="field.secret ? 'password' : 'text'"
-                  @update:model-value="providerConfig[field.key] = $event"
+                  @update:model-value="providerConfig[field.key] = String($event)"
                 />
                 <p v-if="field.hint" class="text-xs text-[var(--color-text-dim)] mt-0.5 ml-0.5">{{ field.hint }}</p>
               </div>
