@@ -8,6 +8,9 @@ export interface Account {
   institution: string | null
   type: string
   currency: string
+  provider: string
+  providerConfig: Record<string, string> | null
+  lastSyncedAt: string | null
   createdAt: string
   cashMinor: string
   holdingsMinor: string
@@ -20,6 +23,8 @@ export interface NewAccount {
   institution?: string | null
   type: string
   currency: string
+  provider?: string
+  providerConfig?: Record<string, string> | null
 }
 
 export interface Transaction {
@@ -106,6 +111,15 @@ export const useAccountsStore = defineStore('accounts', () => {
     accounts.value = accounts.value.filter((a) => a.id !== id)
   }
 
+  async function sync(id: string): Promise<{ imported: number; skipped: number; errors: string[] }> {
+    const result = await api.post<{ imported: number; skipped: number; errors: string[] }>(
+      `/api/accounts/${id}/sync`,
+      {},
+    )
+    await fetchAll()
+    return result
+  }
+
   async function fetchTransactions(
     accountId: string,
     filters: TransactionFilters = {},
@@ -163,6 +177,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     create,
     update,
     remove,
+    sync,
     fetchTransactions,
     fetchHoldings,
     addTransaction,

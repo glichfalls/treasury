@@ -67,14 +67,18 @@ final class ImportService
             }
         };
 
+        return $this->importDrafts($account, $importer->parse($rowGenerator()), $importer->name());
+    }
+
+    /** @param iterable<TransactionDraft> $drafts */
+    public function importDrafts(Account $account, iterable $drafts, string $importerName = 'sync'): ImportResult
+    {
         $existing = $this->transactions->findExternalRefsForAccount($account);
         $imported = 0;
         $skipped = 0;
         $errors = [];
 
-        // We commit per-row to keep the unique constraint as the race-safety net; bulk
-        // insert is faster but a single duplicate would roll back the entire batch.
-        foreach ($importer->parse($rowGenerator()) as $i => $draft) {
+        foreach ($drafts as $i => $draft) {
             if (isset($existing[$draft->externalRef])) {
                 $skipped++;
                 continue;
@@ -100,7 +104,6 @@ final class ImportService
                 $existing[$draft->externalRef] = true;
                 $imported++;
             } catch (UniqueConstraintViolationException) {
-                // Race or in-file duplicate — count and move on.
                 $this->em->clear(Transaction::class);
                 $skipped++;
             } catch (\Throwable $e) {
@@ -110,7 +113,7 @@ final class ImportService
             }
         }
 
-        return new ImportResult($imported, $skipped, $errors, $importer->name());
+        return new ImportResult($imported, $skipped, $errors, $importerName);
     }
 
     /** @param string[] $headers */

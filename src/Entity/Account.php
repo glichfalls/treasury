@@ -33,6 +33,15 @@ class Account
     #[ORM\Column(length: 3)]
     private string $currency;
 
+    #[ORM\Column(length: 32, enumType: AccountProvider::class, nullable: true)]
+    private ?AccountProvider $provider = null;
+
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $providerConfig = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $lastSyncedAt = null;
+
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
 
@@ -58,5 +67,11 @@ class Account
     public function setType(AccountType $type): self { $this->type = $type; return $this; }
     public function getCurrency(): string { return $this->currency; }
     public function setCurrency(string $currency): self { $this->currency = strtoupper($currency); return $this; }
+    public function getProvider(): ?AccountProvider { return $this->provider; }
+    public function setProvider(?AccountProvider $provider): self { $this->provider = $provider; return $this; }
+    public function getProviderConfig(): ?array { return $this->providerConfig; }
+    public function setProviderConfig(?array $providerConfig): self { $this->providerConfig = $providerConfig; return $this; }
+    public function getLastSyncedAt(): ?\DateTimeImmutable { return $this->lastSyncedAt; }
+    public function setLastSyncedAt(?\DateTimeImmutable $lastSyncedAt): self { $this->lastSyncedAt = $lastSyncedAt; return $this; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
 }

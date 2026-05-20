@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useAccountsStore, type Account } from '@/stores/accounts'
+import { providerDef, type AccountProvider } from '@/lib/providers'
 import ModalForm from '@/components/ui/ModalForm.vue'
 import TextField from '@/components/ui/TextField.vue'
 import SelectField from '@/components/ui/SelectField.vue'
@@ -29,10 +30,10 @@ const name = ref('')
 const institution = ref('')
 const type = ref<string>('bank_checking')
 const currency = ref('CHF')
+const providerConfig = ref<Record<string, string>>({})
 const error = ref<string | null>(null)
 const submitting = ref(false)
 
-// Re-seed the form whenever a different account is opened for editing.
 watch(
   () => props.account,
   (a) => {
@@ -41,6 +42,7 @@ watch(
     institution.value = a.institution ?? ''
     type.value = a.type
     currency.value = a.currency
+    providerConfig.value = { ...(a.providerConfig ?? {}) }
     error.value = null
   },
   { immediate: true },
@@ -50,16 +52,27 @@ function close() {
   emit('update:account', null)
 }
 
+const provDef = () => providerDef(props.account?.provider as AccountProvider)
+
 async function submit() {
   if (!props.account) return
   error.value = null
   submitting.value = true
   try {
+    const def = provDef()
+    const config = def.syncConfigFields
+      ? Object.fromEntries(
+          (def.syncConfigFields ?? [])
+            .map((f) => [f.key, providerConfig.value[f.key] ?? ''])
+            .filter(([, v]) => v !== ''),
+        )
+      : null
     await accounts.update(props.account.id, {
       name: name.value.trim(),
       institution: institution.value.trim() || null,
       type: type.value,
       currency: currency.value.trim().toUpperCase(),
+      providerConfig: config && Object.keys(config).length > 0 ? config : null,
     })
     emit('saved')
     close()
@@ -82,18 +95,39 @@ async function submit() {
     @submit="submit"
   >
     <template v-if="account">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <TextField v-model="name" label="Name" required autofocus />
-        <TextField v-model="institution" label="Institution" />
-        <SelectField v-model="type" label="Type" :options="accountTypes" />
-        <TextField
-          v-model="currency"
-          label="Currency"
-          required
-          maxlength="3"
-          pattern="[A-Za-z]{3}"
-          class="uppercase"
-        />
+      <div class="space-y-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <TextField v-model="name" label="Name" required autofocus />
+          <TextField v-model="institution" label="Institution" />
+          <SelectField v-model="type" label="Type" :options="accountTypes" />
+          <TextField
+            v-model="currency"
+            label="Currency"
+            required
+            maxlength="3"
+            pattern="[A-Za-z]{3}"
+            class="uppercase"
+          />
+        </div>
+
+        <!-- Provider config fields (e.g. IBKR Flex credentials) -->
+        <template v-if="provDef().syncConfigFields?.length">
+          <div class="pt-1 border-t" style="border-color: var(--color-border);">
+            <p class="text-xs text-[var(--color-text-muted)] mb-2">Connection settings</p>
+            <div class="space-y-2">
+              <div v-for="field in provDef().syncConfigFields" :key="field.key">
+                <TextField
+                  :model-value="providerConfig[field.key] ?? ''"
+                  :label="field.label"
+                  :placeholder="field.placeholder"
+                  :type="field.secret ? 'password' : 'text'"
+                  @update:model-value="providerConfig[field.key] = $event"
+                />
+                <p v-if="field.hint" class="text-xs text-[var(--color-text-dim)] mt-0.5 ml-0.5">{{ field.hint }}</p>
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
     </template>
   </ModalForm>

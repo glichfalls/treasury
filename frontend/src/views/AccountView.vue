@@ -26,7 +26,9 @@ import type { ColumnDef, SortingState } from '@tanstack/vue-table'
 import { useToastsStore } from '@/stores/toasts'
 import { CATEGORIES, categoryMeta } from '@/lib/categories'
 import { featuresFor } from '@/lib/accountFeatures'
-import { ChevronLeft, Download, Inbox, Pencil, Trash2 } from 'lucide-vue-next'
+import { providerDef } from '@/lib/providers'
+import type { AccountProvider } from '@/lib/providers'
+import { ChevronLeft, Download, Inbox, Pencil, RefreshCw, Trash2 } from 'lucide-vue-next'
 
 const route = useRoute()
 const accounts = useAccountsStore()
@@ -120,6 +122,30 @@ function goToPage(p: number) {
 async function reloadAfterImport() {
   await accounts.fetchAll()
   await load()
+}
+
+const syncing = ref(false)
+const syncResult = ref<{ imported: number; skipped: number; errors: string[] } | null>(null)
+const accountProviderDef = computed(() => providerDef(account.value?.provider as AccountProvider))
+
+async function runSync() {
+  if (!account.value) return
+  syncing.value = true
+  syncResult.value = null
+  try {
+    const result = await accounts.sync(account.value.id)
+    syncResult.value = result
+    if (result.imported > 0) {
+      toasts.success(`Synced: ${result.imported} imported, ${result.skipped} skipped`)
+      await load()
+    } else {
+      toasts.success(`Already up to date — ${result.skipped} transactions skipped`)
+    }
+  } catch (e) {
+    toasts.error(e instanceof Error ? e.message : String(e))
+  } finally {
+    syncing.value = false
+  }
 }
 
 onMounted(async () => {
@@ -329,6 +355,9 @@ async function deleteTransaction(t: Transaction) {
           <div>
             <p class="label">{{ account.institution ?? account.type.replace('_', ' ') }}</p>
             <h1 class="text-2xl font-semibold tracking-tight mt-1">{{ account.name }}</h1>
+            <p v-if="account.lastSyncedAt" class="text-xs text-[var(--color-text-dim)] mt-1">
+              Last synced {{ new Date(account.lastSyncedAt).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' }) }}
+            </p>
           </div>
           <div class="text-right">
             <p class="label">Total</p>
@@ -378,6 +407,15 @@ async function deleteTransaction(t: Transaction) {
               :account-id="account.id"
               @imported="reloadAfterImport"
             />
+            <Button
+              v-if="accountProviderDef.features.sync"
+              variant="secondary"
+              :disabled="syncing"
+              @click="runSync"
+            >
+              <RefreshCw :size="14" :class="syncing ? 'animate-spin' : ''" />
+              <span>{{ syncing ? 'Syncing…' : 'Sync' }}</span>
+            </Button>
           </template>
 
           <!-- Secondary actions: pushed to the right -->

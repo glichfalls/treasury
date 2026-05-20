@@ -3,10 +3,12 @@
 namespace App\Controller\Api;
 
 use App\Entity\Account;
+use App\Entity\AccountProvider;
 use App\Entity\AccountType;
 use App\Entity\User;
 use App\Holdings\HoldingsService;
 use App\Repository\AccountRepository;
+use App\Sync\IbkrFlexService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -22,6 +24,7 @@ class AccountController extends AbstractController
         private readonly AccountRepository $accounts,
         private readonly EntityManagerInterface $em,
         private readonly HoldingsService $holdings,
+        private readonly IbkrFlexService $ibkrFlex,
     ) {}
 
     #[Route('', name: 'api_accounts_list', methods: ['GET'])]
@@ -55,7 +58,7 @@ class AccountController extends AbstractController
     {
         $account = $this->accounts->findOneOwnedBy($id, $user);
         if ($account === null) {
-            throw new \Symfony\Component\HttpKernel\Exception\NotFoundHttpException();
+            throw new NotFoundHttpException();
         }
         return new JsonResponse(array_map(
             fn($h) => $h->toArray(),
@@ -63,11 +66,37 @@ class AccountController extends AbstractController
         ));
     }
 
+    #[Route('/{id}/sync', name: 'api_accounts_sync', methods: ['POST'])]
+    public function sync(string $id, #[CurrentUser] User $user): JsonResponse
+    {
+        $account = $this->accounts->findOneOwnedBy($id, $user);
+        if ($account === null) {
+            throw new NotFoundHttpException();
+        }
+
+        if ($account->getProvider() !== AccountProvider::Ibkr) {
+            return new JsonResponse(['error' => 'Sync is not supported for this account provider'], 422);
+        }
+
+        try {
+            $result = $this->ibkrFlex->sync($account);
+        } catch (\Throwable $e) {
+            return new JsonResponse(['error' => $e->getMessage()], 502);
+        }
+
+        $account->setLastSyncedAt(new \DateTimeImmutable());
+        $this->em->flush();
+
+        return new JsonResponse([
+            'imported' => $result->imported,
+            'skipped' => $result->skipped,
+            'errors' => $result->errors,
+        ]);
+    }
+
     #[Route('/assets/catalog', name: 'api_assets_catalog', methods: ['GET'])]
     public function assetCatalog(): JsonResponse
     {
-        // Plain securities — exclude commodity-backed coins (precious metals) and the
-        // gold spot reference, since they have their own pickers / valuation rules.
         $rows = $this->em->getConnection()->fetchAllAssociative(
             "SELECT isin, ticker, name, currency
              FROM assets
@@ -121,6 +150,10 @@ class AccountController extends AbstractController
         $account->setInstitution($body['institution'] ?? null);
         $account->setType($type);
         $account->setCurrency($currency);
+        $account->setProvider(AccountProvider::tryFrom((string) ($body['provider'] ?? '')) ?? AccountProvider::Manual);
+        if (isset($body['providerConfig']) && is_array($body['providerConfig'])) {
+            $account->setProviderConfig($this->sanitizeProviderConfig($body['providerConfig']));
+        }
 
         $this->em->persist($account);
         $this->em->flush();
@@ -175,6 +208,13 @@ class AccountController extends AbstractController
             }
             $account->setCurrency($currency);
         }
+        if (array_key_exists('provider', $body)) {
+            $account->setProvider(AccountProvider::tryFrom((string) $body['provider']) ?? AccountProvider::Manual);
+        }
+        if (array_key_exists('providerConfig', $body)) {
+            $cfg = $body['providerConfig'];
+            $account->setProviderConfig(is_array($cfg) ? $this->sanitizeProviderConfig($cfg) : null);
+        }
 
         $this->em->flush();
 
@@ -185,6 +225,18 @@ class AccountController extends AbstractController
         $hasOpening = $this->accounts->hasOpeningBalanceMap([$account->getId()])[$account->getId()->toRfc4122()] ?? false;
 
         return new JsonResponse($this->serializeAccount($account, $cash, $holdingsValue, $total, $hasOpening));
+    }
+
+    /** Keeps only string values to prevent arbitrary data from being stored. */
+    private function sanitizeProviderConfig(array $raw): array
+    {
+        $out = [];
+        foreach ($raw as $k => $v) {
+            if (is_string($k) && (is_string($v) || $v === null)) {
+                $out[$k] = $v;
+            }
+        }
+        return $out;
     }
 
     private function serializeAccount(
@@ -200,6 +252,9 @@ class AccountController extends AbstractController
             'institution' => $a->getInstitution(),
             'type' => $a->getType()->value,
             'currency' => $a->getCurrency(),
+            'provider' => $a->getProvider()?->value ?? 'manual',
+            'providerConfig' => $a->getProviderConfig(),
+            'lastSyncedAt' => $a->getLastSyncedAt()?->format(\DateTimeInterface::ATOM),
             'createdAt' => $a->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'cashMinor' => $cashMinor,
             'holdingsMinor' => $holdingsMinor,
