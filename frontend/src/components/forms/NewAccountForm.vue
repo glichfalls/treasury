@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useAccountsStore } from '@/stores/accounts'
 import { useToastsStore } from '@/stores/toasts'
 import { PROVIDER_OPTIONS, providerDef, type AccountProvider } from '@/lib/providers'
@@ -59,7 +59,7 @@ async function submit() {
   error.value = null
   submitting.value = true
   try {
-    const def = providerDef(provider.value as AccountProvider)
+    const def = currentProviderDef.value
     const config = def.syncConfigFields
       ? Object.fromEntries(
           (def.syncConfigFields ?? [])
@@ -85,7 +85,7 @@ async function submit() {
   }
 }
 
-const currentProviderDef = () => providerDef(provider.value as AccountProvider)
+const currentProviderDef = computed(() => providerDef(provider.value as AccountProvider))
 </script>
 
 <template>
@@ -123,11 +123,11 @@ const currentProviderDef = () => providerDef(provider.value as AccountProvider)
       </div>
 
       <!-- Provider-specific config fields -->
-      <template v-if="currentProviderDef().syncConfigFields?.length">
+      <template v-if="currentProviderDef.syncConfigFields?.length">
         <div class="pt-1 border-t" style="border-color: var(--color-border);">
           <p class="text-xs text-[var(--color-text-muted)] mb-2">Connection settings</p>
           <div class="space-y-2">
-            <div v-for="field in currentProviderDef().syncConfigFields" :key="field.key">
+            <div v-for="field in currentProviderDef.syncConfigFields" :key="field.key">
               <TextField
                 :model-value="providerConfig[field.key] ?? ''"
                 :label="field.label"

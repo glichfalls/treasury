@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useAccountsStore, type Account } from '@/stores/accounts'
-import { providerDef, type AccountProvider } from '@/lib/providers'
+import { PROVIDER_OPTIONS, providerDef, type AccountProvider } from '@/lib/providers'
 import ModalForm from '@/components/ui/ModalForm.vue'
 import TextField from '@/components/ui/TextField.vue'
 import SelectField from '@/components/ui/SelectField.vue'
@@ -30,10 +30,12 @@ const name = ref('')
 const institution = ref('')
 const type = ref<string>('bank_checking')
 const currency = ref('CHF')
+const provider = ref<string>('manual')
 const providerConfig = ref<Record<string, string>>({})
 const error = ref<string | null>(null)
 const submitting = ref(false)
 
+// Re-seed all fields when the account being edited changes.
 watch(
   () => props.account,
   (a) => {
@@ -42,28 +44,34 @@ watch(
     institution.value = a.institution ?? ''
     type.value = a.type
     currency.value = a.currency
+    provider.value = a.provider ?? 'manual'
     providerConfig.value = { ...(a.providerConfig ?? {}) }
     error.value = null
   },
   { immediate: true },
 )
 
+// When provider changes, clear stale credentials from the previous provider.
+watch(provider, () => {
+  providerConfig.value = {}
+})
+
+const currentProviderDef = computed(() => providerDef(provider.value as AccountProvider))
+
 function close() {
   emit('update:account', null)
 }
-
-const provDef = () => providerDef(props.account?.provider as AccountProvider)
 
 async function submit() {
   if (!props.account) return
   error.value = null
   submitting.value = true
   try {
-    const def = provDef()
+    const def = currentProviderDef.value
     const config = def.syncConfigFields
       ? Object.fromEntries(
           (def.syncConfigFields ?? [])
-            .map((f) => [f.key, providerConfig.value[f.key] ?? ''])
+            .map((f): [string, string] => [f.key, providerConfig.value[f.key] ?? ''])
             .filter(([, v]) => v !== ''),
         )
       : null
@@ -72,6 +80,7 @@ async function submit() {
       institution: institution.value.trim() || null,
       type: type.value,
       currency: currency.value.trim().toUpperCase(),
+      provider: provider.value,
       providerConfig: config && Object.keys(config).length > 0 ? config : null,
     })
     emit('saved')
@@ -96,6 +105,8 @@ async function submit() {
   >
     <template v-if="account">
       <div class="space-y-3">
+        <SelectField v-model="provider" label="Provider" :options="PROVIDER_OPTIONS" />
+
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <TextField v-model="name" label="Name" required autofocus />
           <TextField v-model="institution" label="Institution" />
@@ -110,12 +121,12 @@ async function submit() {
           />
         </div>
 
-        <!-- Provider config fields (e.g. IBKR Flex credentials) -->
-        <template v-if="provDef().syncConfigFields?.length">
+        <!-- Provider-specific config fields (e.g. IBKR Flex credentials) -->
+        <template v-if="currentProviderDef.syncConfigFields?.length">
           <div class="pt-1 border-t" style="border-color: var(--color-border);">
             <p class="text-xs text-[var(--color-text-muted)] mb-2">Connection settings</p>
             <div class="space-y-2">
-              <div v-for="field in provDef().syncConfigFields" :key="field.key">
+              <div v-for="field in currentProviderDef.syncConfigFields" :key="field.key">
                 <TextField
                   :model-value="providerConfig[field.key] ?? ''"
                   :label="field.label"
