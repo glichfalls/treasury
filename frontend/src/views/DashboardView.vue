@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { onMounted, computed, ref } from 'vue'
 import { useAccountsStore } from '@/stores/accounts'
-import { formatMinor } from '@/lib/money'
 import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 import NetWorthChart from '@/components/charts/NetWorthChart.vue'
 import CashFlowChart from '@/components/charts/CashFlowChart.vue'
@@ -34,65 +33,76 @@ const netWorthByCurrency = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-10">
-    <header>
-      <h1 class="text-2xl font-semibold tracking-tight">Dashboard</h1>
-      <p class="text-sm text-[var(--color-text-muted)] mt-1">A bird's-eye view of your portfolio.</p>
-    </header>
-
-    <section>
-      <h2 class="label mb-3">Net worth</h2>
-      <div v-if="netWorthByCurrency.length === 0" class="text-[var(--color-text-muted)]">
+  <div class="space-y-4">
+    <!-- Hero: the headline number, given room to breathe and a subtle brand tint. -->
+    <section
+      class="rounded-xl border border-[var(--color-border)] p-6"
+      style="background-image: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 9%, var(--color-surface)), var(--color-surface) 60%);"
+    >
+      <div class="label">Net worth</div>
+      <div v-if="netWorthByCurrency.length === 0" class="text-[var(--color-text-muted)] mt-2">
         Add an account from the Accounts page to get started.
       </div>
-      <div v-else class="flex flex-wrap gap-x-10 gap-y-3">
-        <div v-for="t in netWorthByCurrency" :key="t.currency">
-          <div class="text-3xl font-semibold tracking-tight tabular">
+      <template v-else>
+        <div class="flex flex-wrap items-end gap-x-10 gap-y-1 mt-1.5">
+          <div
+            v-for="t in netWorthByCurrency"
+            :key="t.currency"
+            class="text-4xl sm:text-5xl font-semibold tracking-tight tabular"
+          >
             <MoneyDisplay :minor="t.minor" :currency="t.currency" sensitive />
           </div>
         </div>
-      </div>
-      <TodayPnl class="mt-2" />
+        <TodayPnl class="mt-2" />
+      </template>
     </section>
 
-    <section v-if="accounts.accounts.length > 0" class="space-y-4">
-      <div class="flex items-center justify-end -mb-2">
-        <SegmentedControl
-          v-model="networthMode"
-          :options="[
-            { value: 'total', label: 'Total' },
-            { value: 'stacked', label: 'Cash + holdings' },
-          ]"
+    <template v-if="accounts.accounts.length > 0">
+      <!-- Primary tiles: net-worth trend (wide) + allocation. -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="lg:col-span-2 space-y-2">
+          <div class="flex items-center justify-end">
+            <SegmentedControl
+              v-model="networthMode"
+              :options="[
+                { value: 'total', label: 'Total' },
+                { value: 'stacked', label: 'Cash + holdings' },
+              ]"
+            />
+          </div>
+          <NetWorthChart
+            endpoint="/api/networth/timeseries"
+            title="Net worth over time"
+            :range="range"
+            :mode="networthMode"
+            @update:range="range = $event"
+          />
+        </div>
+        <AllocationDonut endpoint="/api/allocation" class="lg:col-span-1" />
+      </div>
+
+      <!-- Movers (narrow) + performance (wide). -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <TopMoversCard class="lg:col-span-1" />
+        <PerformanceChart
+          endpoint="/api/performance"
+          title="Portfolio performance"
+          :range="range"
+          class="lg:col-span-2"
+          @update:range="range = $event"
         />
       </div>
-      <NetWorthChart
-        endpoint="/api/networth/timeseries"
-        title="Net worth over time"
-        :range="range"
-        :mode="networthMode"
-        @update:range="range = $event"
-      />
 
-      <PerformanceChart
-        endpoint="/api/performance"
-        title="Portfolio performance"
-        :range="range"
-        @update:range="range = $event"
-      />
+      <!-- Holdings news, full width. -->
+      <NewsWidget />
 
+      <!-- Cash flow + recent activity. -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <TopMoversCard />
+        <CashFlowChart :months="18" />
         <RecentActivityCard />
       </div>
 
-      <NewsWidget />
-
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <CashFlowChart :months="18" />
-        <AllocationDonut endpoint="/api/allocation" />
-      </div>
-
       <CashflowByCategoryChart :months="12" />
-    </section>
+    </template>
   </div>
 </template>
