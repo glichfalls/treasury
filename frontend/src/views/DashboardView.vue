@@ -33,7 +33,7 @@ const netWorthByCurrency = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-6">
     <!-- Hero: the headline number, given room to breathe and a subtle brand tint. -->
     <section
       class="rounded-xl border border-[var(--color-border)] p-6"
@@ -58,8 +58,8 @@ const netWorthByCurrency = computed(() => {
     </section>
 
     <template v-if="accounts.accounts.length > 0">
-      <!-- Primary tiles: net-worth trend (wide) + allocation. -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <!-- Net-worth trend (wide) + allocation. -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div class="lg:col-span-2 space-y-2">
           <div class="flex items-center justify-end">
             <SegmentedControl
@@ -81,28 +81,28 @@ const netWorthByCurrency = computed(() => {
         <AllocationDonut endpoint="/api/allocation" class="lg:col-span-1" />
       </div>
 
-      <!-- Movers (narrow) + performance (wide). -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <TopMoversCard class="lg:col-span-1" />
-        <PerformanceChart
-          endpoint="/api/performance"
-          title="Portfolio performance"
-          :range="range"
-          class="lg:col-span-2"
-          @update:range="range = $event"
-        />
+      <!-- Performance, full width so the chart isn't squeezed. -->
+      <PerformanceChart
+        endpoint="/api/performance"
+        title="Portfolio performance"
+        :range="range"
+        @update:range="range = $event"
+      />
+
+      <!-- Movers + recent activity, half each — Movers needs the room to read. -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <TopMoversCard />
+        <RecentActivityCard />
       </div>
 
       <!-- Holdings news, full width. -->
       <NewsWidget />
 
-      <!-- Cash flow + recent activity. -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <!-- Cash flow + category breakdown. -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <CashFlowChart :months="18" />
-        <RecentActivityCard />
+        <CashflowByCategoryChart :months="12" />
       </div>
-
-      <CashflowByCategoryChart :months="12" />
     </template>
   </div>
 </template>
