@@ -45,7 +45,7 @@ watch(
     type.value = a.type
     currency.value = a.currency
     provider.value = a.provider ?? 'manual'
-    providerConfig.value = { ...(a.providerConfig ?? {}) }
+    providerConfig.value = { ...a.providerConfig }
     error.value = null
   },
   { immediate: true },
