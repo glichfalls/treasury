@@ -30,6 +30,7 @@ final class NewsFetcher
         private readonly NewsItemRepository $newsItems,
         private readonly SettingsService $settings,
         private readonly NewsQualityFilter $quality,
+        private readonly EtfTopicInferer $topicInferer,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {}
@@ -42,6 +43,9 @@ final class NewsFetcher
     public function refresh(?array $assets = null, ?int $perAssetLimit = null): array
     {
         $assets ??= $this->assets->findActiveForNews();
+        // Give fund/ETF holdings a market topic to search against (prod/AI; no-op
+        // without a key) before we build queries from it.
+        $this->topicInferer->enrich($assets);
         $perAssetLimit ??= $this->settings->getNewsVolumeLimit();
         // Honour admin source toggles — skip providers switched off in config.
         $disabled = $this->settings->getDisabledSources();

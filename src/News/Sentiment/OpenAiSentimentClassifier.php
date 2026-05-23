@@ -152,6 +152,50 @@ final class OpenAiSentimentClassifier implements SentimentClassifier
         ];
     }
 
+    /**
+     * Map a fund/ETF name to the market/index it tracks, as a short news-search
+     * topic ("S&P 500", "MSCI Emerging Markets", "gold"). Returns null for a
+     * single company, or on failure.
+     */
+    public function inferMarketTopic(string $name, string $isin): ?string
+    {
+        $key = $this->settings->get(SettingsService::OPENAI_API_KEY);
+        if ($key === null || trim($name) === '') {
+            return null;
+        }
+
+        $system = 'You map fund/ETF names to the market they track, for news search. '
+            . 'Respond ONLY with JSON {"topic":"<short market or index term>"} for a fund '
+            . '(e.g. "S&P 500", "MSCI Emerging Markets", "Japanese equities", "gold"), or '
+            . '{"topic":null} if the asset is a single company rather than a fund.';
+
+        try {
+            $data = $this->http->request('POST', self::URL, [
+                'headers' => ['Authorization' => 'Bearer ' . $key],
+                'json' => [
+                    'model' => self::MODEL,
+                    'temperature' => 0,
+                    'response_format' => ['type' => 'json_object'],
+                    'messages' => [
+                        ['role' => 'system', 'content' => $system],
+                        ['role' => 'user', 'content' => "Name: {$name}\nISIN: {$isin}"],
+                    ],
+                ],
+                'timeout' => 20,
+            ])->toArray(false);
+        } catch (\Throwable $e) {
+            $this->logger->warning('OpenAI topic inference failed', ['isin' => $isin, 'error' => $e->getMessage()]);
+            return null;
+        }
+
+        $raw = $data['choices'][0]['message']['content'] ?? null;
+        if (!is_string($raw)) {
+            return null;
+        }
+        $topic = is_array($parsed = json_decode($raw, true)) ? ($parsed['topic'] ?? null) : null;
+        return is_string($topic) && trim($topic) !== '' ? trim($topic) : null;
+    }
+
     private function normalize(mixed $sentiment): string
     {
         return match (is_string($sentiment) ? strtolower(trim($sentiment)) : '') {
