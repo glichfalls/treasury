@@ -25,6 +25,7 @@ final class RedditProvider implements NewsProvider
     public function __construct(
         private readonly HttpClientInterface $http,
         private readonly SettingsService $settings,
+        private readonly NewsQualityFilter $quality,
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {}
 
@@ -39,6 +40,7 @@ final class RedditProvider implements NewsProvider
         $byUrl = [];
 
         // Dedicated company subreddit, if set on the asset — its hottest posts.
+        // The whole sub is about the holding, so these aren't relevance-gated.
         $sub = $asset->getRedditSubreddit();
         if ($sub !== null && $sub !== '') {
             foreach ($this->feed('/r/' . rawurlencode($sub) . '/.rss', ['limit' => min($limit, 8)]) as $a) {
@@ -46,7 +48,9 @@ final class RedditProvider implements NewsProvider
             }
         }
 
-        // Broad market subreddits, searched for this holding.
+        // Broad market subreddits, searched for this holding. Search matches
+        // loosely (generic "investing in ETFs" chatter), so require the post to
+        // actually reference the holding.
         $query = $this->query($asset);
         $broad = $this->settings->getRedditBroadSubreddits();
         if ($query !== null && $broad !== []) {
@@ -58,7 +62,9 @@ final class RedditProvider implements NewsProvider
                 'limit' => $limit,
             ]);
             foreach ($articles as $a) {
-                $byUrl[$a->url] = $a;
+                if ($this->quality->matchesAsset($a, $asset)) {
+                    $byUrl[$a->url] = $a;
+                }
             }
         }
 

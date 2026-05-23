@@ -73,6 +73,12 @@ final class NewsFetcher
                     if (!$this->quality->accepts($article)) {
                         continue; // drop clickbait / filing spam / forum noise
                     }
+                    // Headlines must actually reference the holding. Social is gated
+                    // at the provider (broad-sub yes, dedicated-sub exempt).
+                    if ($article->kind === NewsItem::KIND_HEADLINE
+                        && !$this->quality->matchesAsset($article, $asset)) {
+                        continue; // drop off-topic matches (e.g. unrelated ETF hits)
+                    }
                     $hash = $this->hash($article);
                     if (!isset($collected[$hash])) {
                         $collected[$hash] = [$provider->source(), $article];

@@ -2,6 +2,7 @@
 
 namespace App\News;
 
+use App\Entity\Asset;
 use App\Entity\NewsItem;
 
 /**
@@ -44,6 +45,7 @@ final class NewsQualityFilter
         '/\bmotley\s+fool\b/i',
         "/\\bwe\\s+(like|don'?t\\s+like|find\\s+interesting|are\\s+watching)\\b/i",
         '/\b(buy|sell|hold)\s+now\?/i',
+        '/share price\s*\|/i', // fund directory / quote-page listings, not news
     ];
 
     /** Reddit recurring threads that aren't real news. */
@@ -55,6 +57,63 @@ final class NewsQualityFilter
         '/\bmoves\s+tomorrow\b/i',
         '/\bmegathread\b/i',
     ];
+
+    /** Corporate/fund suffixes and generic market words that make poor anchors. */
+    private const ANCHOR_STOPWORDS = [
+        'inc', 'corp', 'corporation', 'ltd', 'limited', 'plc', 'company', 'holdings', 'holding',
+        'group', 'the', 'etf', 'ucits', 'fund', 'trust', 'index', 'acc', 'dist', 'class',
+        'world', 'global', 'core', 'total', 'all', 'growth', 'value', 'equity', 'equities',
+        'income', 'market', 'markets', 'developed', 'emerging', 'large', 'small', 'mid', 'cap',
+        'plus', 'select', 'sector', 'shares', 'stock', 'fund', 'usd', 'eur', 'chf', 'hedged',
+    ];
+
+    /**
+     * Is the article actually about this holding? Drops loose keyword matches
+     * (e.g. a Premier League article surfacing for a broad ETF, or generic
+     * "investing in ETFs" chatter). Matches the ticker or a distinctive token of
+     * the name / market topic. Callers decide where to apply it (headlines and
+     * broad-subreddit social, but not a holding's dedicated subreddit).
+     */
+    public function matchesAsset(NewsArticle $article, Asset $asset): bool
+    {
+        $anchors = $this->anchors($asset);
+        if ($anchors === []) {
+            return true; // nothing distinctive to match on — don't over-filter
+        }
+        $hay = strtolower($article->title . ' ' . ($article->snippet ?? ''));
+        foreach ($anchors as $anchor) {
+            if (preg_match('/\b' . preg_quote($anchor, '/') . '/i', $hay) === 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** @return string[] Lowercased distinctive terms identifying the asset. */
+    private function anchors(Asset $asset): array
+    {
+        $terms = [];
+
+        $ticker = $asset->getTicker();
+        if ($ticker !== null && trim($ticker) !== '') {
+            $base = strtolower(explode('.', trim($ticker))[0]);
+            if (strlen($base) >= 2) {
+                $terms[] = $base;
+            }
+        }
+
+        // Prefer the market topic (ETFs) over the fund name as the anchor source.
+        $source = $asset->getNewsMarketTopic() ?? $asset->getName();
+        if ($source !== null) {
+            foreach (preg_split('/[^a-z0-9&]+/i', strtolower($source)) ?: [] as $tok) {
+                if (strlen($tok) >= 3 && !in_array($tok, self::ANCHOR_STOPWORDS, true)) {
+                    $terms[] = $tok;
+                }
+            }
+        }
+
+        return array_values(array_unique($terms));
+    }
 
     public function accepts(NewsArticle $article): bool
     {
