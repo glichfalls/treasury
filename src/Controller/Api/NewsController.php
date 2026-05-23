@@ -2,8 +2,11 @@
 
 namespace App\Controller\Api;
 
+use App\Entity\NewsItem;
 use App\Entity\User;
+use App\News\Sentiment\NewsClassificationService;
 use App\Repository\AssetRepository;
+use App\Repository\NewsItemRepository;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ParameterType;
@@ -22,13 +25,17 @@ class NewsController extends AbstractController
     public function __construct(
         private readonly Connection $conn,
         private readonly AssetRepository $assets,
+        private readonly NewsItemRepository $newsItems,
+        private readonly NewsClassificationService $classifier,
         private readonly EntityManagerInterface $em,
     ) {}
 
     /**
      * Paginated, filterable feed of news for the user's (un-muted) holdings,
-     * newest first. Returns sentiment counts for the whole filtered set so the
-     * UI can render Bullish / Bearish / Neutral grouping without a second call.
+     * newest first. Articles fetched against multiple holdings (same URL, different
+     * tickers) are collapsed into a single entry with every relevant ticker listed
+     * under `assets`. Tab counts ignore the active sentiment filter so they stay
+     * accurate when switching tabs.
      */
     #[Route('', name: 'api_news_list', methods: ['GET'])]
     public function list(Request $request, #[CurrentUser] User $user): JsonResponse
@@ -41,25 +48,40 @@ class NewsController extends AbstractController
             return new JsonResponse($this->emptyFeed($page, $pageSize));
         }
 
+        // Base WHERE excludes sentiment so the per-sentiment counts stay correct
+        // when a sentiment tab is active.
         [$where, $params, $types] = $this->buildFilter($request, $held);
 
         $counts = $this->sentimentCounts($where, $params, $types);
-        $total = array_sum($counts);
 
-        $rows = $this->conn->fetchAllAssociative(
-            "SELECT n.id, n.source, n.kind, n.title, n.url, n.publisher, n.summary, n.snippet,
-                    n.sentiment, n.published_at, a.isin, a.ticker, a.name AS asset_name
-             FROM news_items n
-             INNER JOIN assets a ON a.id = n.asset_id
-             WHERE {$where}
-             ORDER BY n.published_at DESC, n.id DESC
-             LIMIT {$pageSize} OFFSET " . (($page - 1) * $pageSize),
-            $params,
-            $types,
+        $sentiment = trim((string) $request->query->get('sentiment', ''));
+        $listWhere = $where;
+        $listParams = $params;
+        $listTypes = $types;
+        if ($sentiment === 'unclassified') {
+            $listWhere .= ' AND n.sentiment IS NULL';
+        } elseif ($sentiment !== '') {
+            $listWhere .= ' AND n.sentiment = :sentiment';
+            $listParams['sentiment'] = $sentiment;
+        }
+
+        $total = match (true) {
+            $sentiment === 'unclassified' => $counts['unclassified'],
+            in_array($sentiment, ['bullish', 'bearish', 'neutral'], true) => $counts[$sentiment],
+            default => array_sum($counts),
+        };
+
+        $items = $this->fetchGroupedArticles(
+            $listWhere,
+            $listParams,
+            $listTypes,
+            $held,
+            limit: $pageSize,
+            offset: ($page - 1) * $pageSize,
         );
 
         return new JsonResponse([
-            'items' => array_map([$this, 'serializeItem'], $rows),
+            'items' => $items,
             'total' => $total,
             'page' => $page,
             'pageSize' => $pageSize,
@@ -69,7 +91,7 @@ class NewsController extends AbstractController
     }
 
     /**
-     * Compact payload for the dashboard widget: the few latest items plus the
+     * Compact payload for the dashboard widget: the few latest articles plus the
      * overall sentiment tilt across the user's holdings.
      */
     #[Route('/dashboard', name: 'api_news_dashboard', methods: ['GET'])]
@@ -84,21 +106,76 @@ class NewsController extends AbstractController
         $params = ['isins' => $held];
         $types = ['isins' => ArrayParameterType::STRING];
 
-        $rows = $this->conn->fetchAllAssociative(
-            "SELECT n.id, n.source, n.kind, n.title, n.url, n.publisher, n.summary, n.snippet,
-                    n.sentiment, n.published_at, a.isin, a.ticker, a.name AS asset_name
+        $items = $this->fetchGroupedArticles($where, $params, $types, $held, limit: 6, offset: 0);
+
+        return new JsonResponse([
+            'items' => $items,
+            'counts' => $this->sentimentCounts($where, $params, $types),
+        ]);
+    }
+
+    /**
+     * Single-article detail. Returns the article with every held asset it touches,
+     * and lazy-classifies on first read so AI summaries are produced only when an
+     * article is actually opened — not for every fetched item.
+     */
+    #[Route('/{id}', name: 'api_news_get', methods: ['GET'], requirements: ['id' => '[0-9a-f-]{36}'])]
+    public function get(string $id, #[CurrentUser] User $user): JsonResponse
+    {
+        try {
+            $uuid = Uuid::fromString($id);
+        } catch (\Throwable) {
+            throw new NotFoundHttpException();
+        }
+
+        $item = $this->newsItems->find($uuid);
+        if ($item === null) {
+            throw new NotFoundHttpException();
+        }
+
+        $held = $this->heldIsins($user);
+        if (!in_array($item->getAsset()->getIsin(), $held, true)) {
+            throw new NotFoundHttpException();
+        }
+
+        // Lazy classify: if the article hasn't been processed yet, do it now while
+        // the user is reading. Failures fall back silently to the existing snippet.
+        if ($item->getSummary() === null) {
+            try {
+                $this->classifier->classifyOne($item);
+            } catch (\Throwable) {
+                // Swallow — the detail view still works without a summary.
+            }
+        }
+
+        // Pull every held + enabled asset that shares this article (same content
+        // hash), so the UI can show "AAPL · NVDA · MSFT" on one card.
+        $relatedRows = $this->conn->fetchAllAssociative(
+            'SELECT a.isin, a.ticker, a.name AS asset_name
              FROM news_items n
              INNER JOIN assets a ON a.id = n.asset_id
-             WHERE {$where}
-             ORDER BY n.published_at DESC, n.id DESC
-             LIMIT 6",
-            $params,
-            $types,
+             WHERE n.content_hash = :hash AND a.isin IN (:isins) AND a.news_enabled = 1
+             ORDER BY a.ticker IS NULL, a.ticker, a.name',
+            ['hash' => $item->getContentHash(), 'isins' => $held],
+            ['isins' => ArrayParameterType::STRING],
         );
 
         return new JsonResponse([
-            'items' => array_map([$this, 'serializeItem'], $rows),
-            'counts' => $this->sentimentCounts($where, $params, $types),
+            'id' => $item->getId()->toRfc4122(),
+            'source' => $item->getSource(),
+            'kind' => $item->getKind(),
+            'title' => $item->getTitle(),
+            'url' => $item->getUrl(),
+            'publisher' => $item->getPublisher(),
+            'summary' => $item->getSummary(),
+            'snippet' => $item->getSnippet(),
+            'sentiment' => $item->getSentiment(),
+            'publishedAt' => $item->getPublishedAt()->format(\DateTimeInterface::ATOM),
+            'assets' => array_map(fn($r) => [
+                'isin' => $r['isin'],
+                'ticker' => $r['ticker'],
+                'name' => $r['asset_name'],
+            ], $relatedRows),
         ]);
     }
 
@@ -133,6 +210,87 @@ class NewsController extends AbstractController
     }
 
     /**
+     * Fetch articles grouped by content_hash: one canonical row per article, with
+     * its full asset list inlined. The canonical row is the oldest news_item per
+     * group (UUIDv7 → MIN(id) is time-ordered). Two queries: paginate the groups,
+     * then load asset metadata for the page's hashes.
+     *
+     * @param array<string, mixed> $params
+     * @param array<string, mixed> $types
+     * @param string[] $held
+     * @return list<array<string, mixed>>
+     */
+    private function fetchGroupedArticles(string $where, array $params, array $types, array $held, int $limit, int $offset): array
+    {
+        $rows = $this->conn->fetchAllAssociative(
+            "SELECT id, source, kind, title, url, publisher, summary, snippet,
+                    sentiment, published_at, content_hash
+             FROM (
+                 SELECT n.id, n.source, n.kind, n.title, n.url, n.publisher, n.summary,
+                        n.snippet, n.sentiment, n.published_at, n.content_hash,
+                        ROW_NUMBER() OVER (PARTITION BY n.content_hash ORDER BY n.id ASC) AS rn,
+                        MAX(n.published_at) OVER (PARTITION BY n.content_hash) AS group_published_at
+                 FROM news_items n
+                 INNER JOIN assets a ON a.id = n.asset_id
+                 WHERE {$where}
+             ) ranked
+             WHERE rn = 1
+             ORDER BY group_published_at DESC, id DESC
+             LIMIT {$limit} OFFSET {$offset}",
+            $params,
+            $types,
+        );
+
+        if ($rows === []) {
+            return [];
+        }
+
+        // Second pass: resolve all held assets that share each hash.
+        $hashes = array_column($rows, 'content_hash');
+        $assetRows = $this->conn->fetchAllAssociative(
+            'SELECT n.content_hash, a.isin, a.ticker, a.name AS asset_name
+             FROM news_items n
+             INNER JOIN assets a ON a.id = n.asset_id
+             WHERE n.content_hash IN (:hashes) AND a.isin IN (:isins) AND a.news_enabled = 1',
+            ['hashes' => $hashes, 'isins' => $held],
+            ['hashes' => ArrayParameterType::STRING, 'isins' => ArrayParameterType::STRING],
+        );
+
+        $assetsByHash = [];
+        foreach ($assetRows as $r) {
+            $assetsByHash[$r['content_hash']][] = [
+                'isin' => $r['isin'],
+                'ticker' => $r['ticker'],
+                'name' => $r['asset_name'],
+            ];
+        }
+        // Stable per-hash ordering so the UI doesn't shuffle assets on refresh.
+        foreach ($assetsByHash as &$assets) {
+            usort($assets, fn($a, $b) => strcmp(
+                (string) ($a['ticker'] ?? $a['isin']),
+                (string) ($b['ticker'] ?? $b['isin']),
+            ));
+        }
+        unset($assets);
+
+        return array_map(function (array $r) use ($assetsByHash): array {
+            return [
+                'id' => Uuid::fromBinary($r['id'])->toRfc4122(),
+                'source' => $r['source'],
+                'kind' => $r['kind'],
+                'title' => $r['title'],
+                'url' => $r['url'],
+                'publisher' => $r['publisher'],
+                'summary' => $r['summary'],
+                'snippet' => $r['snippet'],
+                'sentiment' => $r['sentiment'],
+                'publishedAt' => (new \DateTimeImmutable($r['published_at']))->format(\DateTimeInterface::ATOM),
+                'assets' => $assetsByHash[$r['content_hash']] ?? [],
+            ];
+        }, $rows);
+    }
+
+    /**
      * Build the shared WHERE clause + bound params from the request filters.
      *
      * @param string[] $held
@@ -156,15 +314,8 @@ class NewsController extends AbstractController
                 $params[$field] = $val;
             }
         }
-        // Sentiment is null until the AI classifier runs, so 'unclassified' maps
-        // to IS NULL rather than an equality match.
-        $sentiment = trim((string) $request->query->get('sentiment', ''));
-        if ($sentiment === 'unclassified') {
-            $where .= ' AND n.sentiment IS NULL';
-        } elseif ($sentiment !== '') {
-            $where .= ' AND n.sentiment = :sentiment';
-            $params['sentiment'] = $sentiment;
-        }
+        // Sentiment is applied by the caller (list endpoint) so the counts query
+        // can use this base WHERE and stay accurate across tab selections.
         $q = trim((string) $request->query->get('q', ''));
         if ($q !== '') {
             $where .= ' AND n.title LIKE :q';
@@ -175,6 +326,9 @@ class NewsController extends AbstractController
     }
 
     /**
+     * Distinct-article counts per sentiment. Counts content hashes (not rows) so
+     * articles that touch multiple held assets only count once.
+     *
      * @param array<string, mixed> $params
      * @param array<string, mixed> $types
      * @return array{bullish: int, bearish: int, neutral: int, unclassified: int}
@@ -182,7 +336,7 @@ class NewsController extends AbstractController
     private function sentimentCounts(string $where, array $params, array $types): array
     {
         $rows = $this->conn->fetchAllAssociative(
-            "SELECT n.sentiment, COUNT(*) AS c
+            "SELECT n.sentiment, COUNT(DISTINCT n.content_hash) AS c
              FROM news_items n
              INNER JOIN assets a ON a.id = n.asset_id
              WHERE {$where}
@@ -226,28 +380,6 @@ class NewsController extends AbstractController
             [$user->getId()->toBinary()],
             [ParameterType::BINARY],
         );
-    }
-
-    /** @param array<string, mixed> $r */
-    private function serializeItem(array $r): array
-    {
-        return [
-            'id' => Uuid::fromBinary($r['id'])->toRfc4122(),
-            'source' => $r['source'],
-            'kind' => $r['kind'],
-            'title' => $r['title'],
-            'url' => $r['url'],
-            'publisher' => $r['publisher'],
-            'summary' => $r['summary'],
-            'snippet' => $r['snippet'],
-            'sentiment' => $r['sentiment'],
-            'publishedAt' => (new \DateTimeImmutable($r['published_at']))->format(\DateTimeInterface::ATOM),
-            'asset' => [
-                'isin' => $r['isin'],
-                'ticker' => $r['ticker'],
-                'name' => $r['asset_name'],
-            ],
-        ];
     }
 
     private function emptyFeed(int $page, int $pageSize): array

@@ -22,7 +22,11 @@ export interface NewsItem {
   snippet: string | null
   sentiment: Sentiment | null
   publishedAt: string
-  asset: NewsAsset
+  /**
+   * Every held + un-muted asset this article applies to. An article fetched
+   * against AAPL, MSFT, and NVDA collapses to one item with all three here.
+   */
+  assets: NewsAsset[]
 }
 
 export interface SentimentCounts {
@@ -94,5 +98,10 @@ export const useNewsStore = defineStore('news', () => {
     await api.patch(`/api/news/assets/${encodeURIComponent(isin)}/preferences`, prefs)
   }
 
-  return { items, counts, sources, total, page, pageSize, loading, fetch, setAssetPreferences }
+  /** Fetch one article (lazy-classifies on the backend if not yet summarized). */
+  async function fetchOne(id: string): Promise<NewsItem> {
+    return api.get<NewsItem>(`/api/news/${encodeURIComponent(id)}`)
+  }
+
+  return { items, counts, sources, total, page, pageSize, loading, fetch, fetchOne, setAssetPreferences }
 })

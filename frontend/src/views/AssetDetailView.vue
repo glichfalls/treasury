@@ -7,6 +7,7 @@ import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 import { categoryMeta } from '@/lib/categories'
 import AssetPriceChart from '@/components/charts/AssetPriceChart.vue'
 import AssetProfitChart from '@/components/charts/AssetProfitChart.vue'
+import AssetNewsList from '@/components/news/AssetNewsList.vue'
 import DateField from '@/components/ui/DateField.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import SelectField from '@/components/ui/SelectField.vue'
@@ -537,6 +538,12 @@ const singleCurrencyReturn = computed<null | {
       <section class="space-y-3">
         <h2 class="text-lg font-medium">Profit history</h2>
         <AssetProfitChart :isin="data.isin" />
+      </section>
+
+      <!-- Recent news for this asset -->
+      <section class="space-y-3">
+        <h2 class="text-lg font-medium">Recent news</h2>
+        <AssetNewsList :isin="data.isin" />
       </section>
 
       <!-- Per-account holdings -->

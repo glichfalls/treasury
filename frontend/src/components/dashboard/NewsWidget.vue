@@ -2,7 +2,10 @@
 import { onMounted, ref, computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { api } from '@/lib/api'
+import { useToastsStore } from '@/stores/toasts'
 import ChartCard from '@/components/ui/ChartCard.vue'
+import Button from '@/components/ui/Button.vue'
+import { RefreshCw } from 'lucide-vue-next'
 import type { NewsItem, SentimentCounts } from '@/stores/news'
 
 interface DashboardResponse {
@@ -12,6 +15,8 @@ interface DashboardResponse {
 
 const data = ref<DashboardResponse | null>(null)
 const loading = ref(false)
+const refreshing = ref(false)
+const toasts = useToastsStore()
 
 async function load() {
   loading.value = true
@@ -19,6 +24,18 @@ async function load() {
     data.value = await api.get<DashboardResponse>('/api/news/dashboard')
   } finally {
     loading.value = false
+  }
+}
+
+async function refresh() {
+  refreshing.value = true
+  try {
+    await api.post('/api/admin/news/refresh', {})
+    toasts.success('News refresh queued — new items will appear shortly.')
+  } catch (e) {
+    toasts.error(e instanceof Error ? e.message : String(e))
+  } finally {
+    refreshing.value = false
   }
 }
 
@@ -40,6 +57,14 @@ function dotClass(sentiment: string | null): string {
   return 'bg-[var(--color-text-dim)]'
 }
 
+function assetsLabel(item: NewsItem): string {
+  if (item.assets.length === 0) return ''
+  const labels = item.assets.map((a) => a.ticker ?? a.name ?? a.isin)
+  // Compact list — show up to 3, then "+N more" so the row stays single-line.
+  if (labels.length <= 3) return labels.join(' · ')
+  return `${labels.slice(0, 3).join(' · ')} +${labels.length - 3} more`
+}
+
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
   const mins = Math.round(diff / 60000)
@@ -59,9 +84,21 @@ function timeAgo(iso: string): string {
     height="auto"
   >
     <template #actions>
-      <RouterLink :to="{ name: 'news' }" class="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)]">
-        View all
-      </RouterLink>
+      <div class="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          icon-only
+          :loading="refreshing"
+          title="Refresh news"
+          @click="refresh"
+        >
+          <RefreshCw :size="14" />
+        </Button>
+        <RouterLink :to="{ name: 'news' }" class="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)]">
+          View all
+        </RouterLink>
+      </div>
     </template>
 
     <div v-if="data">
@@ -74,22 +111,20 @@ function timeAgo(iso: string): string {
 
       <ul class="space-y-1">
         <li v-for="item in data.items" :key="item.id">
-          <a
-            :href="item.url"
-            target="_blank"
-            rel="noopener noreferrer"
+          <RouterLink
+            :to="{ name: 'news-detail', params: { id: item.id } }"
             class="flex items-baseline gap-2 py-1 px-2 -mx-2 rounded hover:bg-[var(--color-surface)]"
           >
             <span class="mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full" :class="dotClass(item.sentiment)" />
             <span class="min-w-0 flex-1">
               <span class="text-sm truncate block">{{ item.title }}</span>
               <span class="text-xs text-[var(--color-text-muted)]">
-                {{ item.asset.ticker ?? item.asset.name ?? item.asset.isin }}
+                {{ assetsLabel(item) }}
                 · {{ item.publisher ?? item.source }}
               </span>
             </span>
             <span class="shrink-0 text-xs text-[var(--color-text-dim)] tabular">{{ timeAgo(item.publishedAt) }}</span>
-          </a>
+          </RouterLink>
         </li>
       </ul>
     </div>

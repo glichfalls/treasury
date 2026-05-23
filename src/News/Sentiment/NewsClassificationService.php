@@ -65,4 +65,31 @@ final class NewsClassificationService
 
         return ['classified' => $classified, 'via' => $via];
     }
+
+    /**
+     * Classify a single item synchronously. Called when the user opens an article
+     * so we don't burn tokens on items nobody reads.
+     */
+    public function classifyOne(NewsItem $item): void
+    {
+        if ($item->getSummary() !== null) {
+            return;
+        }
+
+        $primary = $this->openai->isAvailable() ? $this->openai : $this->heuristic;
+        $input = [['title' => $item->getTitle(), 'snippet' => $item->getSnippet()]];
+        $results = $primary->classify($input);
+        if ($results === [] && $primary === $this->openai) {
+            $results = $this->heuristic->classify($input);
+        }
+        $r = $results[0] ?? null;
+        if (!is_array($r)) {
+            return;
+        }
+        $item->setSentiment($r['sentiment'] ?? NewsItem::SENTIMENT_NEUTRAL);
+        if (($r['summary'] ?? null) !== null) {
+            $item->setSummary($r['summary']);
+        }
+        $this->em->flush();
+    }
 }

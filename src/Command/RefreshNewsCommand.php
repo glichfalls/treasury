@@ -27,7 +27,7 @@ class RefreshNewsCommand extends Command
     protected function configure(): void
     {
         $this->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Max articles per asset per source', '10');
-        $this->addOption('no-classify', null, InputOption::VALUE_NONE, 'Skip sentiment/summary classification');
+        $this->addOption('classify', null, InputOption::VALUE_NONE, 'Also classify pending items (default: skip — items are classified on first open)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -45,7 +45,7 @@ class RefreshNewsCommand extends Command
             $io->writeln('  ! ' . $err);
         }
 
-        if (!$input->getOption('no-classify')) {
+        if ($input->getOption('classify')) {
             $c = $this->classifier->classifyPending();
             $io->writeln(sprintf('Classified <info>%d</info> item(s) via <comment>%s</comment>.', $c['classified'], $c['via']));
         }

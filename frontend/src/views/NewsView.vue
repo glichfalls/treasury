@@ -6,7 +6,8 @@ import { useToastsStore } from '@/stores/toasts'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import SelectField from '@/components/ui/SelectField.vue'
 import Button from '@/components/ui/Button.vue'
-import { BellOff, Search } from 'lucide-vue-next'
+import { api } from '@/lib/api'
+import { BellOff, RefreshCw, Search } from 'lucide-vue-next'
 
 const news = useNewsStore()
 const toasts = useToastsStore()
@@ -69,6 +70,19 @@ watch(q, () => {
   }, 350)
 })
 
+const refreshing = ref(false)
+async function refresh() {
+  refreshing.value = true
+  try {
+    await api.post('/api/admin/news/refresh', {})
+    toasts.success('News refresh queued — new items will appear shortly.')
+  } catch (e) {
+    toasts.error(e instanceof Error ? e.message : String(e))
+  } finally {
+    refreshing.value = false
+  }
+}
+
 async function muteHolding(isin: string, label: string) {
   try {
     await news.setAssetPreferences(isin, { enabled: false })
@@ -102,9 +116,15 @@ function formatTime(iso: string): string {
 
 <template>
   <div class="space-y-6">
-    <header>
-      <h1 class="text-2xl font-semibold tracking-tight">News</h1>
-      <p class="text-sm text-[var(--color-text-muted)] mt-1">Headlines and sentiment for the assets you hold.</p>
+    <header class="flex items-start justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-semibold tracking-tight">News</h1>
+        <p class="text-sm text-[var(--color-text-muted)] mt-1">Headlines and sentiment for the assets you hold.</p>
+      </div>
+      <Button variant="secondary" size="sm" :loading="refreshing" loading-text="Queuing…" @click="refresh">
+        <RefreshCw :size="14" />
+        Refresh news
+      </Button>
     </header>
 
     <div class="flex flex-wrap items-end gap-3 justify-between">
@@ -152,33 +172,35 @@ function formatTime(iso: string): string {
       >
         <span class="mt-1.5 shrink-0 w-2 h-2 rounded-full" :class="dotClass(item.sentiment)" />
         <div class="min-w-0 flex-1">
-          <a
-            :href="item.url"
-            target="_blank"
-            rel="noopener noreferrer"
+          <RouterLink
+            :to="{ name: 'news-detail', params: { id: item.id } }"
             class="text-sm font-medium hover:text-[var(--color-accent)]"
-          >{{ item.title }}</a>
+          >{{ item.title }}</RouterLink>
           <p v-if="item.summary ?? item.snippet" class="text-sm text-[var(--color-text-muted)] mt-1">
             {{ item.summary ?? item.snippet }}
           </p>
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--color-text-muted)] mt-1.5">
-            <RouterLink
-              :to="{ name: 'asset', params: { isin: item.asset.isin } }"
-              class="font-medium text-[var(--color-text)] hover:text-[var(--color-accent)]"
-            >{{ assetLabel(item.asset) }}</RouterLink>
-            <span>·</span>
+            <template v-for="(a, idx) in item.assets" :key="a.isin">
+              <span v-if="idx > 0" class="text-[var(--color-text-dim)]">·</span>
+              <RouterLink
+                :to="{ name: 'asset', params: { isin: a.isin } }"
+                class="font-medium text-[var(--color-text)] hover:text-[var(--color-accent)]"
+              >{{ assetLabel(a) }}</RouterLink>
+            </template>
+            <span v-if="item.assets.length > 0">·</span>
             <span>{{ item.publisher ?? item.source }}</span>
             <span>·</span>
             <span>{{ formatTime(item.publishedAt) }}</span>
           </div>
         </div>
         <Button
+          v-if="item.assets.length === 1"
           variant="ghost"
           size="sm"
           icon-only
           class="opacity-0 group-hover:opacity-100 transition-opacity"
-          :title="`Mute news for ${assetLabel(item.asset)}`"
-          @click="muteHolding(item.asset.isin, assetLabel(item.asset))"
+          :title="`Mute news for ${assetLabel(item.assets[0]!)}`"
+          @click="muteHolding(item.assets[0]!.isin, assetLabel(item.assets[0]!))"
         >
           <BellOff :size="14" />
         </Button>

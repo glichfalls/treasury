@@ -2,7 +2,7 @@
 import { onMounted, ref, computed } from 'vue'
 import { api } from '@/lib/api'
 import { useToastsStore } from '@/stores/toasts'
-import { KeyRound, Save } from 'lucide-vue-next'
+import { KeyRound, Save, CheckCircle2, XCircle } from 'lucide-vue-next'
 import Button from '@/components/ui/Button.vue'
 
 interface SettingItem {
@@ -19,6 +19,8 @@ const items = ref<SettingItem[]>([])
 const drafts = ref<Record<string, string>>({})
 const loading = ref(false)
 const saving = ref(false)
+const testing = ref<Record<string, boolean>>({})
+const testResults = ref<Record<string, { ok: boolean; message: string }>>({})
 
 async function load() {
   loading.value = true
@@ -64,9 +66,25 @@ async function save() {
 async function clearKey(item: SettingItem) {
   try {
     items.value = await api.patch<SettingItem[]>('/api/admin/settings', { [item.key]: null })
+    delete testResults.value[item.key]
     toasts.success(`${item.label} cleared.`)
   } catch (e) {
     toasts.error(e instanceof Error ? e.message : String(e))
+  }
+}
+
+async function testKey(item: SettingItem) {
+  testing.value[item.key] = true
+  delete testResults.value[item.key]
+  try {
+    testResults.value[item.key] = await api.post<{ ok: boolean; message: string }>(
+      `/api/admin/settings/${item.key}/test`,
+      {},
+    )
+  } catch (e) {
+    testResults.value[item.key] = { ok: false, message: e instanceof Error ? e.message : String(e) }
+  } finally {
+    testing.value[item.key] = false
   }
 }
 </script>
@@ -107,6 +125,20 @@ async function clearKey(item: SettingItem) {
             :placeholder="item.configured ? 'Enter to replace…' : 'Enter key…'"
             class="w-full px-3 py-1.5 text-sm rounded-md bg-[var(--color-surface)] border border-[var(--color-border)] focus:outline-none focus:border-[var(--color-accent)]"
           />
+          <div v-if="item.configured" class="flex items-center gap-3">
+            <Button variant="ghost" size="sm" :loading="testing[item.key]" loading-text="Testing…" @click="testKey(item)">
+              Test connection
+            </Button>
+            <span
+              v-if="testResults[item.key]"
+              class="text-xs flex items-center gap-1"
+              :class="testResults[item.key]?.ok ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'"
+            >
+              <CheckCircle2 v-if="testResults[item.key]?.ok" :size="12" />
+              <XCircle v-else :size="12" />
+              {{ testResults[item.key]?.message }}
+            </span>
+          </div>
         </div>
       </div>
 

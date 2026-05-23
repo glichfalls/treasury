@@ -6,8 +6,10 @@ use App\Settings\SettingsService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 #[Route('/api/admin/settings')]
 #[IsGranted('ROLE_ADMIN')]
@@ -28,6 +30,7 @@ class SettingsAdminController extends AbstractController
 
     public function __construct(
         private readonly SettingsService $settings,
+        private readonly HttpClientInterface $http,
     ) {}
 
     #[Route('', name: 'api_admin_settings_list', methods: ['GET'])]
@@ -70,6 +73,63 @@ class SettingsAdminController extends AbstractController
         }
 
         return $this->list();
+    }
+
+    /**
+     * Probe the provider with the stored key so the admin gets immediate
+     * feedback on whether it's valid, without leaving the settings page.
+     */
+    #[Route('/{key}/test', name: 'api_admin_settings_test', methods: ['POST'])]
+    public function test(string $key): JsonResponse
+    {
+        if (!in_array($key, array_column(self::KNOWN, 'key'), true)) {
+            throw new NotFoundHttpException();
+        }
+        $value = $this->settings->get($key);
+        if ($value === null) {
+            return new JsonResponse(['ok' => false, 'message' => 'No key saved yet — save one first.']);
+        }
+        return new JsonResponse($this->probe($key, $value));
+    }
+
+    /**
+     * @return array{ok: bool, message: string}
+     */
+    private function probe(string $key, string $value): array
+    {
+        [$url, $options] = match ($key) {
+            SettingsService::OPENAI_API_KEY => [
+                'https://api.openai.com/v1/models',
+                ['headers' => ['Authorization' => 'Bearer ' . $value]],
+            ],
+            SettingsService::FINNHUB_API_KEY => [
+                'https://finnhub.io/api/v1/quote',
+                ['query' => ['symbol' => 'AAPL', 'token' => $value]],
+            ],
+            SettingsService::MARKETAUX_API_TOKEN => [
+                'https://api.marketaux.com/v1/news/all',
+                ['query' => ['symbols' => 'AAPL', 'limit' => 1, 'api_token' => $value]],
+            ],
+            default => [null, []],
+        };
+        if ($url === null) {
+            return ['ok' => false, 'message' => 'No connection test available for this setting.'];
+        }
+
+        try {
+            // getStatusCode() does not throw on 4xx/5xx, so we can branch on it.
+            $status = $this->http->request('GET', $url, $options + ['timeout' => 10])->getStatusCode();
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'message' => 'Request failed: ' . $e->getMessage()];
+        }
+
+        return match (true) {
+            $status >= 200 && $status < 300 => ['ok' => true, 'message' => 'Connection successful.'],
+            in_array($status, [401, 403], true) => ['ok' => false, 'message' => 'Authentication failed — the key looks invalid.'],
+            $status === 402 => ['ok' => false, 'message' => 'Payment/plan limit required for this key.'],
+            $status === 429 => ['ok' => true, 'message' => 'Key accepted but currently rate-limited.'],
+            default => ['ok' => false, 'message' => "Provider returned HTTP {$status}."],
+        };
     }
 
     /** Show only the last 4 characters so admins can recognise a key without exposing it. */
