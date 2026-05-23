@@ -17,6 +17,12 @@ final class SettingsService
     public const FINNHUB_API_KEY = 'finnhub_api_key';
     public const MARKETAUX_API_TOKEN = 'marketaux_api_token';
     public const OPENAI_API_KEY = 'openai_api_key';
+    public const REDDIT_CLIENT_ID = 'reddit_client_id';
+    public const REDDIT_CLIENT_SECRET = 'reddit_client_secret';
+    /** Comma-separated list of market-wide subreddits to search per holding. */
+    public const REDDIT_BROAD_SUBREDDITS = 'reddit_broad_subreddits';
+
+    public const DEFAULT_BROAD_SUBREDDITS = ['wallstreetbets', 'stocks', 'investing', 'trading', 'StockMarket'];
 
     /** @var array<string, ?string>|null */
     private ?array $cache = null;
@@ -36,6 +42,24 @@ final class SettingsService
     public function has(string $name): bool
     {
         return $this->get($name) !== null;
+    }
+
+    /**
+     * The configured market-wide subreddits, falling back to the defaults.
+     *
+     * @return string[]
+     */
+    public function getRedditBroadSubreddits(): array
+    {
+        $raw = $this->get(self::REDDIT_BROAD_SUBREDDITS);
+        if ($raw === null) {
+            return self::DEFAULT_BROAD_SUBREDDITS;
+        }
+        $subs = array_values(array_filter(array_map(
+            static fn(string $s) => (string) preg_replace('#^/?r/#i', '', trim($s)),
+            explode(',', $raw),
+        )));
+        return $subs !== [] ? $subs : self::DEFAULT_BROAD_SUBREDDITS;
     }
 
     /**

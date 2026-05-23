@@ -56,6 +56,14 @@ class Asset
     #[ORM\Column(length: 200, nullable: true)]
     private ?string $newsMarketTopic = null;
 
+    /**
+     * Dedicated subreddit for this company (without the "r/" prefix), e.g.
+     * "Tesla". AI-inferred where one plausibly exists, overridable by the user.
+     * Null = no dedicated sub; the broad market subreddits still get searched.
+     */
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $redditSubreddit = null;
+
     public function __construct()
     {
         $this->id = Uuid::v7();
@@ -78,4 +86,11 @@ class Asset
     public function setNewsEnabled(bool $newsEnabled): self { $this->newsEnabled = $newsEnabled; return $this; }
     public function getNewsMarketTopic(): ?string { return $this->newsMarketTopic; }
     public function setNewsMarketTopic(?string $topic): self { $this->newsMarketTopic = $topic; return $this; }
+    public function getRedditSubreddit(): ?string { return $this->redditSubreddit; }
+    public function setRedditSubreddit(?string $subreddit): self
+    {
+        $subreddit = $subreddit !== null ? (string) preg_replace('#^/?r/#i', '', trim($subreddit)) : null;
+        $this->redditSubreddit = $subreddit !== null && $subreddit !== '' ? $subreddit : null;
+        return $this;
+    }
 }
