@@ -41,6 +41,21 @@ class Asset
     #[ORM\Column(type: 'decimal', precision: 6, scale: 3, nullable: true)]
     private ?string $pricePremiumPct = null;
 
+    /**
+     * Whether news is aggregated for this asset. Lets the user mute a single
+     * holding without affecting the rest of the feed.
+     */
+    #[ORM\Column(type: 'boolean', options: ['default' => true])]
+    private bool $newsEnabled = true;
+
+    /**
+     * For ETFs/funds, the market/theme to search news for (the index or sector
+     * the fund tracks) since fund-specific headlines are sparse. Inferred once
+     * from the asset name and overridable by the user. Null = use the ticker.
+     */
+    #[ORM\Column(length: 200, nullable: true)]
+    private ?string $newsMarketTopic = null;
+
     public function __construct()
     {
         $this->id = Uuid::v7();
@@ -59,4 +74,8 @@ class Asset
     public function setUnitWeightGrams(?string $grams): self { $this->unitWeightGrams = $grams; return $this; }
     public function getPricePremiumPct(): ?string { return $this->pricePremiumPct; }
     public function setPricePremiumPct(?string $pct): self { $this->pricePremiumPct = $pct; return $this; }
+    public function isNewsEnabled(): bool { return $this->newsEnabled; }
+    public function setNewsEnabled(bool $newsEnabled): self { $this->newsEnabled = $newsEnabled; return $this; }
+    public function getNewsMarketTopic(): ?string { return $this->newsMarketTopic; }
+    public function setNewsMarketTopic(?string $topic): self { $this->newsMarketTopic = $topic; return $this; }
 }

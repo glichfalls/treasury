@@ -21,6 +21,35 @@ class AssetRepository extends ServiceEntityRepository
         return $this->findOneBy(['isin' => strtoupper($isin)]);
     }
 
+    /**
+     * Assets eligible for news aggregation: currently held (nonzero quantity in
+     * some account), news not muted, and carrying a ticker (so commodity coins
+     * and cash are excluded). News is fetched per-asset by ticker/market topic.
+     *
+     * @return Asset[]
+     */
+    public function findActiveForNews(): array
+    {
+        $sql = <<<'SQL'
+            SELECT a.id
+            FROM assets a
+            INNER JOIN transactions t ON t.asset_isin = a.isin
+            WHERE a.news_enabled = 1 AND a.ticker IS NOT NULL
+            GROUP BY a.id, a.isin
+            HAVING SUM(t.asset_quantity) <> 0
+        SQL;
+
+        $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative($sql);
+        if ($rows === []) {
+            return [];
+        }
+        $uuids = array_map(
+            fn($r) => \Symfony\Component\Uid\Uuid::fromBinary($r['id']),
+            $rows,
+        );
+        return $this->findBy(['id' => $uuids]);
+    }
+
     /** @return Asset[] */
     public function findHeldByAccount(\Symfony\Component\Uid\Uuid $accountId): array
     {

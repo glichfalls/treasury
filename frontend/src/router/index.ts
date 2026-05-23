@@ -19,6 +19,7 @@ const router = createRouter({
     { path: '/assets/:isin', name: 'asset', component: () => import('../views/AssetDetailView.vue') },
     { path: '/tags/:tag', name: 'tag', component: () => import('../views/TagDetailView.vue') },
     { path: '/search', name: 'search', component: () => import('../views/SearchResultsView.vue') },
+    { path: '/news', name: 'news', component: () => import('../views/NewsView.vue') },
     { path: '/insights', name: 'insights', component: () => import('../views/InsightsView.vue') },
     { path: '/plan', name: 'plan', component: () => import('../views/PlanView.vue'), meta: { wide: true } },
     { path: '/settings', name: 'settings', component: () => import('../views/SettingsView.vue') },

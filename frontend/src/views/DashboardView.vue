@@ -12,6 +12,7 @@ import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import TodayPnl from '@/components/dashboard/TodayPnl.vue'
 import TopMoversCard from '@/components/dashboard/TopMoversCard.vue'
 import RecentActivityCard from '@/components/dashboard/RecentActivityCard.vue'
+import NewsWidget from '@/components/dashboard/NewsWidget.vue'
 
 const accounts = useAccountsStore()
 const range = ref<'1w' | '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '5y' | 'all'>('ytd')
@@ -83,6 +84,8 @@ const netWorthByCurrency = computed(() => {
         <TopMoversCard />
         <RecentActivityCard />
       </div>
+
+      <NewsWidget />
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <CashFlowChart :months="18" />

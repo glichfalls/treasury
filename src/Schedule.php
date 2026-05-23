@@ -3,6 +3,7 @@
 namespace App;
 
 use App\Schedule\MaterializeRecurringMessage;
+use App\Schedule\RefreshNewsMessage;
 use App\Schedule\RefreshPricesMessage;
 use Symfony\Component\Scheduler\Attribute\AsSchedule;
 use Symfony\Component\Scheduler\RecurringMessage;
@@ -26,6 +27,8 @@ class Schedule implements ScheduleProviderInterface
             ->add(RecurringMessage::cron('30 22 * * *', new RefreshPricesMessage()))
             // Materialize recurring transactions just after midnight so today's
             // expected entries appear on the same calendar day.
-            ->add(RecurringMessage::cron('5 0 * * *', new MaterializeRecurringMessage()));
+            ->add(RecurringMessage::cron('5 0 * * *', new MaterializeRecurringMessage()))
+            // Aggregate holdings news hourly, on the hour offset, into news_items.
+            ->add(RecurringMessage::cron('15 * * * *', new RefreshNewsMessage()));
     }
 }
