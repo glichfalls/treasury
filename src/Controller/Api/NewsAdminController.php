@@ -114,6 +114,7 @@ class NewsAdminController extends AbstractController
         foreach ($this->providers as $provider) {
             $keys[] = $provider->source();
         }
+        $keys = array_values(array_unique($keys));
         sort($keys);
         return $keys;
     }
