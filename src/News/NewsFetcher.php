@@ -29,6 +29,7 @@ final class NewsFetcher
         private readonly AssetRepository $assets,
         private readonly NewsItemRepository $newsItems,
         private readonly SettingsService $settings,
+        private readonly NewsQualityFilter $quality,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {}
@@ -69,6 +70,9 @@ final class NewsFetcher
                     continue;
                 }
                 foreach ($articles as $article) {
+                    if (!$this->quality->accepts($article)) {
+                        continue; // drop clickbait / filing spam / forum noise
+                    }
                     $hash = $this->hash($article);
                     if (!isset($collected[$hash])) {
                         $collected[$hash] = [$provider->source(), $article];
