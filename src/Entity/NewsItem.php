@@ -59,6 +59,13 @@ class NewsItem
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $summary = null;
 
+    /**
+     * In-depth markdown brief (TL;DR + key points + impact), produced from the
+     * full article body when the item is opened. Null until deep-analysed.
+     */
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $brief = null;
+
     /** One of the SENTIMENT_* constants; null until classified. */
     #[ORM\Column(length: 8, nullable: true)]
     private ?string $sentiment = null;
@@ -100,6 +107,8 @@ class NewsItem
     public function setSnippet(?string $snippet): self { $this->snippet = $snippet; return $this; }
     public function getSummary(): ?string { return $this->summary; }
     public function setSummary(?string $summary): self { $this->summary = $summary; return $this; }
+    public function getBrief(): ?string { return $this->brief; }
+    public function setBrief(?string $brief): self { $this->brief = $brief; return $this; }
     public function getSentiment(): ?string { return $this->sentiment; }
     public function setSentiment(?string $sentiment): self { $this->sentiment = $sentiment; return $this; }
     public function getPublishedAt(): \DateTimeImmutable { return $this->publishedAt; }

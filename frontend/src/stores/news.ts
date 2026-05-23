@@ -19,6 +19,8 @@ export interface NewsItem {
   url: string
   publisher: string | null
   summary: string | null
+  /** In-depth markdown brief; only populated on the single-article detail fetch. */
+  brief: string | null
   snippet: string | null
   sentiment: Sentiment | null
   publishedAt: string

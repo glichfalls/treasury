@@ -3,6 +3,7 @@
 namespace App\News\Sentiment;
 
 use App\Entity\NewsItem;
+use App\News\ArticleContentFetcher;
 use App\Repository\NewsItemRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -18,6 +19,7 @@ final class NewsClassificationService
     public function __construct(
         private readonly OpenAiSentimentClassifier $openai,
         private readonly HeuristicClassifier $heuristic,
+        private readonly ArticleContentFetcher $articleFetcher,
         private readonly NewsItemRepository $repo,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger = new NullLogger(),
@@ -67,15 +69,39 @@ final class NewsClassificationService
     }
 
     /**
-     * Classify a single item synchronously. Called when the user opens an article
-     * so we don't burn tokens on items nobody reads.
+     * Classify a single item synchronously, called when the user opens an article
+     * so we don't burn tokens on items nobody reads. For headlines this fetches
+     * the article body and produces an in-depth brief; everything else (and any
+     * failure) falls back to the cheap snippet-based classification.
      */
     public function classifyOne(NewsItem $item): void
     {
-        if ($item->getSummary() !== null) {
+        // Already deep-analysed (or summarised with no body available).
+        if ($item->getBrief() !== null) {
             return;
         }
 
+        // Deep path: real article + structured brief, AI only, headlines only.
+        if ($item->getKind() === NewsItem::KIND_HEADLINE && $this->openai->isAvailable()) {
+            $content = $this->articleFetcher->fetch($item->getUrl());
+            if ($content !== null) {
+                $deep = $this->openai->deepBrief($item->getTitle(), $content);
+                if ($deep !== null) {
+                    $item->setSentiment($deep['sentiment']);
+                    if ($deep['summary'] !== null) {
+                        $item->setSummary($deep['summary']);
+                    }
+                    $item->setBrief($deep['brief']);
+                    $this->em->flush();
+                    return;
+                }
+            }
+        }
+
+        // Fallback: cheap one-line summary + sentiment from the snippet.
+        if ($item->getSummary() !== null) {
+            return;
+        }
         $primary = $this->openai->isAvailable() ? $this->openai : $this->heuristic;
         $input = [['title' => $item->getTitle(), 'snippet' => $item->getSnippet()]];
         $results = $primary->classify($input);

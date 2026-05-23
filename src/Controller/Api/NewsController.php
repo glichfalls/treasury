@@ -168,6 +168,7 @@ class NewsController extends AbstractController
             'url' => $item->getUrl(),
             'publisher' => $item->getPublisher(),
             'summary' => $item->getSummary(),
+            'brief' => $item->getBrief(),
             'snippet' => $item->getSnippet(),
             'sentiment' => $item->getSentiment(),
             'publishedAt' => $item->getPublishedAt()->format(\DateTimeInterface::ATOM),

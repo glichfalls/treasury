@@ -95,6 +95,63 @@ final class OpenAiSentimentClassifier implements SentimentClassifier
         return $out;
     }
 
+    /**
+     * Produce an in-depth brief from a full article body: sentiment, a one-line
+     * summary, and a markdown brief (TL;DR + key points + investor impact).
+     * Returns null on failure so the caller can fall back to the snippet path.
+     *
+     * @return array{sentiment: string, summary: ?string, brief: ?string}|null
+     */
+    public function deepBrief(string $title, string $content): ?array
+    {
+        $key = $this->settings->get(SettingsService::OPENAI_API_KEY);
+        if ($key === null) {
+            return null;
+        }
+
+        $system = 'You are an equity-research assistant. Given a news article about an asset the '
+            . 'investor holds, respond ONLY with JSON of the form '
+            . '{"sentiment":"bullish|bearish|neutral","summary":"one sentence, max 25 words",'
+            . '"brief":"markdown"}. The brief must be markdown: a bold **TL;DR** line, then 2-4 '
+            . 'bullet points of the key facts, then a final "**What it means:**" line on the impact '
+            . 'for a holder. Be specific and factual; never invent figures not in the text.';
+
+        try {
+            $data = $this->http->request('POST', self::URL, [
+                'headers' => ['Authorization' => 'Bearer ' . $key],
+                'json' => [
+                    'model' => self::MODEL,
+                    'temperature' => 0,
+                    'response_format' => ['type' => 'json_object'],
+                    'messages' => [
+                        ['role' => 'system', 'content' => $system],
+                        ['role' => 'user', 'content' => "Title: {$title}\n\nArticle:\n" . mb_substr($content, 0, 6000)],
+                    ],
+                ],
+                'timeout' => 40,
+            ])->toArray(false);
+        } catch (\Throwable $e) {
+            $this->logger->warning('OpenAI deep brief failed', ['error' => $e->getMessage()]);
+            return null;
+        }
+
+        $raw = $data['choices'][0]['message']['content'] ?? null;
+        if (!is_string($raw)) {
+            return null;
+        }
+        $parsed = json_decode($raw, true);
+        if (!is_array($parsed)) {
+            return null;
+        }
+        $summary = $parsed['summary'] ?? null;
+        $brief = $parsed['brief'] ?? null;
+        return [
+            'sentiment' => $this->normalize($parsed['sentiment'] ?? null),
+            'summary' => is_string($summary) && trim($summary) !== '' ? trim($summary) : null,
+            'brief' => is_string($brief) && trim($brief) !== '' ? trim($brief) : null,
+        ];
+    }
+
     private function normalize(mixed $sentiment): string
     {
         return match (is_string($sentiment) ? strtolower(trim($sentiment)) : '') {

@@ -52,6 +52,34 @@ function formatTime(iso: string): string {
     hour: '2-digit', minute: '2-digit',
   })
 }
+
+/**
+ * Minimal, safe markdown for the AI brief (no markdown dependency in the app):
+ * HTML-escape first, then render **bold**, bullet lists, and paragraphs.
+ */
+function renderBrief(md: string): string {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const inline = (s: string) => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  let html = ''
+  let inList = false
+  for (const raw of md.split(/\r?\n/)) {
+    const line = raw.trim()
+    if (line === '') {
+      if (inList) { html += '</ul>'; inList = false }
+      continue
+    }
+    const bullet = /^[-*]\s+(.*)$/.exec(line)
+    if (bullet) {
+      if (!inList) { html += '<ul class="list-disc pl-5 space-y-1">'; inList = true }
+      html += `<li>${inline(bullet[1] ?? '')}</li>`
+    } else {
+      if (inList) { html += '</ul>'; inList = false }
+      html += `<p>${inline(line)}</p>`
+    }
+  }
+  if (inList) html += '</ul>'
+  return html
+}
 </script>
 
 <template>
@@ -89,7 +117,12 @@ function formatTime(iso: string): string {
         </div>
       </header>
 
-      <section v-if="item.summary" class="space-y-2">
+      <section v-if="item.brief" class="space-y-2">
+        <h2 class="label">In-depth brief</h2>
+        <!-- eslint-disable-next-line vue/no-v-html -- sanitized: HTML-escaped, only bold/list re-added -->
+        <div class="text-sm leading-relaxed space-y-2 brief-body" v-html="renderBrief(item.brief)" />
+      </section>
+      <section v-else-if="item.summary" class="space-y-2">
         <h2 class="label">Summary</h2>
         <p class="text-sm leading-relaxed">{{ item.summary }}</p>
       </section>
