@@ -18,6 +18,8 @@ class NewsItem
     public const KIND_HEADLINE = 'headline';
     /** Structured analyst upgrade/downgrade event. */
     public const KIND_ANALYST_ACTION = 'analyst_action';
+    /** Earnings result or upcoming earnings date. */
+    public const KIND_EARNINGS = 'earnings';
     /** Social chatter (Reddit, StockTwits, …). */
     public const KIND_SOCIAL = 'social';
 

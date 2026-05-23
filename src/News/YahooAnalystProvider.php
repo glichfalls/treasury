@@ -4,9 +4,6 @@ namespace App\News;
 
 use App\Entity\Asset;
 use App\Entity\NewsItem;
-use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Analyst rating changes (upgrades/downgrades/initiations) from Yahoo's
@@ -17,20 +14,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final class YahooAnalystProvider implements NewsProvider
 {
-    private const QUOTE_SUMMARY = 'https://query1.finance.yahoo.com/v10/finance/quoteSummary/';
-    private const CRUMB_URL = 'https://query1.finance.yahoo.com/v1/test/getcrumb';
-    // fc.yahoo.com mints the A1 cookie without the EU consent redirect that
-    // finance.yahoo.com triggers from datacenter IPs (it 404s but sets the cookie).
-    private const COOKIE_URL = 'https://fc.yahoo.com/';
-    private const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-        . '(KHTML, like Gecko) Chrome/120.0 Safari/537.36';
-
-    /** @var array{cookie: string, crumb: string}|null|false null=untried, false=failed */
-    private array|null|false $creds = null;
-
     public function __construct(
-        private readonly HttpClientInterface $http,
-        private readonly LoggerInterface $logger = new NullLogger(),
+        private readonly YahooQuoteSummaryClient $yahoo,
     ) {}
 
     public function source(): string
@@ -45,23 +30,9 @@ final class YahooAnalystProvider implements NewsProvider
         if ($ticker === null || trim($ticker) === '' || $asset->getNewsMarketTopic() !== null) {
             return [];
         }
-        $creds = $this->credentials();
-        if ($creds === false) {
-            return [];
-        }
 
-        try {
-            $data = $this->http->request('GET', self::QUOTE_SUMMARY . rawurlencode(trim($ticker)), [
-                'query' => ['modules' => 'upgradeDowngradeHistory', 'crumb' => $creds['crumb']],
-                'headers' => ['User-Agent' => self::UA, 'Cookie' => $creds['cookie']],
-                'timeout' => 12,
-            ])->toArray(false);
-        } catch (\Throwable $e) {
-            $this->logger->info('Yahoo analyst fetch failed', ['ticker' => $ticker, 'error' => $e->getMessage()]);
-            return [];
-        }
-
-        $history = $data['quoteSummary']['result'][0]['upgradeDowngradeHistory']['history'] ?? null;
+        $result = $this->yahoo->fetch(trim($ticker), 'upgradeDowngradeHistory');
+        $history = $result['upgradeDowngradeHistory']['history'] ?? null;
         if (!is_array($history)) {
             return [];
         }
@@ -130,56 +101,5 @@ final class YahooAnalystProvider implements NewsProvider
             'down' => NewsItem::SENTIMENT_BEARISH,
             default => NewsItem::SENTIMENT_NEUTRAL,
         };
-    }
-
-    /**
-     * Yahoo cookie + crumb, fetched once per run. The cookie comes from a normal
-     * page load; the crumb endpoint then mints a token valid with that cookie.
-     *
-     * @return array{cookie: string, crumb: string}|false
-     */
-    private function credentials(): array|false
-    {
-        if ($this->creds !== null) {
-            return $this->creds;
-        }
-        try {
-            $resp = $this->http->request('GET', self::COOKIE_URL, [
-                'headers' => ['User-Agent' => self::UA, 'Accept' => 'text/html'],
-                'timeout' => 10,
-            ]);
-            $resp->getStatusCode();
-            $setCookies = $resp->getHeaders(false)['set-cookie'] ?? [];
-            $cookie = $this->cookieHeader($setCookies);
-            if ($cookie === '') {
-                return $this->creds = false;
-            }
-            $crumb = $this->http->request('GET', self::CRUMB_URL, [
-                'headers' => ['User-Agent' => self::UA, 'Cookie' => $cookie],
-                'timeout' => 10,
-            ])->getContent(false);
-        } catch (\Throwable $e) {
-            $this->logger->info('Yahoo crumb handshake failed', ['error' => $e->getMessage()]);
-            return $this->creds = false;
-        }
-
-        $crumb = trim($crumb);
-        if ($crumb === '' || str_contains($crumb, '<')) {
-            return $this->creds = false; // got an error page, not a crumb
-        }
-        return $this->creds = ['cookie' => $cookie, 'crumb' => $crumb];
-    }
-
-    /** @param string[] $setCookies */
-    private function cookieHeader(array $setCookies): string
-    {
-        $pairs = [];
-        foreach ($setCookies as $sc) {
-            $pair = explode(';', $sc, 2)[0];
-            if (str_contains($pair, '=')) {
-                $pairs[] = trim($pair);
-            }
-        }
-        return implode('; ', $pairs);
     }
 }
