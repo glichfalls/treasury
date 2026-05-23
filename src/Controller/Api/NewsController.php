@@ -201,12 +201,17 @@ class NewsController extends AbstractController
             $topic = $body['marketTopic'];
             $asset->setNewsMarketTopic(is_string($topic) && trim($topic) !== '' ? trim($topic) : null);
         }
+        if (array_key_exists('redditSubreddit', $body)) {
+            $sub = $body['redditSubreddit'];
+            $asset->setRedditSubreddit(is_string($sub) ? $sub : null);
+        }
         $this->em->flush();
 
         return new JsonResponse([
             'isin' => $asset->getIsin(),
             'newsEnabled' => $asset->isNewsEnabled(),
             'newsMarketTopic' => $asset->getNewsMarketTopic(),
+            'redditSubreddit' => $asset->getRedditSubreddit(),
         ]);
     }
 

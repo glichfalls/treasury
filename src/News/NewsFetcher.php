@@ -6,6 +6,7 @@ use App\Entity\Asset;
 use App\Entity\NewsItem;
 use App\Repository\AssetRepository;
 use App\Repository\NewsItemRepository;
+use App\Settings\SettingsService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -27,17 +28,22 @@ final class NewsFetcher
         private readonly iterable $providers,
         private readonly AssetRepository $assets,
         private readonly NewsItemRepository $newsItems,
+        private readonly SettingsService $settings,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {}
 
     /**
      * @param Asset[]|null $assets  Defaults to all news-eligible held assets.
+     * @param int|null $perAssetLimit  Defaults to the configured volume level.
      * @return array{inserted: int, skipped: int, errors: string[]}
      */
-    public function refresh(?array $assets = null, int $perAssetLimit = 10): array
+    public function refresh(?array $assets = null, ?int $perAssetLimit = null): array
     {
         $assets ??= $this->assets->findActiveForNews();
+        $perAssetLimit ??= $this->settings->getNewsVolumeLimit();
+        // Honour admin source toggles — skip providers switched off in config.
+        $disabled = $this->settings->getDisabledSources();
         $inserted = 0;
         $skipped = 0;
         $errors = [];
@@ -48,6 +54,9 @@ final class NewsFetcher
             /** @var array<string, array{0: string, 1: NewsArticle}> $collected */
             $collected = [];
             foreach ($this->providers as $provider) {
+                if (in_array($provider->source(), $disabled, true)) {
+                    continue;
+                }
                 try {
                     $articles = $provider->fetchForAsset($asset, $perAssetLimit);
                 } catch (\Throwable $e) {

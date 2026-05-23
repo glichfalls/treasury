@@ -7,10 +7,12 @@ import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import SelectField from '@/components/ui/SelectField.vue'
 import Button from '@/components/ui/Button.vue'
 import { api } from '@/lib/api'
-import { BellOff, RefreshCw, Search } from 'lucide-vue-next'
+import { BellOff, RefreshCw, Search, Settings } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
 const news = useNewsStore()
 const toasts = useToastsStore()
+const auth = useAuthStore()
 
 type Tab = 'all' | Sentiment | 'unclassified'
 
@@ -121,10 +123,16 @@ function formatTime(iso: string): string {
         <h1 class="text-2xl font-semibold tracking-tight">News</h1>
         <p class="text-sm text-[var(--color-text-muted)] mt-1">Headlines and sentiment for the assets you hold.</p>
       </div>
-      <Button variant="secondary" size="sm" :loading="refreshing" loading-text="Queuing…" @click="refresh">
-        <RefreshCw :size="14" />
-        Refresh news
-      </Button>
+      <div v-if="auth.isAdmin" class="flex items-center gap-2">
+        <Button variant="ghost" size="sm" :to="{ name: 'news-admin' }">
+          <Settings :size="14" />
+          Configure
+        </Button>
+        <Button variant="secondary" size="sm" :loading="refreshing" loading-text="Queuing…" @click="refresh">
+          <RefreshCw :size="14" />
+          Refresh news
+        </Button>
+      </div>
     </header>
 
     <div class="flex flex-wrap items-end gap-3 justify-between">

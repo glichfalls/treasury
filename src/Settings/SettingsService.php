@@ -21,8 +21,15 @@ final class SettingsService
     public const REDDIT_CLIENT_SECRET = 'reddit_client_secret';
     /** Comma-separated list of market-wide subreddits to search per holding. */
     public const REDDIT_BROAD_SUBREDDITS = 'reddit_broad_subreddits';
+    /** Comma-separated provider source keys that are switched off. */
+    public const NEWS_DISABLED_SOURCES = 'news_disabled_sources';
+    /** Fetch volume per holding: low | medium | high. */
+    public const NEWS_VOLUME = 'news_volume';
 
     public const DEFAULT_BROAD_SUBREDDITS = ['wallstreetbets', 'stocks', 'investing', 'trading', 'StockMarket'];
+
+    /** Articles fetched per holding per source, by volume level. */
+    private const VOLUME_LIMITS = ['low' => 3, 'medium' => 8, 'high' => 20];
 
     /** @var array<string, ?string>|null */
     private ?array $cache = null;
@@ -60,6 +67,36 @@ final class SettingsService
             explode(',', $raw),
         )));
         return $subs !== [] ? $subs : self::DEFAULT_BROAD_SUBREDDITS;
+    }
+
+    /** @return string[] Provider source keys the admin has switched off. */
+    public function getDisabledSources(): array
+    {
+        $raw = $this->get(self::NEWS_DISABLED_SOURCES);
+        if ($raw === null) {
+            return [];
+        }
+        return array_values(array_filter(array_map(
+            static fn(string $s) => strtolower(trim($s)),
+            explode(',', $raw),
+        )));
+    }
+
+    public function isSourceEnabled(string $source): bool
+    {
+        return !in_array(strtolower($source), $this->getDisabledSources(), true);
+    }
+
+    public function getNewsVolume(): string
+    {
+        $v = $this->get(self::NEWS_VOLUME);
+        return $v !== null && isset(self::VOLUME_LIMITS[$v]) ? $v : 'medium';
+    }
+
+    /** Articles to fetch per holding per source for the configured volume. */
+    public function getNewsVolumeLimit(): int
+    {
+        return self::VOLUME_LIMITS[$this->getNewsVolume()];
     }
 
     /**
