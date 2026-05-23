@@ -3,6 +3,7 @@
 namespace App\Controller\Api;
 
 use App\Entity\User;
+use App\News\DigestService;
 use App\News\NewsProvider;
 use App\Schedule\RefreshNewsMessage;
 use App\Settings\SettingsService;
@@ -28,6 +29,7 @@ class NewsAdminController extends AbstractController
         private readonly MessageBusInterface $bus,
         private readonly SettingsService $settings,
         private readonly Connection $conn,
+        private readonly DigestService $digests,
         #[AutowireIterator('app.news_provider')]
         private readonly iterable $providers,
     ) {}
@@ -37,6 +39,17 @@ class NewsAdminController extends AbstractController
     {
         $this->bus->dispatch(new RefreshNewsMessage());
         return new JsonResponse(['queued' => true], 202);
+    }
+
+    /** Generate the 24h briefing for the current user on demand. */
+    #[Route('/digest', name: 'api_admin_news_digest', methods: ['POST'])]
+    public function generateDigest(#[CurrentUser] User $user): JsonResponse
+    {
+        $digest = $this->digests->generate($user);
+        if ($digest === null) {
+            return new JsonResponse(['error' => 'Nothing to summarise, or no OpenAI key configured.'], 422);
+        }
+        return new JsonResponse(['generated' => true, 'itemCount' => $digest->getItemCount()], 201);
     }
 
     /** Aggregator configuration: which sources are on, fetch volume, broad subs. */

@@ -196,6 +196,47 @@ final class OpenAiSentimentClassifier implements SentimentClassifier
         return is_string($topic) && trim($topic) !== '' ? trim($topic) : null;
     }
 
+    /**
+     * Write a daily briefing (markdown) from a block of the last 24h of items.
+     * Returns null on failure.
+     */
+    public function summarizeDigest(string $itemsBlock): ?string
+    {
+        $key = $this->settings->get(SettingsService::OPENAI_API_KEY);
+        if ($key === null || trim($itemsBlock) === '') {
+            return null;
+        }
+
+        $system = 'You are an investment analyst writing a concise daily briefing for an investor about '
+            . 'THEIR holdings. From the last 24h of items below (news, analyst rating changes, earnings, '
+            . 'social chatter) write a markdown briefing: open with a 1-2 sentence overview including the '
+            . 'overall bullish/bearish tilt, then short sections grouping the notable developments '
+            . '(**Earnings**, **Analyst moves**, **Company news**, **Social buzz**), naming the tickers. '
+            . 'Lead with the most material items; omit holdings with nothing notable. Be specific and '
+            . 'factual, never invent. Keep it tight.';
+
+        try {
+            $data = $this->http->request('POST', self::URL, [
+                'headers' => ['Authorization' => 'Bearer ' . $key],
+                'json' => [
+                    'model' => self::MODEL,
+                    'temperature' => 0.2,
+                    'messages' => [
+                        ['role' => 'system', 'content' => $system],
+                        ['role' => 'user', 'content' => "Items (last 24h):\n" . $itemsBlock],
+                    ],
+                ],
+                'timeout' => 45,
+            ])->toArray(false);
+        } catch (\Throwable $e) {
+            $this->logger->warning('OpenAI digest failed', ['error' => $e->getMessage()]);
+            return null;
+        }
+
+        $content = $data['choices'][0]['message']['content'] ?? null;
+        return is_string($content) && trim($content) !== '' ? trim($content) : null;
+    }
+
     private function normalize(mixed $sentiment): string
     {
         return match (is_string($sentiment) ? strtolower(trim($sentiment)) : '') {

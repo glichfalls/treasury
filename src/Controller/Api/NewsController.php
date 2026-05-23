@@ -4,6 +4,7 @@ namespace App\Controller\Api;
 
 use App\Entity\NewsItem;
 use App\Entity\User;
+use App\News\DigestService;
 use App\News\Sentiment\NewsClassificationService;
 use App\Repository\AssetRepository;
 use App\Repository\NewsItemRepository;
@@ -27,8 +28,27 @@ class NewsController extends AbstractController
         private readonly AssetRepository $assets,
         private readonly NewsItemRepository $newsItems,
         private readonly NewsClassificationService $classifier,
+        private readonly DigestService $digestService,
         private readonly EntityManagerInterface $em,
     ) {}
+
+    /** The latest 24h AI briefing for the user's holdings, or null if none yet. */
+    #[Route('/digest', name: 'api_news_digest', methods: ['GET'])]
+    public function digest(#[CurrentUser] User $user): JsonResponse
+    {
+        $digest = $this->digestService->latest($user);
+        if ($digest === null) {
+            return new JsonResponse(null, 204); // no briefing yet
+        }
+        return new JsonResponse([
+            'id' => $digest->getId()->toRfc4122(),
+            'content' => $digest->getContent(),
+            'generatedAt' => $digest->getGeneratedAt()->format(\DateTimeInterface::ATOM),
+            'periodStart' => $digest->getPeriodStart()->format(\DateTimeInterface::ATOM),
+            'periodEnd' => $digest->getPeriodEnd()->format(\DateTimeInterface::ATOM),
+            'itemCount' => $digest->getItemCount(),
+        ]);
+    }
 
     /**
      * Paginated, filterable feed of news for the user's (un-muted) holdings,

@@ -6,6 +6,7 @@ import { useToastsStore } from '@/stores/toasts'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import SelectField from '@/components/ui/SelectField.vue'
 import Button from '@/components/ui/Button.vue'
+import DigestCard from '@/components/news/DigestCard.vue'
 import { api } from '@/lib/api'
 import { BellOff, RefreshCw, Search, Settings } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
@@ -158,6 +159,8 @@ function formatTime(iso: string): string {
         </Button>
       </div>
     </header>
+
+    <DigestCard />
 
     <div class="flex flex-wrap items-center gap-3">
       <SegmentedControl v-model="kind" variant="chip" :options="kindOptions" />

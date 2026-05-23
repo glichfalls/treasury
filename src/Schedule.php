@@ -2,6 +2,7 @@
 
 namespace App;
 
+use App\Schedule\GenerateDigestsMessage;
 use App\Schedule\MaterializeRecurringMessage;
 use App\Schedule\RefreshNewsMessage;
 use App\Schedule\RefreshPricesMessage;
@@ -29,6 +30,8 @@ class Schedule implements ScheduleProviderInterface
             // expected entries appear on the same calendar day.
             ->add(RecurringMessage::cron('5 0 * * *', new MaterializeRecurringMessage()))
             // Aggregate holdings news hourly, on the hour offset, into news_items.
-            ->add(RecurringMessage::cron('15 * * * *', new RefreshNewsMessage()));
+            ->add(RecurringMessage::cron('15 * * * *', new RefreshNewsMessage()))
+            // Generate the 24h AI briefing each morning, after the overnight news.
+            ->add(RecurringMessage::cron('0 7 * * *', new GenerateDigestsMessage()));
     }
 }

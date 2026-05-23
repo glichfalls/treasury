@@ -47,6 +47,15 @@ export interface NewsFeedResponse {
   sources: string[]
 }
 
+export interface NewsDigest {
+  id: string
+  content: string
+  generatedAt: string
+  periodStart: string
+  periodEnd: string
+  itemCount: number
+}
+
 export interface NewsFilters {
   isin?: string
   source?: string
@@ -105,5 +114,18 @@ export const useNewsStore = defineStore('news', () => {
     return api.get<NewsItem>(`/api/news/${encodeURIComponent(id)}`)
   }
 
-  return { items, counts, sources, total, page, pageSize, loading, fetch, fetchOne, setAssetPreferences }
+  /** The latest 24h AI briefing for the user's holdings (null if none yet — 204). */
+  async function fetchDigest(): Promise<NewsDigest | null> {
+    return (await api.get<NewsDigest | null>('/api/news/digest')) ?? null
+  }
+
+  /** Admin: generate a fresh digest now. */
+  async function generateDigest(): Promise<{ generated: boolean; itemCount: number }> {
+    return api.post<{ generated: boolean; itemCount: number }>('/api/admin/news/digest', {})
+  }
+
+  return {
+    items, counts, sources, total, page, pageSize, loading,
+    fetch, fetchOne, fetchDigest, generateDigest, setAssetPreferences,
+  }
 })
