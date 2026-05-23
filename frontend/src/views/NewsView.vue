@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { useNewsStore, type Sentiment } from '@/stores/news'
+import { useNewsStore, type Sentiment, type NewsKind } from '@/stores/news'
 import { useToastsStore } from '@/stores/toasts'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import SelectField from '@/components/ui/SelectField.vue'
@@ -17,9 +17,18 @@ const auth = useAuthStore()
 type Tab = 'all' | Sentiment | 'unclassified'
 
 const tab = ref<Tab>('all')
+const kind = ref<'all' | NewsKind>('all')
 const source = ref<string | null>(null)
 const q = ref('')
 const page = ref(1)
+
+const kindOptions: { value: 'all' | NewsKind; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'headline', label: 'News' },
+  { value: 'analyst_action', label: 'Analyst' },
+  { value: 'earnings', label: 'Earnings' },
+  { value: 'social', label: 'Social' },
+]
 
 const sentimentTabs = computed(() => {
   const c = news.counts
@@ -48,6 +57,7 @@ const rangeEnd = computed(() => Math.min(news.page * news.pageSize, news.total))
 function load() {
   news.fetch({
     sentiment: tab.value === 'all' ? undefined : tab.value,
+    kind: kind.value === 'all' ? undefined : kind.value,
     source: source.value ?? undefined,
     q: q.value.trim() || undefined,
     page: page.value,
@@ -57,7 +67,7 @@ function load() {
 onMounted(load)
 
 // Filter changes reset to page 1; page changes just reload.
-watch([tab, source], () => {
+watch([tab, kind, source], () => {
   page.value = 1
   load()
 })
@@ -106,6 +116,20 @@ function assetLabel(a: { ticker: string | null; name: string | null; isin: strin
   return a.ticker ?? a.name ?? a.isin
 }
 
+/** Badge for the structured kinds; headlines get none (they're the default). */
+function kindBadge(k: NewsKind): { label: string; class: string } | null {
+  switch (k) {
+    case 'analyst_action':
+      return { label: 'Analyst', class: 'border-[var(--color-accent)] text-[var(--color-accent)]' }
+    case 'earnings':
+      return { label: 'Earnings', class: 'border-[var(--color-positive)] text-[var(--color-positive)]' }
+    case 'social':
+      return { label: 'Social', class: 'border-[var(--color-border)] text-[var(--color-text-muted)]' }
+    default:
+      return null
+  }
+}
+
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
     month: 'short',
@@ -134,6 +158,10 @@ function formatTime(iso: string): string {
         </Button>
       </div>
     </header>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <SegmentedControl v-model="kind" variant="chip" :options="kindOptions" />
+    </div>
 
     <div class="flex flex-wrap items-end gap-3 justify-between">
       <SegmentedControl v-model="tab" variant="tabs" :options="sentimentTabs" />
@@ -180,6 +208,11 @@ function formatTime(iso: string): string {
       >
         <span class="mt-1.5 shrink-0 w-2 h-2 rounded-full" :class="dotClass(item.sentiment)" />
         <div class="min-w-0 flex-1">
+          <span
+            v-if="kindBadge(item.kind)"
+            class="inline-block mr-2 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide border align-middle"
+            :class="kindBadge(item.kind)!.class"
+          >{{ kindBadge(item.kind)!.label }}</span>
           <RouterLink
             :to="{ name: 'news-detail', params: { id: item.id } }"
             class="text-sm font-medium hover:text-[var(--color-accent)]"

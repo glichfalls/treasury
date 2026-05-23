@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { api } from '@/lib/api'
 
 export type Sentiment = 'bullish' | 'bearish' | 'neutral'
-export type NewsKind = 'headline' | 'analyst_action' | 'social'
+export type NewsKind = 'headline' | 'analyst_action' | 'earnings' | 'social'
 
 export interface NewsAsset {
   isin: string
