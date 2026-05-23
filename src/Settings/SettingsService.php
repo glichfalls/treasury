@@ -17,8 +17,6 @@ final class SettingsService
     public const FINNHUB_API_KEY = 'finnhub_api_key';
     public const MARKETAUX_API_TOKEN = 'marketaux_api_token';
     public const OPENAI_API_KEY = 'openai_api_key';
-    public const REDDIT_CLIENT_ID = 'reddit_client_id';
-    public const REDDIT_CLIENT_SECRET = 'reddit_client_secret';
     /** Comma-separated list of market-wide subreddits to search per holding. */
     public const REDDIT_BROAD_SUBREDDITS = 'reddit_broad_subreddits';
     /** Comma-separated provider source keys that are switched off. */

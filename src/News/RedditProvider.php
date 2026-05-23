@@ -10,19 +10,17 @@ use Psr\Log\NullLogger;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
- * Reddit chatter as `social` news. Uses app-only OAuth (a free "script" app's
- * client ID + secret via the client_credentials grant). For each holding it
- * pulls the dedicated subreddit (when one is set on the asset) and searches the
- * broad market subreddits (wallstreetbets, stocks, …) for the ticker/company.
- * No-ops without credentials. Sentiment is left to the AI classifier.
+ * Reddit chatter as `social` news via Reddit's public RSS/Atom feeds — no API
+ * key, app, or OAuth. For each holding it reads the dedicated subreddit (when
+ * one is set on the asset) and searches the broad market subreddits for the
+ * ticker/company. Feeds are rate-limited by IP and carry less metadata than the
+ * official API; failures degrade to an empty result. Sentiment is left to the AI.
  */
 final class RedditProvider implements NewsProvider
 {
-    private const TOKEN_URL = 'https://www.reddit.com/api/v1/access_token';
-    private const API_BASE = 'https://oauth.reddit.com';
+    private const BASE = 'https://www.reddit.com';
+    private const ATOM_NS = 'http://www.w3.org/2005/Atom';
     private const UA = 'treasury-news/1.0 (personal net-worth tracker)';
-
-    private ?string $token = null;
 
     public function __construct(
         private readonly HttpClientInterface $http,
@@ -37,19 +35,14 @@ final class RedditProvider implements NewsProvider
 
     public function fetchForAsset(Asset $asset, int $limit = 10): array
     {
-        $token = $this->token();
-        if ($token === null) {
-            return [];
-        }
+        /** @var array<string, NewsArticle> $byUrl */
+        $byUrl = [];
 
-        /** @var array<string, NewsArticle> $byPermalink */
-        $byPermalink = [];
-
-        // Dedicated company subreddit, if the asset has one — its hottest posts.
+        // Dedicated company subreddit, if set on the asset — its hottest posts.
         $sub = $asset->getRedditSubreddit();
         if ($sub !== null && $sub !== '') {
-            foreach ($this->listing('/r/' . rawurlencode($sub) . '/hot', ['limit' => min($limit, 8)], $token) as $a) {
-                $byPermalink[$a->url] = $a;
+            foreach ($this->feed('/r/' . rawurlencode($sub) . '/.rss', ['limit' => min($limit, 8)]) as $a) {
+                $byUrl[$a->url] = $a;
             }
         }
 
@@ -58,69 +51,97 @@ final class RedditProvider implements NewsProvider
         $broad = $this->settings->getRedditBroadSubreddits();
         if ($query !== null && $broad !== []) {
             $multi = implode('+', array_map('rawurlencode', $broad));
-            $articles = $this->listing(
-                '/r/' . $multi . '/search',
-                ['q' => $query, 'restrict_sr' => 'on', 'sort' => 'new', 'limit' => $limit, 'type' => 'link'],
-                $token,
-            );
+            $articles = $this->feed('/r/' . $multi . '/search.rss', [
+                'q' => $query,
+                'restrict_sr' => 'on',
+                'sort' => 'new',
+                'limit' => $limit,
+            ]);
             foreach ($articles as $a) {
-                $byPermalink[$a->url] = $a;
+                $byUrl[$a->url] = $a;
             }
         }
 
-        return array_values($byPermalink);
+        return array_values($byUrl);
     }
 
     /**
      * @param array<string, scalar> $query
      * @return NewsArticle[]
      */
-    private function listing(string $path, array $query, string $token): array
+    private function feed(string $path, array $query): array
     {
         try {
-            $data = $this->http->request('GET', self::API_BASE . $path, [
-                'query' => $query + ['raw_json' => 1],
-                'headers' => ['Authorization' => 'Bearer ' . $token, 'User-Agent' => self::UA],
+            $body = $this->http->request('GET', self::BASE . $path, [
+                'query' => $query,
+                'headers' => ['User-Agent' => self::UA, 'Accept' => 'application/atom+xml,application/xml'],
                 'timeout' => 12,
-            ])->toArray(false);
+            ])->getContent(false);
         } catch (\Throwable $e) {
-            $this->logger->warning('Reddit listing failed', ['path' => $path, 'error' => $e->getMessage()]);
+            $this->logger->warning('Reddit feed failed', ['path' => $path, 'error' => $e->getMessage()]);
+            return [];
+        }
+
+        $xml = @simplexml_load_string($body);
+        if ($xml === false) {
+            return [];
+        }
+        $entries = $xml->children(self::ATOM_NS)->entry;
+        if ($entries === null) {
             return [];
         }
 
         $out = [];
-        foreach ($data['data']['children'] ?? [] as $child) {
-            $post = $child['data'] ?? null;
-            if (!is_array($post)) {
+        foreach ($entries as $entry) {
+            $atom = $entry->children(self::ATOM_NS);
+            $title = trim((string) $atom->title);
+            $url = $this->linkHref($entry);
+            if ($title === '' || $url === '') {
                 continue;
             }
-            $title = $post['title'] ?? null;
-            $permalink = $post['permalink'] ?? null;
-            if (!is_string($title) || trim($title) === '' || !is_string($permalink) || $permalink === '') {
-                continue;
-            }
-            // Skip pinned megathreads and NSFW noise.
-            if (($post['stickied'] ?? false) === true || ($post['over_18'] ?? false) === true) {
-                continue;
-            }
-
-            $score = (int) ($post['score'] ?? 0);
-            $comments = (int) ($post['num_comments'] ?? 0);
-            $selftext = is_string($post['selftext'] ?? null) ? trim($post['selftext']) : '';
-            $snippet = $selftext !== ''
-                ? (mb_strlen($selftext) > 280 ? mb_substr($selftext, 0, 277) . '…' : $selftext)
-                : sprintf('%d upvotes · %d comments', $score, $comments);
+            $when = (string) ($atom->published ?? '') ?: (string) ($atom->updated ?? '');
 
             $out[] = new NewsArticle(
-                title: trim($title),
-                url: 'https://www.reddit.com' . $permalink,
-                publishedAt: (new \DateTimeImmutable())->setTimestamp((int) ($post['created_utc'] ?? time())),
-                publisher: is_string($post['subreddit_name_prefixed'] ?? null) ? $post['subreddit_name_prefixed'] : 'reddit',
+                title: $title,
+                url: $url,
+                publishedAt: $this->parseDate($when),
+                publisher: $this->subredditFromUrl($url),
                 kind: NewsItem::KIND_SOCIAL,
-                snippet: $snippet,
+                snippet: $this->snippet((string) $atom->content),
             );
         }
         return $out;
+    }
+
+    private function linkHref(\SimpleXMLElement $entry): string
+    {
+        foreach ($entry->children(self::ATOM_NS)->link as $link) {
+            $href = (string) ($link->attributes()->href ?? '');
+            if ($href !== '') {
+                return $href;
+            }
+        }
+        return '';
+    }
+
+    /** "r/stocks" from a permalink, for display as the publisher. */
+    private function subredditFromUrl(string $url): string
+    {
+        return preg_match('#/r/([^/]+)/#', $url, $m) === 1 ? 'r/' . $m[1] : 'reddit';
+    }
+
+    /** Reddit Atom content is HTML with a "submitted by … to …" footer; trim it. */
+    private function snippet(string $contentHtml): ?string
+    {
+        if (trim($contentHtml) === '') {
+            return null;
+        }
+        $text = trim((string) preg_replace('/\s+/', ' ', strip_tags(html_entity_decode($contentHtml, ENT_QUOTES | ENT_HTML5))));
+        $text = (string) preg_replace('/\s*submitted by.*$/i', '', $text);
+        if (mb_strlen($text) < 20) {
+            return null;
+        }
+        return mb_strlen($text) > 280 ? mb_substr($text, 0, 277) . '…' : $text;
     }
 
     private function query(Asset $asset): ?string
@@ -134,38 +155,18 @@ final class RedditProvider implements NewsProvider
         if ($ticker !== null && trim($ticker) !== '') {
             $terms[] = strtoupper(explode('.', trim($ticker))[0]);
         }
-        if ($terms === []) {
-            return null;
-        }
-        return implode(' OR ', array_unique($terms));
+        return $terms !== [] ? implode(' OR ', array_unique($terms)) : null;
     }
 
-    /** Fetch (and cache for the run) an app-only access token. */
-    private function token(): ?string
+    private function parseDate(string $raw): \DateTimeImmutable
     {
-        if ($this->token !== null) {
-            return $this->token;
+        if (trim($raw) !== '') {
+            try {
+                return new \DateTimeImmutable($raw);
+            } catch (\Throwable) {
+                // fall through
+            }
         }
-        $id = $this->settings->get(SettingsService::REDDIT_CLIENT_ID);
-        $secret = $this->settings->get(SettingsService::REDDIT_CLIENT_SECRET);
-        if ($id === null || $secret === null) {
-            return null;
-        }
-        try {
-            $data = $this->http->request('POST', self::TOKEN_URL, [
-                'auth_basic' => [$id, $secret],
-                'headers' => ['User-Agent' => self::UA],
-                'body' => ['grant_type' => 'client_credentials'],
-                'timeout' => 10,
-            ])->toArray(false);
-        } catch (\Throwable $e) {
-            $this->logger->warning('Reddit auth failed', ['error' => $e->getMessage()]);
-            return null;
-        }
-        $token = $data['access_token'] ?? null;
-        if (!is_string($token) || $token === '') {
-            return null;
-        }
-        return $this->token = $token;
+        return new \DateTimeImmutable();
     }
 }

@@ -25,8 +25,6 @@ class SettingsAdminController extends AbstractController
     private const KNOWN = [
         ['key' => SettingsService::FINNHUB_API_KEY,    'label' => 'Finnhub API key',     'group' => 'News providers', 'secret' => true],
         ['key' => SettingsService::MARKETAUX_API_TOKEN, 'label' => 'Marketaux API token', 'group' => 'News providers', 'secret' => true],
-        ['key' => SettingsService::REDDIT_CLIENT_ID,    'label' => 'Reddit client ID',    'group' => 'Reddit',         'secret' => true],
-        ['key' => SettingsService::REDDIT_CLIENT_SECRET, 'label' => 'Reddit client secret', 'group' => 'Reddit',        'secret' => true],
         ['key' => SettingsService::OPENAI_API_KEY,     'label' => 'OpenAI API key',      'group' => 'AI',             'secret' => true],
     ];
 
@@ -99,11 +97,6 @@ class SettingsAdminController extends AbstractController
      */
     private function probe(string $key, string $value): array
     {
-        // Reddit needs both halves of the credential, so test them together.
-        if ($key === SettingsService::REDDIT_CLIENT_ID || $key === SettingsService::REDDIT_CLIENT_SECRET) {
-            return $this->probeReddit();
-        }
-
         [$url, $options] = match ($key) {
             SettingsService::OPENAI_API_KEY => [
                 'https://api.openai.com/v1/models',
@@ -136,33 +129,6 @@ class SettingsAdminController extends AbstractController
             $status === 402 => ['ok' => false, 'message' => 'Payment/plan limit required for this key.'],
             $status === 429 => ['ok' => true, 'message' => 'Key accepted but currently rate-limited.'],
             default => ['ok' => false, 'message' => "Provider returned HTTP {$status}."],
-        };
-    }
-
-    /**
-     * @return array{ok: bool, message: string}
-     */
-    private function probeReddit(): array
-    {
-        $id = $this->settings->get(SettingsService::REDDIT_CLIENT_ID);
-        $secret = $this->settings->get(SettingsService::REDDIT_CLIENT_SECRET);
-        if ($id === null || $secret === null) {
-            return ['ok' => false, 'message' => 'Save both the Reddit client ID and secret first.'];
-        }
-        try {
-            $status = $this->http->request('POST', 'https://www.reddit.com/api/v1/access_token', [
-                'auth_basic' => [$id, $secret],
-                'headers' => ['User-Agent' => 'treasury-news/1.0'],
-                'body' => ['grant_type' => 'client_credentials'],
-                'timeout' => 10,
-            ])->getStatusCode();
-        } catch (\Throwable $e) {
-            return ['ok' => false, 'message' => 'Request failed: ' . $e->getMessage()];
-        }
-        return match (true) {
-            $status >= 200 && $status < 300 => ['ok' => true, 'message' => 'Reddit credentials valid.'],
-            in_array($status, [401, 403], true) => ['ok' => false, 'message' => 'Authentication failed — check client ID/secret.'],
-            default => ['ok' => false, 'message' => "Reddit returned HTTP {$status}."],
         };
     }
 
