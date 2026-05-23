@@ -120,7 +120,6 @@ const option = computed<EChartsOption>(() => {
       {
         name: 'Price P&L',
         type: 'line',
-        smooth: true,
         showSymbol: false,
         sampling: 'lttb',
         color: chartColors.accent,
@@ -140,7 +139,6 @@ const option = computed<EChartsOption>(() => {
       {
         name: 'Total return (incl. dividends)',
         type: 'line',
-        smooth: true,
         showSymbol: false,
         sampling: 'lttb',
         color: chartColors.highlight,

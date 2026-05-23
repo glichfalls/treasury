@@ -55,8 +55,8 @@ export type Granularity = 'daily' | 'weekly' | 'monthly'
 
 /** Auto-pick sampling cadence so short windows don't render with two data points. */
 export function granularityFor(range: Range): Granularity {
-  if (range === '1w' || range === '1m' || range === '3m') return 'daily'
-  if (range === '6m' || range === 'ytd' || range === '1y' || range === '2y') return 'weekly'
+  if (range === '1w' || range === '1m' || range === '3m' || range === '6m' || range === 'ytd' || range === '1y') return 'daily'
+  if (range === '2y' || range === '5y') return 'weekly'
   return 'monthly'
 }
 

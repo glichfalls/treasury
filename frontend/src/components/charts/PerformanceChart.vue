@@ -118,7 +118,6 @@ const option = computed<EChartsOption>(() => {
 
   const trackDefaults = {
     type: 'line' as const,
-    smooth: true,
     showSymbol: false,
     connectNulls: false,
     lineStyle: { width: 2 },

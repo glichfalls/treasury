@@ -156,7 +156,6 @@ const option = computed<EChartsOption>(() => {
           name: 'Cash',
           type: 'line',
           stack: 'total',
-          smooth: true,
           showSymbol: false,
           sampling: 'lttb',
           // Setting `color` (and matching itemStyle) gives ECharts the right
@@ -172,7 +171,6 @@ const option = computed<EChartsOption>(() => {
           name: 'Holdings',
           type: 'line',
           stack: 'total',
-          smooth: true,
           showSymbol: false,
           sampling: 'lttb',
           color: '#a78bfa',
@@ -201,7 +199,6 @@ const option = computed<EChartsOption>(() => {
         {
           name: 'Account value',
           type: 'line',
-          smooth: true,
           showSymbol: false,
           sampling: 'lttb',
           // `color` controls the legend marker; ECharts ignores lineStyle.color for it.
@@ -224,7 +221,6 @@ const option = computed<EChartsOption>(() => {
         {
           name: 'Net deposits',
           type: 'line',
-          smooth: true,
           showSymbol: false,
           sampling: 'lttb',
           color: chartColors.textMuted,
@@ -244,7 +240,6 @@ const option = computed<EChartsOption>(() => {
     series: [{
       name: props.title,
       type: 'line',
-      smooth: true,
       showSymbol: false,
       sampling: 'lttb',
       color: dir.line,

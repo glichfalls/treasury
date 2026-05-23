@@ -63,7 +63,6 @@ const option = computed<EChartsOption>(() => {
     },
     series: [{
       type: 'line',
-      smooth: true,
       showSymbol: false,
       sampling: 'lttb',
       lineStyle: { color: chartColors.accent, width: 2 },
