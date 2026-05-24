@@ -35,9 +35,18 @@ class NewsItem
     #[ORM\JoinColumn(nullable: false)]
     private Asset $asset;
 
-    /** Origin of the item, e.g. 'yahoo', 'finnhub', 'reddit'. */
+    /** Origin of the item, e.g. 'yahoo', 'finnhub', 'reddit', 'custom'. */
     #[ORM\Column(length: 32)]
     private string $source;
+
+    /**
+     * The user-curated source this item came from, when source === 'custom'.
+     * Null for built-in providers. Lets the AI gate honour the source's
+     * per-source aiEnabled toggle and attributes the item to its feed.
+     */
+    #[ORM\ManyToOne(targetEntity: AssetNewsSource::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?AssetNewsSource $newsSource = null;
 
     /** One of the KIND_* constants. */
     #[ORM\Column(length: 16, options: ['default' => self::KIND_HEADLINE])]
@@ -97,6 +106,8 @@ class NewsItem
     public function setAsset(Asset $asset): self { $this->asset = $asset; return $this; }
     public function getSource(): string { return $this->source; }
     public function setSource(string $source): self { $this->source = $source; return $this; }
+    public function getNewsSource(): ?AssetNewsSource { return $this->newsSource; }
+    public function setNewsSource(?AssetNewsSource $newsSource): self { $this->newsSource = $newsSource; return $this; }
     public function getKind(): string { return $this->kind; }
     public function setKind(string $kind): self { $this->kind = $kind; return $this; }
     public function getTitle(): string { return $this->title; }

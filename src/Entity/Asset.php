@@ -3,6 +3,8 @@
 namespace App\Entity;
 
 use App\Repository\AssetRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\Uid\Uuid;
@@ -64,9 +66,19 @@ class Asset
     #[ORM\Column(length: 64, nullable: true)]
     private ?string $redditSubreddit = null;
 
+    /**
+     * User-curated, asset-specific news sources (RSS feeds / websites) crawled
+     * for this holding alongside the built-in providers.
+     *
+     * @var Collection<int, AssetNewsSource>
+     */
+    #[ORM\OneToMany(mappedBy: 'asset', targetEntity: AssetNewsSource::class, cascade: ['remove'], orphanRemoval: true)]
+    private Collection $newsSources;
+
     public function __construct()
     {
         $this->id = Uuid::v7();
+        $this->newsSources = new ArrayCollection();
     }
 
     public function getId(): Uuid { return $this->id; }
@@ -93,4 +105,7 @@ class Asset
         $this->redditSubreddit = $subreddit !== null && $subreddit !== '' ? $subreddit : null;
         return $this;
     }
+
+    /** @return Collection<int, AssetNewsSource> */
+    public function getNewsSources(): Collection { return $this->newsSources; }
 }

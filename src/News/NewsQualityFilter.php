@@ -115,13 +115,18 @@ final class NewsQualityFilter
         return array_values(array_unique($terms));
     }
 
-    public function accepts(NewsArticle $article): bool
+    /**
+     * @param bool $trustedSource When true (a user-curated custom source), skip
+     *   the publisher blocklist — the user picked this outlet deliberately — but
+     *   still drop clickbait/filing-spam headline shapes.
+     */
+    public function accepts(NewsArticle $article, bool $trustedSource = false): bool
     {
         if ($article->kind === NewsItem::KIND_SOCIAL) {
             return !$this->matchesAny($article->title, self::SOCIAL_NOISE_PATTERNS);
         }
 
-        if ($article->publisher !== null && $this->isBlockedPublisher($article->publisher)) {
+        if (!$trustedSource && $article->publisher !== null && $this->isBlockedPublisher($article->publisher)) {
             return false;
         }
         return !$this->matchesAny($article->title, self::FILING_PATTERNS)

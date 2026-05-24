@@ -30,5 +30,31 @@ final class NewsArticle
         public readonly ?string $dedupKey = null,
         /** Analyst price target as a display string (e.g. "$150"), when the source supplies one. */
         public readonly ?string $priceTarget = null,
+        /**
+         * For custom (user-curated) sources: the AssetNewsSource id (RFC-4122)
+         * this article came from, so NewsFetcher can link the FK. Null for
+         * built-in providers.
+         */
+        public readonly ?string $sourceRef = null,
     ) {}
+
+    /**
+     * Copy tagged with the originating custom source: links the FK and, when the
+     * article carried no publisher of its own, falls back to the source's label.
+     */
+    public function withSource(string $sourceRef, ?string $publisherFallback): self
+    {
+        return new self(
+            title: $this->title,
+            url: $this->url,
+            publishedAt: $this->publishedAt,
+            publisher: $this->publisher ?? $publisherFallback,
+            kind: $this->kind,
+            snippet: $this->snippet,
+            sentiment: $this->sentiment,
+            dedupKey: $this->dedupKey,
+            priceTarget: $this->priceTarget,
+            sourceRef: $sourceRef,
+        );
+    }
 }

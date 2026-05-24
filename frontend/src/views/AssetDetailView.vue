@@ -2,12 +2,14 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { api } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth'
 import { formatMinor, formatQuantity } from '@/lib/money'
 import MoneyDisplay from '@/components/ui/MoneyDisplay.vue'
 import { categoryMeta } from '@/lib/categories'
 import AssetPriceChart from '@/components/charts/AssetPriceChart.vue'
 import AssetProfitChart from '@/components/charts/AssetProfitChart.vue'
 import AssetNewsList from '@/components/news/AssetNewsList.vue'
+import AssetNewsSources from '@/components/news/AssetNewsSources.vue'
 import DateField from '@/components/ui/DateField.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import SelectField from '@/components/ui/SelectField.vue'
@@ -80,6 +82,7 @@ interface TransactionsPage {
 }
 
 const route = useRoute()
+const auth = useAuthStore()
 const isin = computed(() => String(route.params.isin).toUpperCase())
 
 const data = ref<AssetDetail | null>(null)
@@ -544,6 +547,8 @@ const singleCurrencyReturn = computed<null | {
       <section class="space-y-3">
         <h2 class="text-lg font-medium">Recent news</h2>
         <AssetNewsList :isin="data.isin" />
+        <!-- Admin-only: curate the per-asset news sources crawled for this holding. -->
+        <AssetNewsSources v-if="auth.isAdmin" :isin="data.isin" />
       </section>
 
       <!-- Per-account holdings -->

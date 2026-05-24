@@ -6,6 +6,7 @@ use App\Entity\NewsDigest;
 use App\Entity\User;
 use App\News\Sentiment\OpenAiSentimentClassifier;
 use App\Repository\NewsDigestRepository;
+use App\Settings\SettingsService;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ParameterType;
@@ -32,6 +33,7 @@ final class DigestService
         private readonly OpenAiSentimentClassifier $openai,
         private readonly Connection $conn,
         private readonly NewsDigestRepository $digests,
+        private readonly SettingsService $settings,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {}
@@ -70,10 +72,21 @@ final class DigestService
         $last = $this->digests->latestForOwner($user);
         $start = ($last !== null && $last->getPeriodEnd() > $cap) ? $last->getPeriodEnd() : $cap;
 
+        // Keep AI-gated custom-source items out of the AI briefing: when the
+        // global custom-AI switch is off, exclude all custom items; when on,
+        // exclude only those whose source has AI turned off (a NULL link is
+        // treated as allowed). Built-in sources are always included.
+        $customFilter = $this->settings->isCustomNewsAiEnabled()
+            ? "AND (n.source <> 'custom' OR n.news_source_id IS NULL OR ns.ai_enabled = 1)"
+            : "AND n.source <> 'custom'";
+
         $rows = $this->conn->fetchAllAssociative(
             "SELECT n.kind, n.sentiment, n.title, n.url, n.published_at, a.ticker, a.name
-             FROM news_items n INNER JOIN assets a ON a.id = n.asset_id
+             FROM news_items n
+             INNER JOIN assets a ON a.id = n.asset_id
+             LEFT JOIN asset_news_sources ns ON ns.id = n.news_source_id
              WHERE a.isin IN (?) AND a.news_enabled = 1 AND n.published_at >= ?
+             {$customFilter}
              ORDER BY FIELD(n.kind, 'earnings', 'analyst_action', 'headline', 'social'), n.published_at DESC
              LIMIT 80",
             [$held, $start->format('Y-m-d H:i:s')],

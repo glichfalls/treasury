@@ -3,6 +3,7 @@
 namespace App\News;
 
 use App\Entity\Asset;
+use App\Entity\AssetNewsSource;
 use App\Entity\NewsItem;
 use App\Repository\AssetRepository;
 use App\Repository\NewsItemRepository;
@@ -11,6 +12,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * Orchestrates news aggregation: for each news-eligible asset, fans out across
@@ -73,13 +75,19 @@ final class NewsFetcher
                     $errors[] = $provider->source() . '/' . $asset->getIsin() . ': ' . $e->getMessage();
                     continue;
                 }
+                // Custom sources are user-curated for this exact holding, so we
+                // trust them: keep their chosen publishers and skip the relevance
+                // gate (the same exemption a dedicated subreddit gets). Clickbait/
+                // filing-spam shapes are still filtered out.
+                $isCustom = $provider->source() === CustomFeedProvider::SOURCE;
                 foreach ($articles as $article) {
-                    if (!$this->quality->accepts($article)) {
+                    if (!$this->quality->accepts($article, trustedSource: $isCustom)) {
                         continue; // drop clickbait / filing spam / forum noise
                     }
                     // Headlines must actually reference the holding. Social is gated
                     // at the provider (broad-sub yes, dedicated-sub exempt).
-                    if ($article->kind === NewsItem::KIND_HEADLINE
+                    if (!$isCustom
+                        && $article->kind === NewsItem::KIND_HEADLINE
                         && !$this->quality->matchesAsset($article, $asset)) {
                         continue; // drop off-topic matches (e.g. unrelated ETF hits)
                     }
@@ -115,6 +123,14 @@ final class NewsFetcher
                     ->setSentiment($article->sentiment)
                     ->setPublishedAt($article->publishedAt)
                     ->setContentHash($hash);
+                // Link the originating custom source (a lazy reference — no query)
+                // so the AI gate can read its per-source toggle and the feed is
+                // attributed. getReference is safe here: the row was just loaded.
+                if ($article->sourceRef !== null) {
+                    $item->setNewsSource(
+                        $this->em->getReference(AssetNewsSource::class, Uuid::fromString($article->sourceRef)),
+                    );
+                }
                 $this->em->persist($item);
                 $inserted++;
             }

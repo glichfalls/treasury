@@ -24,6 +24,8 @@ final class SettingsService
     public const NEWS_DISABLED_SOURCES = 'news_disabled_sources';
     /** Fetch volume per holding: low | medium | high. */
     public const NEWS_VOLUME = 'news_volume';
+    /** Master switch for AI processing of custom-source articles ('1' = on). */
+    public const NEWS_CUSTOM_AI = 'news_custom_ai';
 
     public const DEFAULT_BROAD_SUBREDDITS = ['wallstreetbets', 'stocks', 'investing', 'trading', 'StockMarket'];
 
@@ -84,6 +86,18 @@ final class SettingsService
     public function isSourceEnabled(string $source): bool
     {
         return !in_array(strtolower($source), $this->getDisabledSources(), true);
+    }
+
+    /**
+     * Master switch for AI processing (deep briefs, digest inclusion) of
+     * custom-source articles. Defaults on, so curated feeds get the same AI
+     * treatment as built-in sources unless an admin turns it off; per-source
+     * aiEnabled toggles refine it under this switch.
+     */
+    public function isCustomNewsAiEnabled(): bool
+    {
+        $v = $this->get(self::NEWS_CUSTOM_AI);
+        return $v === null || ($v !== '0' && strtolower($v) !== 'false' && strtolower($v) !== 'off');
     }
 
     public function getNewsVolume(): string

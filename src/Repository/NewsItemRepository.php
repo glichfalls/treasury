@@ -45,17 +45,24 @@ class NewsItemRepository extends ServiceEntityRepository
      * kinds. Oldest-first so a backlog drains in publish order.
      *
      * @param string[] $kinds
+     * @param string[] $excludeSources Source keys to leave out (e.g. 'custom',
+     *   which is classified lazily under its own per-source AI gate).
      * @return NewsItem[]
      */
-    public function findUnclassified(array $kinds, int $limit = 50): array
+    public function findUnclassified(array $kinds, int $limit = 50, array $excludeSources = []): array
     {
-        return $this->createQueryBuilder('n')
+        $qb = $this->createQueryBuilder('n')
             ->where('n.sentiment IS NULL')
             ->andWhere('n.kind IN (:kinds)')
             ->setParameter('kinds', $kinds)
             ->orderBy('n.publishedAt', 'ASC')
-            ->setMaxResults($limit)
-            ->getQuery()
-            ->getResult();
+            ->setMaxResults($limit);
+
+        if ($excludeSources !== []) {
+            $qb->andWhere('n.source NOT IN (:excludeSources)')
+                ->setParameter('excludeSources', $excludeSources);
+        }
+
+        return $qb->getQuery()->getResult();
     }
 }

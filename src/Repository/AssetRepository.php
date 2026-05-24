@@ -23,8 +23,10 @@ class AssetRepository extends ServiceEntityRepository
 
     /**
      * Assets eligible for news aggregation: currently held (nonzero quantity in
-     * some account), news not muted, and carrying a ticker (so commodity coins
-     * and cash are excluded). News is fetched per-asset by ticker/market topic.
+     * some account), news not muted, and either carrying a ticker (so the
+     * built-in ticker/topic providers have something to search) or having at
+     * least one enabled custom source (so a curated feed works on a tickerless
+     * holding too). Commodity coins and cash without a custom feed are excluded.
      *
      * @return Asset[]
      */
@@ -34,7 +36,14 @@ class AssetRepository extends ServiceEntityRepository
             SELECT a.id
             FROM assets a
             INNER JOIN transactions t ON t.asset_isin = a.isin
-            WHERE a.news_enabled = 1 AND a.ticker IS NOT NULL
+            WHERE a.news_enabled = 1
+              AND (
+                a.ticker IS NOT NULL
+                OR EXISTS (
+                    SELECT 1 FROM asset_news_sources s
+                    WHERE s.asset_id = a.id AND s.enabled = 1
+                )
+              )
             GROUP BY a.id, a.isin
             HAVING SUM(t.asset_quantity) <> 0
         SQL;

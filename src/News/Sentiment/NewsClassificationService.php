@@ -4,7 +4,9 @@ namespace App\News\Sentiment;
 
 use App\Entity\NewsItem;
 use App\News\ArticleContentFetcher;
+use App\News\CustomFeedProvider;
 use App\Repository\NewsItemRepository;
+use App\Settings\SettingsService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -21,9 +23,30 @@ final class NewsClassificationService
         private readonly HeuristicClassifier $heuristic,
         private readonly ArticleContentFetcher $articleFetcher,
         private readonly NewsItemRepository $repo,
+        private readonly SettingsService $settings,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {}
+
+    /**
+     * Whether AI may process this item. Always yes for built-in sources; for a
+     * custom (user-curated) source, only when the global master switch is on AND
+     * the source's own aiEnabled toggle is on. A custom item whose AI is gated
+     * off behaves exactly as if no key were configured — it falls back to the
+     * keyless heuristic.
+     */
+    private function aiAllowed(NewsItem $item): bool
+    {
+        if (!$this->openai->isAvailable()) {
+            return false;
+        }
+        if ($item->getSource() !== CustomFeedProvider::SOURCE) {
+            return true;
+        }
+        $source = $item->getNewsSource();
+        return $this->settings->isCustomNewsAiEnabled()
+            && ($source === null || $source->isAiEnabled());
+    }
 
     /**
      * @return array{classified: int, via: string}
@@ -33,9 +56,13 @@ final class NewsClassificationService
         $primary = $this->openai->isAvailable() ? $this->openai : $this->heuristic;
         $via = $primary === $this->openai ? 'openai' : 'heuristic';
 
+        // Custom-source items are classified lazily on open (classifyOne), where
+        // the per-source AI gate applies — keep them out of the bulk drainer,
+        // which uses one classifier for the whole batch and can't gate per item.
         $items = $this->repo->findUnclassified(
             [NewsItem::KIND_HEADLINE, NewsItem::KIND_SOCIAL],
             $max,
+            excludeSources: [CustomFeedProvider::SOURCE],
         );
 
         $classified = 0;
@@ -82,7 +109,7 @@ final class NewsClassificationService
         }
 
         // Deep path: real article + structured brief, AI only, headlines only.
-        if ($item->getKind() === NewsItem::KIND_HEADLINE && $this->openai->isAvailable()) {
+        if ($item->getKind() === NewsItem::KIND_HEADLINE && $this->aiAllowed($item)) {
             $content = $this->articleFetcher->fetch($item->getUrl());
             if ($content !== null) {
                 $deep = $this->openai->deepBrief($item->getTitle(), $content);
@@ -98,11 +125,12 @@ final class NewsClassificationService
             }
         }
 
-        // Fallback: cheap one-line summary + sentiment from the snippet.
+        // Fallback: cheap one-line summary + sentiment from the snippet. AI when
+        // allowed for this item, else the keyless heuristic.
         if ($item->getSummary() !== null) {
             return;
         }
-        $primary = $this->openai->isAvailable() ? $this->openai : $this->heuristic;
+        $primary = $this->aiAllowed($item) ? $this->openai : $this->heuristic;
         $input = [['title' => $item->getTitle(), 'snippet' => $item->getSnippet()]];
         $results = $primary->classify($input);
         if ($results === [] && $primary === $this->openai) {

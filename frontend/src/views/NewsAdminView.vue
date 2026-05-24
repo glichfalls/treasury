@@ -15,6 +15,7 @@ interface NewsConfig {
   sources: SourceCfg[]
   volume: 'low' | 'medium' | 'high'
   broadSubreddits: string
+  customAiEnabled: boolean
 }
 interface HoldingCfg {
   isin: string
@@ -52,6 +53,7 @@ async function saveConfig() {
       enabledSources: config.value.sources.filter((s) => s.enabled).map((s) => s.key),
       volume: config.value.volume,
       broadSubreddits: config.value.broadSubreddits,
+      customAiEnabled: config.value.customAiEnabled,
     })
     toasts.success('News settings saved.')
   } catch (e) {
@@ -164,6 +166,18 @@ function sourceLabel(k: string): string {
             class="w-full max-w-md px-3 py-1.5 text-sm rounded-md bg-[var(--color-surface)] border border-[var(--color-border)] focus:outline-none focus:border-[var(--color-accent)]"
           />
           <p class="text-xs text-[var(--color-text-muted)] mt-1">Comma-separated; searched per holding for the ticker/company.</p>
+        </div>
+
+        <div>
+          <h3 class="label mb-2">Custom sources</h3>
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input v-model="config.customAiEnabled" type="checkbox" class="accent-[var(--color-accent)] w-4 h-4 rounded" />
+            <span>AI briefs &amp; digest for custom-source articles</span>
+          </label>
+          <p class="text-xs text-[var(--color-text-muted)] mt-1">
+            Master switch for AI on per-asset custom feeds. Each source also has its own toggle
+            (set on the asset page) which only applies while this is on.
+          </p>
         </div>
 
         <Button variant="primary" :loading="savingConfig" loading-text="Saving…" @click="saveConfig">Save settings</Button>
