@@ -7,11 +7,14 @@ services:
     environment:
       APP_ENV: prod
       APP_DEBUG: "0"
+      REDIS_URL: "redis://redis:6379"
     # Reach Plesk's MySQL on the host
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     expose:
       - "9000"
@@ -36,10 +39,13 @@ services:
     environment:
       APP_ENV: prod
       APP_DEBUG: "0"
+      REDIS_URL: "redis://redis:6379"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     entrypoint: []
     command: ["php", "bin/console", "messenger:consume", "scheduler_default", "async", "-vv", "--time-limit=3600"]
@@ -58,6 +64,20 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # appendonly persists the Scheduler's last-run state across deploys/restarts.
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - redis_data:/data
+
   web:
     image: ghcr.io/${GHCR_OWNER}/treasury-web:${IMAGE_TAG:-latest}
     restart: unless-stopped
@@ -70,3 +90,4 @@ services:
 volumes:
   php_sessions:
   rabbitmq_data:
+  redis_data:

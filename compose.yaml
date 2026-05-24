@@ -5,11 +5,14 @@ services:
     environment:
       DATABASE_URL: "mysql://${MYSQL_USER:-app}:${MYSQL_PASSWORD:-apppass}@database:3306/${MYSQL_DATABASE:-app}?serverVersion=8.4&charset=utf8mb4"
       MESSENGER_TRANSPORT_DSN: "amqp://guest:guest@rabbitmq:5672/%2f/messages"
+      REDIS_URL: "redis://redis:6379"
       APP_ENV: dev
     depends_on:
       database:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     working_dir: /app
 
@@ -27,6 +30,19 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
 
+  redis:
+    image: redis:7-alpine
+    # appendonly persists the Scheduler's last-run state across restarts.
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - redis_data:/data
+
   # Ticks the Symfony Scheduler (cron-style) and consumes the async (RabbitMQ)
   # queue. Waits for the shared php_vendor volume to be populated by the `php`
   # service before starting. --time-limit recycles the process hourly so code
@@ -36,11 +52,14 @@ services:
     environment:
       DATABASE_URL: "mysql://${MYSQL_USER:-app}:${MYSQL_PASSWORD:-apppass}@database:3306/${MYSQL_DATABASE:-app}?serverVersion=8.4&charset=utf8mb4"
       MESSENGER_TRANSPORT_DSN: "amqp://guest:guest@rabbitmq:5672/%2f/messages"
+      REDIS_URL: "redis://redis:6379"
       APP_ENV: dev
     depends_on:
       database:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     working_dir: /app
     entrypoint: ["sh", "-c"]
@@ -79,3 +98,4 @@ volumes:
   php_vendor:
   frontend_node_modules:
   rabbitmq_data:
+  redis_data:

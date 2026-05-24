@@ -5,6 +5,8 @@ RUN apk add --no-cache git unzip icu-libs icu-data-full rabbitmq-c \
     && docker-php-ext-install -j$(nproc) pdo_mysql intl opcache bcmath \
     && pecl install amqp \
     && docker-php-ext-enable amqp \
+    && yes '' | pecl install redis \
+    && docker-php-ext-enable redis \
     && apk del .build-deps
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
