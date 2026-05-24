@@ -43,6 +43,15 @@ function formatWhen(iso: string): string {
     weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
   })
 }
+
+// The window the briefing actually covers (e.g. "May 21 – 24"), collapsing to a
+// single date when start and end land on the same day.
+function formatRange(startIso: string, endIso: string): string {
+  const opt: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
+  const start = new Date(startIso).toLocaleDateString(undefined, opt)
+  const end = new Date(endIso).toLocaleDateString(undefined, opt)
+  return start === end ? end : `${start} – ${end}`
+}
 </script>
 
 <template>
@@ -51,19 +60,23 @@ function formatWhen(iso: string): string {
     style="background-image: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 7%, var(--color-surface)), var(--color-surface) 70%);"
   >
     <div class="flex items-start justify-between gap-3">
-      <div class="flex items-center gap-2">
-        <Sparkles :size="16" class="text-[var(--color-accent)]" />
-        <h2 class="text-base font-semibold tracking-tight">Daily briefing</h2>
+      <div>
+        <div class="flex items-center gap-2">
+          <Sparkles :size="16" class="text-[var(--color-accent)]" />
+          <h2 class="text-base font-semibold tracking-tight">Daily briefing</h2>
+        </div>
+        <p
+          v-if="digest"
+          class="text-xs text-[var(--color-text-muted)] mt-0.5"
+          :title="'Generated ' + formatWhen(digest.generatedAt)"
+        >
+          {{ formatRange(digest.periodStart, digest.periodEnd) }} · {{ digest.itemCount }} {{ digest.itemCount === 1 ? 'item' : 'items' }}
+        </p>
       </div>
-      <div class="flex items-center gap-3 shrink-0">
-        <span v-if="digest" class="text-xs text-[var(--color-text-muted)]">
-          {{ formatWhen(digest.generatedAt) }} · {{ digest.itemCount }} items
-        </span>
-        <Button v-if="auth.isAdmin" variant="ghost" size="sm" :loading="generating" loading-text="Generating…" @click="generate">
-          <RefreshCw :size="13" />
-          Generate
-        </Button>
-      </div>
+      <Button v-if="auth.isAdmin" class="shrink-0" variant="ghost" size="sm" :loading="generating" loading-text="Generating…" @click="generate">
+        <RefreshCw :size="13" />
+        Generate
+      </Button>
     </div>
 
     <div v-if="loading" class="text-sm text-[var(--color-text-muted)] mt-3">Loading…</div>

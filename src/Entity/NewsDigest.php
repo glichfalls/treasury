@@ -8,8 +8,8 @@ use Symfony\Bridge\Doctrine\Types\UuidType;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * An AI-generated daily briefing summarising the last ~24h of news across a
- * user's holdings. One row per generation; the UI shows the latest.
+ * An AI-generated briefing summarising news across a user's holdings since
+ * their last briefing. One row per generation; the UI shows the latest.
  */
 #[ORM\Entity(repositoryClass: NewsDigestRepository::class)]
 #[ORM\Table(name: 'news_digests')]

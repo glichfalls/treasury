@@ -32,7 +32,7 @@ class NewsController extends AbstractController
         private readonly EntityManagerInterface $em,
     ) {}
 
-    /** The latest 24h AI briefing for the user's holdings, or null if none yet. */
+    /** The latest AI briefing for the user's holdings, or null if none yet. */
     #[Route('/digest', name: 'api_news_digest', methods: ['GET'])]
     public function digest(#[CurrentUser] User $user): JsonResponse
     {

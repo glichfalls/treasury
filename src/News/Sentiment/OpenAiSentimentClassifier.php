@@ -197,7 +197,8 @@ final class OpenAiSentimentClassifier implements SentimentClassifier
     }
 
     /**
-     * Write a daily briefing (markdown) from a block of the last 24h of items.
+     * Write a briefing (markdown) from a block of recent items. Each input line
+     * is one item: `KIND | TICKER | SENTIMENT | DATE | HEADLINE | URL`.
      * Returns null on failure.
      */
     public function summarizeDigest(string $itemsBlock): ?string
@@ -207,13 +208,27 @@ final class OpenAiSentimentClassifier implements SentimentClassifier
             return null;
         }
 
-        $system = 'You are an investment analyst writing a concise daily briefing for an investor about '
-            . 'THEIR holdings. From the last 24h of items below (news, analyst rating changes, earnings, '
-            . 'social chatter) write a markdown briefing: open with a 1-2 sentence overview including the '
-            . 'overall bullish/bearish tilt, then short sections grouping the notable developments '
-            . '(**Earnings**, **Analyst moves**, **Company news**, **Social buzz**), naming the tickers. '
-            . 'Lead with the most material items; omit holdings with nothing notable. Be specific and '
-            . 'factual, never invent. Keep it tight.';
+        $system = <<<'PROMPT'
+            You are an investment analyst writing a briefing for an investor about THEIR holdings,
+            covering only the developments since their last briefing (a few days at most).
+
+            Each input line is one item, pipe-delimited:
+            KIND | TICKER | SENTIMENT | DATE | HEADLINE | URL
+
+            Write a tight markdown briefing:
+            - Open with a 1-2 sentence overview, including the overall bullish/bearish tilt.
+            - Then short sections grouping the notable developments — **Earnings**, **Analyst moves**,
+              **Company news**, **Social buzz** — naming the tickers. Omit any empty section and any
+              holding with nothing notable.
+            - State each item's date naturally (e.g. "May 23"). Do not imply an item is from today.
+            - Cite each item with an inline markdown link: [ticker or short headline](URL). Use ONLY the
+              exact URLs provided, copied verbatim — never invent, alter, or drop the scheme. One link
+              per item is enough.
+            - Lead with the most material items. Be specific and factual; never invent figures or events.
+            - If little or nothing is material (e.g. a quiet weekend), say so in a sentence rather than padding.
+
+            Keep it concise.
+            PROMPT;
 
         try {
             $data = $this->http->request('POST', self::URL, [
@@ -223,7 +238,7 @@ final class OpenAiSentimentClassifier implements SentimentClassifier
                     'temperature' => 0.2,
                     'messages' => [
                         ['role' => 'system', 'content' => $system],
-                        ['role' => 'user', 'content' => "Items (last 24h):\n" . $itemsBlock],
+                        ['role' => 'user', 'content' => "Items since last briefing:\n" . $itemsBlock],
                     ],
                 ],
                 'timeout' => 45,

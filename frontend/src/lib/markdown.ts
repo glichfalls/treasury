@@ -1,11 +1,20 @@
 /**
  * Minimal, safe markdown renderer for AI-generated content (no markdown
- * dependency in the app): HTML-escape first, then render headings, **bold**,
- * bullet lists, and paragraphs. Safe to use with v-html on trusted AI output.
+ * dependency in the app): HTML-escape first, then render headings, [links](url),
+ * **bold**, bullet lists, and paragraphs. Safe to use with v-html on trusted AI
+ * output.
  */
 export function renderMarkdown(md: string): string {
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  const inline = (s: string) => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  // [text](url) → anchor, http(s) only (the URL is already HTML-escaped, so a
+  // stray scheme or quote can't break out). Unsafe URLs fall back to plain text.
+  const link = (s: string) =>
+    s.replace(/\[([^\]]+)\]\(([^)\s"]+)\)/g, (_m, text: string, url: string) =>
+      /^https?:\/\//i.test(url)
+        ? `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-[var(--color-accent)] underline underline-offset-2 hover:opacity-80">${text}</a>`
+        : text,
+    )
+  const inline = (s: string) => link(esc(s)).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
 
   let html = ''
   let inList = false

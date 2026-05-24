@@ -14,12 +14,20 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
 /**
- * Builds the 24h AI briefing: gathers the items loaded for a user's holdings in
- * the last day and asks the AI to summarise/rank them into a report. Prod/AI —
- * no-ops without an OpenAI key.
+ * Builds the AI briefing: gathers the items *published* for a user's holdings
+ * since their last briefing (capped at a few days) and asks the AI to
+ * summarise/rank them into a report. Prod/AI — no-ops without an OpenAI key.
+ *
+ * The window is keyed off `published_at` (when the event happened), not
+ * `created_at` (when we fetched it) — otherwise a freshly-ingested but
+ * weeks-old earnings/analyst row leaks into "today's" briefing.
  */
 final class DigestService
 {
+    /** Never look back further than this, even after a long quiet stretch. */
+    private const MAX_LOOKBACK = '-3 days';
+
+
     public function __construct(
         private readonly OpenAiSentimentClassifier $openai,
         private readonly Connection $conn,
@@ -43,9 +51,6 @@ final class DigestService
             return null;
         }
 
-        $end = new \DateTimeImmutable();
-        $start = $end->modify('-24 hours');
-
         $held = $this->conn->fetchFirstColumn(
             'SELECT DISTINCT t.asset_isin
              FROM transactions t INNER JOIN accounts ac ON ac.id = t.account_id
@@ -57,10 +62,18 @@ final class DigestService
             return null;
         }
 
+        // Cover events since the last briefing so nothing is missed across a
+        // weekend gap, but never more than MAX_LOOKBACK so the first run (or one
+        // after a quiet stretch) doesn't dredge up old news.
+        $end = new \DateTimeImmutable();
+        $cap = $end->modify(self::MAX_LOOKBACK);
+        $last = $this->digests->latestForOwner($user);
+        $start = ($last !== null && $last->getPeriodEnd() > $cap) ? $last->getPeriodEnd() : $cap;
+
         $rows = $this->conn->fetchAllAssociative(
-            "SELECT n.kind, n.sentiment, n.title, a.ticker, a.name
+            "SELECT n.kind, n.sentiment, n.title, n.url, n.published_at, a.ticker, a.name
              FROM news_items n INNER JOIN assets a ON a.id = n.asset_id
-             WHERE a.isin IN (?) AND a.news_enabled = 1 AND n.created_at >= ?
+             WHERE a.isin IN (?) AND a.news_enabled = 1 AND n.published_at >= ?
              ORDER BY FIELD(n.kind, 'earnings', 'analyst_action', 'headline', 'social'), n.published_at DESC
              LIMIT 80",
             [$held, $start->format('Y-m-d H:i:s')],
@@ -70,12 +83,15 @@ final class DigestService
             return null;
         }
 
+        // One pipe-delimited line per item so the AI can cite the real date and
+        // link the exact URL: KIND | TICKER | SENTIMENT | DATE | HEADLINE | URL.
         $block = '';
         foreach ($rows as $r) {
             $label = $r['ticker'] ?: ($r['name'] ?: '?');
             $kind = strtoupper(str_replace('_action', '', (string) $r['kind']));
-            $sentiment = $r['sentiment'] !== null ? " ({$r['sentiment']})" : '';
-            $block .= "- [{$kind}] {$label}{$sentiment}: {$r['title']}\n";
+            $sentiment = $r['sentiment'] ?: 'neutral';
+            $date = substr((string) $r['published_at'], 0, 10);
+            $block .= sprintf("%s | %s | %s | %s | %s | %s\n", $kind, $label, $sentiment, $date, $r['title'], $r['url']);
         }
 
         $content = $this->openai->summarizeDigest($block);
