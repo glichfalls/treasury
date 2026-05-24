@@ -27,6 +27,20 @@ class NewsItemRepository extends ServiceEntityRepository
      * @param string[] $hashes
      * @return array<string, true>
      */
+    /**
+     * Delete every stored news item. Used by `app:news:refresh --purge` to rebuild
+     * the feed from scratch (e.g. after a fetch/date-parsing change). Nothing has
+     * an FK onto news_items, so a bulk DQL delete is safe.
+     *
+     * @return int rows removed
+     */
+    public function deleteAll(): int
+    {
+        return (int) $this->getEntityManager()
+            ->createQuery('DELETE FROM ' . NewsItem::class . ' n')
+            ->execute();
+    }
+
     public function existingHashesForAsset(Uuid $assetId, array $hashes): array
     {
         if ($hashes === []) {

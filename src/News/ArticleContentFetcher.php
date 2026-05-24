@@ -2,24 +2,27 @@
 
 namespace App\News;
 
+use App\News\Source\PublishedDateExtractor;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
- * Best-effort fetch + plain-text extraction of an article body, for feeding the
- * AI deep-brief. Follows redirects (Google News links bounce to the publisher),
- * strips boilerplate, and keeps the substantive paragraphs. Returns null on any
- * failure (paywall, anti-bot, timeout) so callers degrade to the snippet.
+ * Best-effort fetch of an article page: plain-text body for the AI deep-brief,
+ * plus the article's own publication date (aggregator/listing dates are often
+ * the index or fetch time). Follows redirects (Google News links bounce to the
+ * publisher) and strips boilerplate. Returns null only when the page can't be
+ * fetched at all, so callers degrade to the snippet and the stored date.
  */
 final class ArticleContentFetcher
 {
     public function __construct(
         private readonly HttpClientInterface $http,
+        private readonly PublishedDateExtractor $dateExtractor = new PublishedDateExtractor(),
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {}
 
-    public function fetch(string $url): ?string
+    public function fetch(string $url): ?FetchedArticle
     {
         try {
             $res = $this->http->request('GET', $url, [
@@ -40,7 +43,13 @@ final class ArticleContentFetcher
             return null;
         }
 
-        return trim($html) !== '' ? $this->extract($html) : null;
+        if (trim($html) === '') {
+            return null;
+        }
+        return new FetchedArticle(
+            text: $this->extract($html),
+            publishedAt: $this->dateExtractor->extract($html),
+        );
     }
 
     /** Pull the meaningful paragraph text out of a page; crude but AI-tolerant. */

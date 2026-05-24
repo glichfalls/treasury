@@ -49,6 +49,17 @@ final class NewsClassificationService
     }
 
     /**
+     * Whether the stored date is probably a fetch-time fallback rather than the
+     * real publication date. Providers stamp "now" when the source carries no
+     * date, so such items land within a few hours of when we fetched them — worth
+     * a page lookup to recover the article's own date.
+     */
+    private function dateLooksLikeFallback(NewsItem $item): bool
+    {
+        return abs($item->getPublishedAt()->getTimestamp() - $item->getCreatedAt()->getTimestamp()) < 6 * 3600;
+    }
+
+    /**
      * @return array{classified: int, via: string}
      */
     public function classifyPending(int $max = 200, int $batchSize = 20): array
@@ -108,26 +119,40 @@ final class NewsClassificationService
             return;
         }
 
-        // Deep path: real article + structured brief, AI only, headlines only.
-        if ($item->getKind() === NewsItem::KIND_HEADLINE && $this->aiAllowed($item)) {
-            $content = $this->articleFetcher->fetch($item->getUrl());
-            if ($content !== null) {
-                $deep = $this->openai->deepBrief($item->getTitle(), $content);
-                if ($deep !== null) {
-                    $item->setSentiment($deep['sentiment']);
-                    if ($deep['summary'] !== null) {
-                        $item->setSummary($deep['summary']);
+        // For headlines, fetch the real article once: it carries the authoritative
+        // publication date (the aggregator/listing date is often the index or
+        // fetch time) and, when AI is enabled, the body for a deep brief. We pay
+        // for the fetch when we'll brief it, or when the stored date looks like a
+        // fetch-time fallback worth correcting even without AI.
+        if ($item->getKind() === NewsItem::KIND_HEADLINE) {
+            $ai = $this->aiAllowed($item);
+            if ($ai || $this->dateLooksLikeFallback($item)) {
+                $article = $this->articleFetcher->fetch($item->getUrl());
+                if ($article !== null) {
+                    if ($article->publishedAt !== null) {
+                        $item->setPublishedAt($article->publishedAt);
                     }
-                    $item->setBrief($deep['brief']);
-                    $this->em->flush();
-                    return;
+                    if ($ai && $article->text !== null) {
+                        $deep = $this->openai->deepBrief($item->getTitle(), $article->text);
+                        if ($deep !== null) {
+                            $item->setSentiment($deep['sentiment']);
+                            if ($deep['summary'] !== null) {
+                                $item->setSummary($deep['summary']);
+                            }
+                            $item->setBrief($deep['brief']);
+                            $this->em->flush();
+                            return;
+                        }
+                    }
                 }
             }
         }
 
         // Fallback: cheap one-line summary + sentiment from the snippet. AI when
-        // allowed for this item, else the keyless heuristic.
+        // allowed for this item, else the keyless heuristic. Flush first so any
+        // date correction above is persisted even when a summary already exists.
         if ($item->getSummary() !== null) {
+            $this->em->flush();
             return;
         }
         $primary = $this->aiAllowed($item) ? $this->openai : $this->heuristic;
