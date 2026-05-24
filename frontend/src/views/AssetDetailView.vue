@@ -13,6 +13,7 @@ import AssetNewsSources from '@/components/news/AssetNewsSources.vue'
 import DateField from '@/components/ui/DateField.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import SelectField from '@/components/ui/SelectField.vue'
+import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import Button from '@/components/ui/Button.vue'
 import DayChangeBadge from '@/components/ui/DayChangeBadge.vue'
 import type { ColumnDef, SortingState } from '@tanstack/vue-table'
@@ -319,10 +320,35 @@ const singleCurrencyReturn = computed<null | {
     returnPct,
   }
 })
+
+// Tabbed layout — keeps the page compact instead of one long scroll.
+type AssetTab = 'overview' | 'transactions' | 'dividends' | 'news'
+const activeTab = ref<AssetTab>('overview')
+
+const dividendCount = computed(() =>
+  dividendsByCurrency.value.reduce((sum, d) => sum + d.count, 0),
+)
+
+const tabOptions = computed(() => {
+  const opts: { value: AssetTab; label: string; count?: number }[] = [
+    { value: 'overview', label: 'Overview' },
+    { value: 'transactions', label: 'Transactions', count: data.value?.transactions.total ?? 0 },
+  ]
+  if (dividendCount.value > 0) {
+    opts.push({ value: 'dividends', label: 'Dividends', count: dividendCount.value })
+  }
+  opts.push({ value: 'news', label: 'News' })
+  return opts
+})
+
+// If the active tab vanishes (e.g. an asset with no dividends), fall back to Overview.
+watch(tabOptions, (opts) => {
+  if (!opts.some((o) => o.value === activeTab.value)) activeTab.value = 'overview'
+})
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div class="space-y-6">
     <RouterLink
       :to="{ name: 'dashboard' }"
       class="inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
@@ -331,7 +357,7 @@ const singleCurrencyReturn = computed<null | {
       <span>Back</span>
     </RouterLink>
 
-    <div v-if="loading" class="text-[var(--color-text-muted)]">Loading…</div>
+    <div v-if="loading && !data" class="text-[var(--color-text-muted)]">Loading…</div>
 
     <template v-else-if="data">
       <!-- Header -->
@@ -383,6 +409,12 @@ const singleCurrencyReturn = computed<null | {
         </div>
       </div>
 
+      <!-- Tabs keep the page compact: Overview is the at-a-glance view, the rest
+           are on-demand. -->
+      <SegmentedControl v-model="activeTab" variant="tabs" :options="tabOptions" />
+
+      <!-- ===== Overview tab: return, charts, holdings ===== -->
+      <div v-if="activeTab === 'overview'" class="space-y-6">
       <!-- Return: base-currency card (using historical FX) is the headline
            since it handles mixed-currency assets cleanly. The native-currency
            card alongside makes the underlying numbers obvious. -->
@@ -526,30 +558,17 @@ const singleCurrencyReturn = computed<null | {
         <p class="text-xs text-[var(--color-text-dim)]">
           You paid in {{ costBasis.map((c) => c.currency).join(' + ') }} for an asset priced in
           {{ data.currentValueCurrency ?? data.currency ?? 'a different currency' }}.
-          A single return % isn't meaningful here without an FX rate — see Dividends below and the
+          A single return % isn't meaningful here without an FX rate — see the Dividends tab and the
           current value in the header above for the raw figures.
         </p>
       </section>
 
-      <!-- Price chart -->
-      <section class="space-y-3">
-        <h2 class="text-lg font-medium">Price history</h2>
+      <!-- Price + profit charts side by side on wide screens. Both are
+           ChartCards now, so they line up cleanly. -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
         <AssetPriceChart :isin="data.isin" />
-      </section>
-
-      <!-- Profit chart -->
-      <section class="space-y-3">
-        <h2 class="text-lg font-medium">Profit history</h2>
         <AssetProfitChart :isin="data.isin" />
-      </section>
-
-      <!-- Recent news for this asset -->
-      <section class="space-y-3">
-        <h2 class="text-lg font-medium">Recent news</h2>
-        <AssetNewsList :isin="data.isin" />
-        <!-- Admin-only: curate the per-asset news sources crawled for this holding. -->
-        <AssetNewsSources v-if="auth.isAdmin" :isin="data.isin" />
-      </section>
+      </div>
 
       <!-- Per-account holdings -->
       <section v-if="data.accounts.length > 0" class="space-y-3">
@@ -565,31 +584,10 @@ const singleCurrencyReturn = computed<null | {
           </template>
         </DataTable>
       </section>
+      </div>
 
-      <!-- Dividends by year -->
-      <section v-if="dividendsByCurrency.length > 0" class="space-y-3">
-        <h2 class="text-lg font-medium">Dividends</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div v-for="d in dividendsByCurrency" :key="d.currency" class="card p-5 space-y-3">
-            <div class="flex items-baseline justify-between">
-              <span class="label">{{ d.currency }}</span>
-              <span class="text-xs text-[var(--color-text-muted)]">{{ d.count }} payments</span>
-            </div>
-            <p class="text-2xl font-medium tabular text-[var(--color-positive)]"><MoneyDisplay :minor="d.total" :currency="d.currency" sensitive /></p>
-            <ul class="space-y-1 text-sm">
-              <li v-for="y in d.years" :key="y.year" class="flex items-center justify-between">
-                <span class="text-[var(--color-text-muted)]">{{ y.year }}</span>
-                <MoneyDisplay :minor="y.amountMinor" :currency="y.currency" sensitive class="tabular" />
-              </li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <!-- Transactions -->
-      <section class="space-y-3">
-        <h2 class="text-lg font-medium">Transactions</h2>
-
+      <!-- ===== Transactions tab ===== -->
+      <div v-else-if="activeTab === 'transactions'" class="space-y-3">
         <div
           v-if="!loading && data.transactions.items.length === 0 && !hasFilters"
           class="card p-10 text-center space-y-2"
@@ -678,7 +676,33 @@ const singleCurrencyReturn = computed<null | {
             />
           </template>
         </DataTable>
-      </section>
+      </div>
+
+      <!-- ===== Dividends tab ===== -->
+      <div v-else-if="activeTab === 'dividends'" class="space-y-3">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div v-for="d in dividendsByCurrency" :key="d.currency" class="card p-5 space-y-3">
+            <div class="flex items-baseline justify-between">
+              <span class="label">{{ d.currency }}</span>
+              <span class="text-xs text-[var(--color-text-muted)]">{{ d.count }} payments</span>
+            </div>
+            <p class="text-2xl font-medium tabular text-[var(--color-positive)]"><MoneyDisplay :minor="d.total" :currency="d.currency" sensitive /></p>
+            <ul class="space-y-1 text-sm">
+              <li v-for="y in d.years" :key="y.year" class="flex items-center justify-between">
+                <span class="text-[var(--color-text-muted)]">{{ y.year }}</span>
+                <MoneyDisplay :minor="y.amountMinor" :currency="y.currency" sensitive class="tabular" />
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== News tab ===== -->
+      <div v-else-if="activeTab === 'news'" class="space-y-3">
+        <AssetNewsList :isin="data.isin" />
+        <!-- Admin-only: curate the per-asset news sources crawled for this holding. -->
+        <AssetNewsSources v-if="auth.isAdmin" :isin="data.isin" />
+      </div>
     </template>
 
     <p v-else class="text-[var(--color-text-muted)]">Asset not found.</p>
