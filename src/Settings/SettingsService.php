@@ -16,6 +16,7 @@ final class SettingsService
     /** Known setting keys, so callers don't pass around magic strings. */
     public const FINNHUB_API_KEY = 'finnhub_api_key';
     public const MARKETAUX_API_TOKEN = 'marketaux_api_token';
+    public const FMP_API_KEY = 'fmp_api_key';
     public const OPENAI_API_KEY = 'openai_api_key';
     /** Comma-separated list of market-wide subreddits to search per holding. */
     public const REDDIT_BROAD_SUBREDDITS = 'reddit_broad_subreddits';

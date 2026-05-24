@@ -52,16 +52,20 @@ final class YahooAnalystProvider implements NewsProvider
             }
             $from = is_string($row['fromGrade'] ?? null) && trim($row['fromGrade']) !== '' ? trim($row['fromGrade']) : null;
             $epoch = (int) ($row['epochGradeDate'] ?? time());
+            $publishedAt = (new \DateTimeImmutable())->setTimestamp($epoch);
+            $toGrade = trim($to);
 
             $out[] = new NewsArticle(
-                title: $this->title($firm, $from, trim($to), $action),
+                title: $this->title($firm, $from, $toGrade, $action),
                 // Unique per rating so the per-asset dedup keeps each change.
                 url: 'https://finance.yahoo.com/quote/' . rawurlencode(trim($ticker)) . '/analysis?rating=' . $epoch . '-' . rawurlencode($firm),
-                publishedAt: (new \DateTimeImmutable())->setTimestamp($epoch),
+                publishedAt: $publishedAt,
                 publisher: trim($firm),
                 kind: NewsItem::KIND_ANALYST_ACTION,
                 snippet: $this->actionLabel($action),
                 sentiment: $this->sentiment($action),
+                // Merge with the same rating from other sources (e.g. FMP).
+                dedupKey: AnalystDedup::key($firm, $toGrade, $publishedAt),
             );
             if (count($out) >= $limit) {
                 break;

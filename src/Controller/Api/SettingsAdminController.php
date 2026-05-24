@@ -25,6 +25,7 @@ class SettingsAdminController extends AbstractController
     private const KNOWN = [
         ['key' => SettingsService::FINNHUB_API_KEY,    'label' => 'Finnhub API key',     'group' => 'News providers', 'secret' => true],
         ['key' => SettingsService::MARKETAUX_API_TOKEN, 'label' => 'Marketaux API token', 'group' => 'News providers', 'secret' => true],
+        ['key' => SettingsService::FMP_API_KEY,        'label' => 'Financial Modeling Prep API key', 'group' => 'News providers', 'secret' => true],
         ['key' => SettingsService::OPENAI_API_KEY,     'label' => 'OpenAI API key',      'group' => 'AI',             'secret' => true],
     ];
 
@@ -109,6 +110,10 @@ class SettingsAdminController extends AbstractController
             SettingsService::MARKETAUX_API_TOKEN => [
                 'https://api.marketaux.com/v1/news/all',
                 ['query' => ['symbols' => 'AAPL', 'limit' => 1, 'api_token' => $value]],
+            ],
+            SettingsService::FMP_API_KEY => [
+                'https://financialmodelingprep.com/api/v3/profile/AAPL',
+                ['query' => ['apikey' => $value]],
             ],
             default => [null, []],
         };

@@ -84,7 +84,11 @@ final class NewsFetcher
                         continue; // drop off-topic matches (e.g. unrelated ETF hits)
                     }
                     $hash = $this->hash($article);
-                    if (!isset($collected[$hash])) {
+                    $seen = $collected[$hash][1] ?? null;
+                    // First source wins, except a later source carrying a price
+                    // target supersedes an earlier one without it (FMP enriches
+                    // the same analyst rating Yahoo reported with no target).
+                    if ($seen === null || ($seen->priceTarget === null && $article->priceTarget !== null)) {
                         $collected[$hash] = [$provider->source(), $article];
                     }
                 }
@@ -120,9 +124,16 @@ final class NewsFetcher
         return ['inserted' => $inserted, 'skipped' => $skipped, 'errors' => $errors];
     }
 
-    /** Per-asset dedup key: sha256 of the URL minus fragment and trailing slash. */
+    /**
+     * Per-asset dedup key: the article's explicit dedupKey when it carries one
+     * (so the same event from two sources merges), else the sha256 of the URL
+     * minus fragment and trailing slash.
+     */
     private function hash(NewsArticle $article): string
     {
+        if ($article->dedupKey !== null && trim($article->dedupKey) !== '') {
+            return hash('sha256', $article->dedupKey);
+        }
         $url = rtrim((string) strtok($article->url, '#'), '/');
         return hash('sha256', $url !== '' ? $url : $article->title);
     }
