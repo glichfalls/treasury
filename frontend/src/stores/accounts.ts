@@ -83,6 +83,10 @@ export interface Holding {
   previousPriceMinor: string | null
   /** Day-over-day price change in %, or null when there's no prior price. */
   dayChangePct: number | null
+  /** Pre-market price in minor units; null outside pre-market hours. */
+  preMarketPriceMinor: string | null
+  /** Pre-market % change vs. previous close; null outside pre-market hours. */
+  preMarketChangePct: number | null
 }
 
 export const useAccountsStore = defineStore('accounts', () => {

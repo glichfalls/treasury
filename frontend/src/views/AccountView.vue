@@ -515,7 +515,16 @@ async function deleteTransaction(t: Transaction) {
             {{ row.priceMinor && row.priceCurrency ? formatMinor(row.priceMinor, row.priceCurrency) : '—' }}
           </template>
           <template #cell-dayChange="{ row }">
-            <DayChangeBadge :pct="row.dayChangePct" size="sm" :show-icon="false" />
+            <div class="flex flex-col items-end gap-0.5">
+              <DayChangeBadge :pct="row.dayChangePct" size="sm" :show-icon="false" />
+              <span
+                v-if="row.preMarketChangePct !== null"
+                class="flex items-center gap-1 text-[10px] text-[var(--color-text-dim)]"
+              >
+                pre
+                <DayChangeBadge :pct="row.preMarketChangePct" size="sm" :show-icon="false" />
+              </span>
+            </div>
           </template>
           <template #cell-value="{ row }">
             <MoneyDisplay v-if="row.valueBaseMinor" :minor="row.valueBaseMinor" :currency="row.baseCurrency" sensitive />

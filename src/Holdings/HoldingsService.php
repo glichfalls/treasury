@@ -3,6 +3,7 @@
 namespace App\Holdings;
 
 use App\Entity\Account;
+use App\Price\PreMarketService;
 use App\Repository\AssetRepository;
 use App\Repository\FxRateRepository;
 use App\Repository\PriceRepository;
@@ -21,6 +22,7 @@ final class HoldingsService
         private readonly AssetRepository $assets,
         private readonly PriceRepository $prices,
         private readonly FxRateRepository $fxRates,
+        private readonly PreMarketService $preMarket,
     ) {}
 
     /** @return Holding[] */
@@ -59,6 +61,15 @@ final class HoldingsService
             ? $this->dayChangePctFor($lastTwoByAssetId[$spotAsset->getId()->toRfc4122()] ?? [])
             : null;
 
+        // Fetch pre-market quotes in parallel for all market assets with a ticker.
+        $preMarketTickers = [];
+        foreach ($assetsByIsin as $asset) {
+            if ($asset->getUnitWeightGrams() === null && $asset->getTicker() !== null) {
+                $preMarketTickers[] = $asset->getTicker();
+            }
+        }
+        $preMarketQuotes = $this->preMarket->getQuotes($preMarketTickers);
+
         $base = $account->getCurrency();
         $holdings = [];
         foreach ($rows as $r) {
@@ -84,9 +95,12 @@ final class HoldingsService
                 }
             }
 
+            $ticker = $asset?->getTicker();
+            $pmq = ($ticker !== null) ? ($preMarketQuotes[$ticker] ?? null) : null;
+
             $holdings[] = new Holding(
                 isin: $r['asset_isin'],
-                ticker: $asset?->getTicker(),
+                ticker: $ticker,
                 name: $asset?->getName(),
                 quantity: $qty,
                 priceCurrency: $priceCurrency,
@@ -96,6 +110,8 @@ final class HoldingsService
                 baseCurrency: $base,
                 previousPriceMinor: $previousPriceMinor,
                 dayChangePct: $dayChangePct,
+                preMarketPriceMinor: $pmq !== null ? (string) $pmq->priceMinor : null,
+                preMarketChangePct: $pmq?->changePct,
             );
         }
 

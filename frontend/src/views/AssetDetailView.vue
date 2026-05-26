@@ -63,6 +63,8 @@ interface AssetDetail {
   previousPriceMinor: string | null
   previousPriceAsOf: string | null
   dayChangePct: number | null
+  preMarketPriceMinor: string | null
+  preMarketChangePct: number | null
   currentValueMinor: string | null
   currentValueCurrency: string | null
   totalsByCurrency: CurrencyTotal[]
@@ -390,6 +392,14 @@ watch(tabOptions, (opts) => {
                 : '—' }}
             </p>
             <DayChangeBadge :pct="data.dayChangePct" size="sm" />
+          </div>
+          <div
+            v-if="data.preMarketPriceMinor && data.currentPriceCurrency"
+            class="flex items-center gap-1.5 mt-1"
+          >
+            <span class="text-xs text-[var(--color-text-dim)]">Pre-mkt</span>
+            <span class="text-xs tabular">{{ formatMinor(data.preMarketPriceMinor, data.currentPriceCurrency) }}</span>
+            <DayChangeBadge :pct="data.preMarketChangePct" size="sm" :show-icon="false" />
           </div>
           <p v-if="data.currentPriceAsOf" class="text-xs text-[var(--color-text-dim)] mt-0.5">{{ data.currentPriceAsOf }}</p>
         </div>

@@ -19,6 +19,10 @@ final class Holding
         public readonly ?string $previousPriceMinor = null,
         /** (latest − previous) / previous × 100. Null if either side is missing. */
         public readonly ?float $dayChangePct = null,
+        /** Pre-market price in minor units, or null when not in a pre-market session. */
+        public readonly ?string $preMarketPriceMinor = null,
+        /** Pre-market % change vs. previous close. Null when not in pre-market. */
+        public readonly ?float $preMarketChangePct = null,
     ) {}
 
     public function toArray(): array
@@ -35,6 +39,8 @@ final class Holding
             'baseCurrency' => $this->baseCurrency,
             'previousPriceMinor' => $this->previousPriceMinor,
             'dayChangePct' => $this->dayChangePct,
+            'preMarketPriceMinor' => $this->preMarketPriceMinor,
+            'preMarketChangePct' => $this->preMarketChangePct,
         ];
     }
 }

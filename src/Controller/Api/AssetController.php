@@ -5,6 +5,7 @@ namespace App\Controller\Api;
 use App\Entity\Asset;
 use App\Entity\User;
 use App\Fx\FxConverter;
+use App\Price\PreMarketService;
 use App\Repository\AssetRepository;
 use App\TimeSeries\TimeSeriesService;
 use Doctrine\DBAL\Connection;
@@ -22,6 +23,7 @@ class AssetController extends AbstractController
         private readonly Connection $conn,
         private readonly FxConverter $fx,
         private readonly TimeSeriesService $timeSeries,
+        private readonly PreMarketService $preMarket,
     ) {}
 
     /**
@@ -184,6 +186,17 @@ class AssetController extends AbstractController
             fn($a) => bccomp($a['quantity'], '0', 8) !== 0,
         ));
 
+        // Pre-market price (Redis-cached, only present during pre-market hours).
+        $preMarketPriceMinor = null;
+        $preMarketChangePct = null;
+        if ($asset->getTicker() !== null && $asset->getUnitWeightGrams() === null) {
+            $pmq = $this->preMarket->getQuotes([$asset->getTicker()])[$asset->getTicker()] ?? null;
+            if ($pmq !== null) {
+                $preMarketPriceMinor = (string) $pmq->priceMinor;
+                $preMarketChangePct = $pmq->changePct;
+            }
+        }
+
         // Latest TWO prices for the asset (latest + previous) so we can show a
         // day-over-day % change next to the latest price.
         $lastTwoPrices = $this->conn->fetchAllAssociative(
@@ -252,6 +265,8 @@ class AssetController extends AbstractController
             'previousPriceMinor' => $previousPrice['price_minor'] ?? null,
             'previousPriceAsOf' => $previousPrice['occurred_at'] ?? null,
             'dayChangePct' => $dayChangePct,
+            'preMarketPriceMinor' => $preMarketPriceMinor,
+            'preMarketChangePct' => $preMarketChangePct,
             'currentValueMinor' => $currentValueMinor,
             'currentValueCurrency' => $currentValueCurrency,
 
