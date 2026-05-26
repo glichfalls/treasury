@@ -717,6 +717,16 @@ final class TimeSeriesService
         return $sorted[$lo];
     }
 
+    /** Snap a date back to the nearest preceding weekday (Sat→Fri, Sun→Fri). */
+    private function toTradingDay(\DateTimeImmutable $date): \DateTimeImmutable
+    {
+        return match ((int) $date->format('N')) {
+            6 => $date->modify('-1 day'),  // Saturday → Friday
+            7 => $date->modify('-2 days'), // Sunday → Friday
+            default => $date,
+        };
+    }
+
     /**
      * @return list<\DateTimeImmutable>
      */
@@ -733,13 +743,22 @@ final class TimeSeriesService
         $out = [];
         $cursor = $from;
         while ($cursor <= $to) {
-            $out[] = $cursor;
+            if ($granularity === 'daily') {
+                // Skip Sat (N=6) and Sun (N=7) — markets are closed.
+                if ((int) $cursor->format('N') <= 5) {
+                    $out[] = $cursor;
+                }
+            } else {
+                // For weekly/monthly, snap any weekend landing to the preceding Friday.
+                $out[] = $this->toTradingDay($cursor);
+            }
             $cursor = $cursor->add($step);
         }
-        // Always include the end date so we don't truncate by step alignment.
+        // Always include the end date (snapped to nearest preceding trading day).
+        $effectiveTo = $this->toTradingDay($to);
         $last = end($out);
-        if ($last === false || $last < $to) {
-            $out[] = $to;
+        if ($last === false || $last->format('Y-m-d') < $effectiveTo->format('Y-m-d')) {
+            $out[] = $effectiveTo;
         }
         return $out;
     }
